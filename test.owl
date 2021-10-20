@@ -10,7 +10,7 @@ stmt = "pub"? base_stmt
 
 base_stmt =
   'let' _ binding (':' _ type_expr)? _ '=' _ expr : let
-  'return' expr? ';' : return
+  'return' expr? : return
   'for' _ binding _ 'in' _ expr block : for
   'while' _ expr block : while
   'continue' : continue
