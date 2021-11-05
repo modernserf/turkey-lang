@@ -1,0 +1,142 @@
+#using owl.v4
+
+.line-comment-token "//"
+
+# type identifiers use upper-case
+.token type_ident "Foo" "Bar" "Baz" "Quux"
+
+program = stmt*
+
+# values
+
+stmt = 
+  "pub"? base_stmt
+rm -
+base_stmt =
+  "type" type_binding "=" type_expr : type_alias
+  "enum" type_binding ["{" enum_case* "}"] : enum
+  "struct" type_binding type_body : struct
+  "impl" type_params? type_expr "for" type_expr type_body : impl
+  "module" type_ident block : module
+  "import" import_path ("from" string)? : import
+  "let" binding (":" type_expr)? "=" expr : let
+  "func" identifier type_params? func_params ":" type_expr block : func
+  "for" ["(" binding "in" expr ")"] block : for
+  "while" if_cond block : while 
+  "break" : break
+  "continue" : continue
+  "return" expr : return
+  mod_value "=" expr : assign
+  expr\:parens\:negate ":" field "=" expr : assign_field
+  expr\:parens\:negate : expr
+  ";" : semi_decorative
+
+enum_case = 
+  "case" type_ident type_body
+
+import_path_tree =
+  import_path : module_or_type
+  mod_value : value
+
+import_path =
+  mod_type : simple
+  mod_type "as" type_ident : renamed
+  mod_type "::" ["{" import_path_tree{","} "}"] : tree
+
+expr =
+  ["(" expr ")"] : parens
+  number : number
+  string : string
+  mod_value : identifier
+  mod_type type_args? : tuple_constructor
+  mod_type type_args? record_body : record
+  ["#[" expr{","} "]"] : list
+  "|" binding{","} "|" block : closure
+  "do" block : do_block
+  "if" if_body : if
+  "match" args ["{" match_case* "}"] : match
+.operators postfix
+  args : funcall
+  "." mod_value args : dotcall
+  ":" field : field
+  "as" type_expr : type_as
+.operators prefix
+  '-' : negate
+  '!' : not
+.operators infix right
+  '**' : pow
+.operators infix left
+  '*' : mult
+  '/' : div
+.operators infix left
+  '+' : add
+  '-' : sub
+.operators infix left
+  '==' : eq
+  '!=' : neq
+  '<' : lt
+  '>' : gt
+  '<=' : lte
+  '>=' : gte
+.operators infix left
+  '&&' : and
+.operators infix left
+  '||' : or
+
+record_body =
+  ["{" (field ":" expr){","} "}"]
+
+if_body = 
+  if_cond ("else" "if" if_cond block)* ("else" block)?
+if_cond =
+  ["(" expr ")"] : if_expr
+  "let" ["(" binding "in" expr ")"] : if_let
+
+match_case =
+  "case" (binding | ["(" binding{","} ")"]) block
+
+args =
+  ["(" expr{","} ")"]
+
+# bindings
+binding =
+  base_binding ("as" identifier)?
+bind_field =
+  identifier : field_pun
+  field ':' base_binding ("as" identifier)? : field
+base_binding =
+  identifier : identifier
+  mod_type? ['[' binding{','} ']'] : tuple
+  mod_type? ['{' bind_field{','} '}'] : record
+
+# types
+type_binding =
+  type_ident type_params?
+
+type_expr =
+  type_ident type_args? : identifier
+.operators prefix
+  "func" type_params? func_params ":" : func
+
+func_params = 
+  ["(" (binding ":" type_expr){","} ")"]
+
+type_body =
+  ["(" type_expr{","} ")"] : tuple
+  ["{" (field ":" type_expr){","} "}"] : record
+type_params =
+  ["[" (type_ident (":" type_expr{"+"})?){","} "]"]
+type_args =
+  ["[" type_expr{","} "]"]
+
+# module-qualified identifiers
+mod_type =
+  (type_ident '::')* type_ident
+mod_value =
+  (type_ident '::')* identifier
+
+# misc
+block = 
+  ["{" stmt* "}"]
+field =
+  identifier | number
