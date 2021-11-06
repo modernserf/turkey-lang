@@ -7,17 +7,17 @@ it("compiles print statements, ints", () => {
     { tag: "print", expr: { tag: "integer", value: 32768 } },
     { tag: "print", expr: { tag: "float", value: 0.1 } },
   ]);
-  expect(result.constants).toEqual([32768, 0.1]);
+  expect(result.constants).toEqual([true, false, 32768, 0.1]);
   expect(Array.from(result.program)).toEqual([
     Opcode.PushScope,
     Opcode.IntImmediate,
     1,
     Opcode.Print,
     Opcode.Constant,
-    0,
+    2,
     Opcode.Print,
     Opcode.Constant,
-    1,
+    3,
     Opcode.Print,
     Opcode.PopScopeVoid,
     Opcode.Halt,
@@ -247,6 +247,20 @@ it("compiles expressions", () => {
     Opcode.SubInt,
     Opcode.AddInt,
     Opcode.DivInt,
+    Opcode.Print,
+    Opcode.PopScopeVoid,
+    Opcode.Halt,
+  ]);
+});
+
+it("compiles bools", () => {
+  const result = compile([
+    { tag: "print", expr: { tag: "typeConstructor", value: "True" } },
+  ]);
+  expect(Array.from(result.program)).toEqual([
+    Opcode.PushScope,
+    Opcode.Constant,
+    0,
     Opcode.Print,
     Opcode.PopScopeVoid,
     Opcode.Halt,

@@ -174,3 +174,17 @@ it("does not parse invalid programs", () => {
     parse(lex(`let x + y`));
   }).toThrowError(ParseError);
 });
+
+it("parses simple type constructors", () => {
+  expect(parse(lex(`print True`))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "tag": "typeConstructor",
+      "value": "True",
+    },
+    "tag": "print",
+  },
+]
+`);
+});

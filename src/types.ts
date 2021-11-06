@@ -7,6 +7,7 @@ export type Token =
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "identifier"; value: string }
+  | { tag: "typeIdentifier"; value: string }
   | { tag: "+" }
   | { tag: "-" }
   | { tag: "*" }
@@ -33,6 +34,7 @@ export type Stmt =
 
 export type Expr =
   | { tag: "identifier"; value: string }
+  | { tag: "typeConstructor"; value: string }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "binaryOp"; left: Expr; right: Expr; operator: string }

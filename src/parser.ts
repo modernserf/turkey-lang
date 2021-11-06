@@ -64,6 +64,9 @@ const parseBaseExpr: Parser<Expr> = (state) => {
       match(state, ")");
       return expr;
     }
+    case "typeIdentifier":
+      state.advance();
+      return { tag: "typeConstructor", value: token.value };
     case "identifier":
       state.advance();
       return { tag: "identifier", value: token.value };

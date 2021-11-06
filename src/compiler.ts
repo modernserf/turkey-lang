@@ -1,19 +1,27 @@
 import { Stmt, Expr, Opcode, CompileResult } from "./types";
 
-type Type = { tag: "void" } | { tag: "integer" } | { tag: "float" };
+type Type =
+  | { tag: "void" }
+  | { tag: "integer" }
+  | { tag: "float" }
+  | { tag: "struct"; value: string };
 const voidType: Type = { tag: "void" };
 const integerType: Type = { tag: "integer" };
 const floatType: Type = { tag: "float" };
+const boolType: Type = { tag: "struct", value: "Boolean" };
 
 export function compile(program: Stmt[]): CompileResult {
   return new Compiler(program);
 }
 
-type ScopeRecord = { index: number; type: Type };
+type ScopeRecord = { index: number; type: Type; constant: boolean };
 
 class Scope {
   private map: Map<string, ScopeRecord> = new Map();
-  constructor(private parent?: Scope) {}
+  private stackSize = 0;
+  constructor(private parent?: Scope) {
+    if (parent) this.stackSize = parent.stackSize + 1; // +1 for frame pointer
+  }
   get(key: string): ScopeRecord {
     const value = this.map.get(key);
     if (value !== undefined) return value;
@@ -22,12 +30,12 @@ class Scope {
   }
   add(key: string, type: Type): void {
     if (this.map.has(key)) throw new Error(`Redefining variable ${key}`);
-    const index = this.stackSize();
-    this.map.set(key, { type, index });
+    const index = this.stackSize;
+    this.stackSize++;
+    this.map.set(key, { type, index, constant: false });
   }
-  private stackSize(): number {
-    const restSize = this.parent ? this.parent.stackSize() + 1 : 0; // +1 for frame pointer
-    return this.map.size + restSize;
+  addConstant(key: string, type: Type, index: number): void {
+    this.map.set(key, { type, index, constant: true });
   }
   push(): Scope {
     return new Scope(this);
@@ -45,6 +53,7 @@ class Compiler {
   private length = 0;
   private scope = new Scope();
   constructor(input: Stmt[]) {
+    this.setupConstants();
     this.compileBlock(input);
     this.writeByte(Opcode.Halt);
     this.program = this.program.slice(0, this.length);
@@ -60,6 +69,10 @@ class Compiler {
       this.program = new Uint8Array(this.program.length << 1);
       this.program.set(old);
     }
+  }
+  private setupConstants() {
+    this.scope.addConstant("True", boolType, this.constants.push(true) - 1);
+    this.scope.addConstant("False", boolType, this.constants.push(false) - 1);
   }
   private compileBlock(input: Stmt[]): Type {
     this.scope = this.scope.push();
@@ -100,10 +113,10 @@ class Compiler {
   private compileExpr(expr: Expr): Type {
     switch (expr.tag) {
       case "identifier": {
-        const local = this.scope.get(expr.value);
-        this.writeByte(Opcode.GetLocal);
-        this.writeByte(local.index);
-        return local.type;
+        return this.compileIdent(expr.value);
+      }
+      case "typeConstructor": {
+        return this.compileIdent(expr.value);
       }
       case "integer": {
         if (expr.value > -128 && expr.value < 127) {
@@ -139,9 +152,19 @@ class Compiler {
       }
     }
   }
+  private compileIdent(name: string): Type {
+    const result = this.scope.get(name);
+    if (result.constant) {
+      this.writeByte(Opcode.Constant);
+      this.writeByte(result.index);
+    } else {
+      this.writeByte(Opcode.GetLocal);
+      this.writeByte(result.index);
+    }
+    return result.type;
+  }
   private compileConstant(value: any) {
-    const index = this.constants.length;
-    this.constants.push(value);
+    const index = this.constants.push(value) - 1;
     this.writeByte(Opcode.Constant);
     this.writeByte(index); // TODO: more than 256 constants
   }
