@@ -8,7 +8,12 @@ export type Token =
   | { tag: "float"; value: number }
   | { tag: "identifier"; value: string }
   | { tag: "+" }
+  | { tag: "-" }
+  | { tag: "*" }
+  | { tag: "/" }
   | { tag: "=" }
+  | { tag: "(" }
+  | { tag: ")" }
   | { tag: "{" }
   | { tag: "}" }
   | { tag: "endOfInput" };
@@ -44,6 +49,12 @@ export enum Opcode {
   Print = 0x10,
   AddInt = 0x20,
   AddFloat = 0x21,
+  SubInt = 0x22,
+  SubFloat = 0x23,
+  MulInt = 0x24,
+  MulFloat = 0x25,
+  DivInt = 0x26,
+  DivFloat = 0x27,
   InitLocal = 0x30,
   GetLocal = 0x31, // (index: u8)
   // SetLocal = 0x32,

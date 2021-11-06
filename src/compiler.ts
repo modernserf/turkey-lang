@@ -122,6 +122,13 @@ class Compiler {
         switch (expr.operator) {
           case "+":
             return this.arithmeticOp(expr, Opcode.AddInt, Opcode.AddFloat);
+          case "-":
+            return this.arithmeticOp(expr, Opcode.SubInt, Opcode.SubFloat);
+          case "*":
+            return this.arithmeticOp(expr, Opcode.MulInt, Opcode.MulFloat);
+          case "/":
+            this.arithmeticOp(expr, Opcode.DivInt, Opcode.DivFloat);
+            return floatType;
           // istanbul ignore next
           default:
             throw new Error("unknown operator");

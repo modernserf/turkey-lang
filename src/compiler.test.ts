@@ -1,5 +1,5 @@
 import { compile } from "./compiler";
-import { Opcode } from "./types";
+import { Expr, Opcode } from "./types";
 
 it("compiles print statements, ints", () => {
   const result = compile([
@@ -210,4 +210,45 @@ it("typechecks arithmetic", () => {
       },
     ]);
   }).toThrow();
+});
+
+it("compiles expressions", () => {
+  const op = (left: number, operator: string, right: Expr): Expr => ({
+    tag: "binaryOp",
+    operator,
+    left: { tag: "integer", value: left },
+    right: right,
+  });
+
+  const result = compile([
+    {
+      tag: "print",
+      expr: op(
+        6,
+        "/",
+        op(5, "+", op(4, "-", op(3, "*", { tag: "integer", value: 2 })))
+      ),
+    },
+  ]);
+
+  expect(Array.from(result.program)).toEqual([
+    Opcode.PushScope,
+    Opcode.IntImmediate,
+    6,
+    Opcode.IntImmediate,
+    5,
+    Opcode.IntImmediate,
+    4,
+    Opcode.IntImmediate,
+    3,
+    Opcode.IntImmediate,
+    2,
+    Opcode.MulInt,
+    Opcode.SubInt,
+    Opcode.AddInt,
+    Opcode.DivInt,
+    Opcode.Print,
+    Opcode.PopScopeVoid,
+    Opcode.Halt,
+  ]);
 });

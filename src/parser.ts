@@ -48,12 +48,22 @@ const parseStatement: Parser<Stmt> = (state) => {
 };
 
 const parseExpr: Parser<Expr> = (state) => {
-  return infixLeft(state, parseBaseExpr, ["+"]);
+  return infixLeft(state, parseTermExpr, ["+", "-"]);
+};
+
+const parseTermExpr: Parser<Expr> = (state) => {
+  return infixLeft(state, parseBaseExpr, ["*", "/"]);
 };
 
 const parseBaseExpr: Parser<Expr> = (state) => {
   const token = state.token();
   switch (token.tag) {
+    case "(": {
+      state.advance();
+      const expr = parseExpr(state);
+      match(state, ")");
+      return expr;
+    }
     case "identifier":
       state.advance();
       return { tag: "identifier", value: token.value };

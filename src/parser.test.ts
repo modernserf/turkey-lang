@@ -107,6 +107,56 @@ Array [
 `);
 });
 
+it("parses equations", () => {
+  const ast = parse(lex(`a * b + c / d - e`));
+  const ast2 = parse(lex(`(a * b) + (c / d) - e`));
+  expect(ast).toEqual(ast2);
+
+  expect(ast).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "left": Object {
+        "left": Object {
+          "left": Object {
+            "tag": "identifier",
+            "value": "a",
+          },
+          "operator": "*",
+          "right": Object {
+            "tag": "identifier",
+            "value": "b",
+          },
+          "tag": "binaryOp",
+        },
+        "operator": "+",
+        "right": Object {
+          "left": Object {
+            "tag": "identifier",
+            "value": "c",
+          },
+          "operator": "/",
+          "right": Object {
+            "tag": "identifier",
+            "value": "d",
+          },
+          "tag": "binaryOp",
+        },
+        "tag": "binaryOp",
+      },
+      "operator": "-",
+      "right": Object {
+        "tag": "identifier",
+        "value": "e",
+      },
+      "tag": "binaryOp",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
 it("does not parse invalid programs", () => {
   expect(() => {
     parse(lex(`print`));

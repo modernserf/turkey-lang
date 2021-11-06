@@ -63,6 +63,27 @@ class Interpreter {
         this.push(left + right);
         return;
       }
+      case Opcode.SubInt:
+      case Opcode.SubFloat: {
+        const right = this.pop();
+        const left = this.pop();
+        this.push(left - right);
+        return;
+      }
+      case Opcode.MulInt:
+      case Opcode.MulFloat: {
+        const right = this.pop();
+        const left = this.pop();
+        this.push(left * right);
+        return;
+      }
+      case Opcode.DivInt:
+      case Opcode.DivFloat: {
+        const right = this.pop();
+        const left = this.pop();
+        this.push(left / right);
+        return;
+      }
       case Opcode.InitLocal: {
         // do nothing, leave the current value on the stack at this position
         return;

@@ -69,6 +69,32 @@ it("adds numbers", () => {
   expect(result2).toEqual([2.0]);
 });
 
+it("subtracts, multiplies, divides", () => {
+  const result = interpret({
+    constants: [],
+    program: new Uint8Array([
+      Opcode.IntImmediate,
+      6,
+      Opcode.IntImmediate,
+      5,
+      Opcode.IntImmediate,
+      4,
+      Opcode.IntImmediate,
+      3,
+      Opcode.IntImmediate,
+      2,
+      Opcode.MulInt,
+      Opcode.SubInt,
+      Opcode.AddInt,
+      Opcode.DivInt,
+      Opcode.Print,
+      Opcode.Halt,
+    ]),
+  });
+
+  expect(result).toEqual([6 / (5 + (4 - 3 * 2))]);
+});
+
 it("works with scopes", () => {
   /*
   let x = 1
