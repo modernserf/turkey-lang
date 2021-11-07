@@ -188,3 +188,97 @@ Array [
 ]
 `);
 });
+
+it("parses if statements", () => {
+  const code = `
+    if (x) { print y }
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "cases": Array [
+        Object {
+          "block": Array [
+            Object {
+              "expr": Object {
+                "tag": "identifier",
+                "value": "y",
+              },
+              "tag": "print",
+            },
+          ],
+          "predicate": Object {
+            "tag": "identifier",
+            "value": "x",
+          },
+          "tag": "cond",
+        },
+      ],
+      "elseBlock": Array [],
+      "tag": "if",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("parses if expressions", () => {
+  const code = `
+    if (x) { y } else if (a) { b } else { c } 
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "cases": Array [
+        Object {
+          "block": Array [
+            Object {
+              "expr": Object {
+                "tag": "identifier",
+                "value": "y",
+              },
+              "tag": "expr",
+            },
+          ],
+          "predicate": Object {
+            "tag": "identifier",
+            "value": "x",
+          },
+          "tag": "cond",
+        },
+        Object {
+          "block": Array [
+            Object {
+              "expr": Object {
+                "tag": "identifier",
+                "value": "b",
+              },
+              "tag": "expr",
+            },
+          ],
+          "predicate": Object {
+            "tag": "identifier",
+            "value": "a",
+          },
+          "tag": "cond",
+        },
+      ],
+      "elseBlock": Array [
+        Object {
+          "expr": Object {
+            "tag": "identifier",
+            "value": "c",
+          },
+          "tag": "expr",
+        },
+      ],
+      "tag": "if",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});

@@ -40,13 +40,28 @@ class ByteWriter {
   }
   writeByte(byte: number): number {
     this.checkSize();
-    this.program[this.length] = byte;
     const prevLength = this.length;
-    this.length++;
+    this.program[this.length++] = byte;
     return prevLength;
   }
+  write32(number: number): number {
+    this.checkSize();
+    const prevLength = this.length;
+    // little endian i guess?
+    this.program[this.length++] = number & 0xff;
+    this.program[this.length++] = (number >> 8) & 0xff;
+    this.program[this.length++] = (number >> 16) & 0xff;
+    this.program[this.length++] = (number >> 24) & 0xff;
+    return prevLength;
+  }
+  writeBack(index: number): void {
+    this.program[index++] = this.length & 0xff;
+    this.program[index++] = (this.length >> 8) & 0xff;
+    this.program[index++] = (this.length >> 16) & 0xff;
+    this.program[index++] = (this.length >> 24) & 0xff;
+  }
   private checkSize() {
-    if (this.length === this.program.length) {
+    if (this.length > this.program.length - 16) {
       const old = this.program;
       this.program = new Uint8Array(this.program.length << 1);
       this.program.set(old);
@@ -167,6 +182,25 @@ function compileExpr(state: CompilerState, expr: Expr): Type {
     case "do": {
       return compileBlock(state, expr.block);
     }
+    case "if": {
+      const endJumps: number[] = [];
+      let type: Type | null = null;
+      for (const cond of expr.cases) {
+        unify(boolType, compileExpr(state, cond.predicate));
+        state.output.writeByte(Opcode.JumpIfZero);
+        const skip = state.output.write32(0);
+        const blockType = compileBlock(state, cond.block);
+        type = unify(type, blockType);
+        state.output.writeByte(Opcode.Jump);
+        endJumps.push(state.output.write32(0));
+        state.output.writeBack(skip);
+      }
+      type = unify(type, compileBlock(state, expr.elseBlock));
+      for (const jump of endJumps) {
+        state.output.writeBack(jump);
+      }
+      return type;
+    }
   }
 }
 
@@ -204,7 +238,9 @@ function arithmeticOp(
   }
 }
 
-function unify(left: Type, right: Type) {
+function unify(left: Type | null, right: Type): Type {
+  if (!left) return right;
+
   if (left.tag !== right.tag) {
     throw new Error("type error");
   }

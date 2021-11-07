@@ -1,4 +1,4 @@
-import { Token, Stmt, Expr, Binding, ParseError } from "./types";
+import { Token, Stmt, Expr, Binding, ParseError, IfCase } from "./types";
 
 interface IParseState {
   token(): Token;
@@ -79,6 +79,25 @@ const parseBaseExpr: Parser<Expr> = (state) => {
     case "do":
       state.advance();
       return { tag: "do", block: parseBlock(state) };
+    case "if": {
+      state.advance();
+      const cases: IfCase[] = [];
+      while (true) {
+        match(state, "(");
+        const predicate = parseExpr(state);
+        match(state, ")");
+        const block = parseBlock(state);
+        cases.push({ tag: "cond", predicate, block });
+        if (check(state, "else")) {
+          if (check(state, "if")) continue;
+          const elseBlock = parseBlock(state);
+          return { tag: "if", cases, elseBlock };
+        } else {
+          return { tag: "if", cases, elseBlock: [] };
+        }
+      }
+    }
+
     default:
       throw new ParseError("expression", token);
   }

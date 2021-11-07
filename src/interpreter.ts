@@ -113,6 +113,26 @@ class Interpreter {
         this.framePointer = prevFramePointer;
         return;
       }
+      case Opcode.Jump: {
+        const addr =
+          this.next() |
+          (this.next() << 8) |
+          (this.next() << 16) |
+          (this.next() << 24);
+        this.instructionPointer = addr;
+        return;
+      }
+      case Opcode.JumpIfZero: {
+        const addr =
+          this.next() |
+          (this.next() << 8) |
+          (this.next() << 16) |
+          (this.next() << 24);
+        const value = this.pop();
+        if (value === 0) this.instructionPointer = addr;
+        return;
+      }
+
       // istanbul ignore next
       default: {
         throw new Error("Illegal opcode");

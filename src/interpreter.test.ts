@@ -129,3 +129,29 @@ it("works with scopes", () => {
   });
   expect(result).toEqual([10]);
 });
+
+it("jumps", () => {
+  const result = interpret({
+    constants: [],
+    // prettier-ignore
+    program: new Uint8Array([
+      Opcode.PushScope,
+      // if (True)
+      Opcode.IntImmediate, 1,
+      Opcode.JumpIfZero, 17, 0, 0, 0, // to else
+      Opcode.PushScope,
+      Opcode.IntImmediate, 1,
+      Opcode.PopScope,
+      Opcode.Jump, 20, 0, 0, 0, // to end
+      // else
+      Opcode.PushScope,
+      Opcode.IntImmediate, 2,
+      Opcode.PopScope,
+      // end
+      Opcode.Print,
+      Opcode.PopScopeVoid,
+      Opcode.Halt,
+    ]),
+  });
+  expect(result).toEqual([1]);
+});

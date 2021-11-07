@@ -270,3 +270,41 @@ it("compiles bools", () => {
     Opcode.Halt,
   ]);
 });
+
+it("compiles conditionals", () => {
+  const result = compile([
+    {
+      tag: "print",
+      expr: {
+        tag: "if",
+        cases: [
+          {
+            tag: "cond",
+            predicate: { tag: "typeConstructor", value: "True" },
+            block: [{ tag: "expr", expr: { tag: "integer", value: 1 } }],
+          },
+        ],
+        elseBlock: [{ tag: "expr", expr: { tag: "integer", value: 2 } }],
+      },
+    },
+  ]);
+  // prettier-ignore
+  expect(Array.from(result.program)).toEqual([
+    Opcode.PushScope,
+    Opcode.IntImmediate, 1,
+    Opcode.JumpIfZero, 17, 0, 0, 0, // to else
+    // if
+    Opcode.PushScope, 
+    Opcode.IntImmediate, 1,
+    Opcode.PopScope,
+    Opcode.Jump, 21, 0, 0, 0, // to end
+    // else
+    Opcode.PushScope, 
+    Opcode.IntImmediate, 2,
+    Opcode.PopScope,
+    // end
+    Opcode.Print,
+    Opcode.PopScopeVoid,
+    Opcode.Halt,
+  ]);
+});

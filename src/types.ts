@@ -4,6 +4,8 @@ export type Token =
   | { tag: "print" }
   | { tag: "let" }
   | { tag: "do" }
+  | { tag: "if" }
+  | { tag: "else" }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "identifier"; value: string }
@@ -38,7 +40,10 @@ export type Expr =
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "binaryOp"; left: Expr; right: Expr; operator: string }
-  | { tag: "do"; block: Stmt[] };
+  | { tag: "do"; block: Stmt[] }
+  | { tag: "if"; cases: IfCase[]; elseBlock: Stmt[] };
+
+export type IfCase = { tag: "cond"; predicate: Expr; block: Stmt[] };
 
 export type Binding = { tag: "identifier"; value: string };
 
@@ -64,6 +69,8 @@ export enum Opcode {
   PopScope = 0x41,
   PopScopeVoid = 0x42,
   Drop = 0x43,
+  Jump = 0x50, // (address: u32)
+  JumpIfZero = 0x51, // (address: u32)
 }
 
 export interface CompileResult {
