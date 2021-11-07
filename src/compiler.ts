@@ -10,10 +10,6 @@ const integerType: Type = { tag: "integer" };
 const floatType: Type = { tag: "float" };
 const boolType: Type = { tag: "struct", value: "Boolean" };
 
-export function compile(program: Stmt[]): CompileResult {
-  return new Compiler(program);
-}
-
 type ScopeRecord = { index: number; type: Type; constant: boolean };
 
 class Scope {
@@ -47,18 +43,13 @@ class Scope {
   }
 }
 
-class Compiler {
-  program = new Uint8Array(256);
-  constants: any[] = [];
+class ByteWriter {
+  private program = new Uint8Array(256);
   private length = 0;
-  private scope = new Scope();
-  constructor(input: Stmt[]) {
-    this.setupConstants();
-    this.compileBlock(input);
-    this.writeByte(Opcode.Halt);
-    this.program = this.program.slice(0, this.length);
+  result(): Uint8Array {
+    return this.program.slice(0, this.length);
   }
-  private writeByte(byte: number) {
+  writeByte(byte: number) {
     this.checkSize();
     this.program[this.length] = byte;
     this.length++;
@@ -70,127 +61,146 @@ class Compiler {
       this.program.set(old);
     }
   }
-  private setupConstants() {
-    this.scope.addConstant("True", boolType, this.constants.push(true) - 1);
-    this.scope.addConstant("False", boolType, this.constants.push(false) - 1);
-  }
-  private compileBlock(input: Stmt[]): Type {
-    this.scope = this.scope.push();
-    this.writeByte(Opcode.PushScope);
-    let returnType = voidType;
-    for (const stmt of input) {
-      // drop the result of the previous statement if its a non-void expr
-      if (returnType.tag !== "void") {
-        this.writeByte(Opcode.Drop);
-      }
-      returnType = this.compileStmt(stmt);
+}
+
+class CompilerState {
+  constants: any[] = [];
+  output = new ByteWriter();
+  scope = new Scope();
+}
+
+export function compile(input: Stmt[]): CompileResult {
+  const state = new CompilerState();
+  state.scope.addConstant("True", boolType, state.constants.push(true) - 1);
+  state.scope.addConstant("False", boolType, state.constants.push(false) - 1);
+  compileBlock(state, input);
+  state.output.writeByte(Opcode.Halt);
+  return { constants: state.constants, program: state.output.result() };
+}
+
+function compileBlock(state: CompilerState, input: Stmt[]): Type {
+  state.scope = state.scope.push();
+  state.output.writeByte(Opcode.PushScope);
+  let returnType = voidType;
+  for (const stmt of input) {
+    // drop the result of the previous statement if its a non-void expr
+    if (returnType.tag !== "void") {
+      state.output.writeByte(Opcode.Drop);
     }
-    if (returnType.tag === "void") {
-      this.writeByte(Opcode.PopScopeVoid);
-    } else {
-      this.writeByte(Opcode.PopScope);
+    returnType = compileStmt(state, stmt);
+  }
+  if (returnType.tag === "void") {
+    state.output.writeByte(Opcode.PopScopeVoid);
+  } else {
+    state.output.writeByte(Opcode.PopScope);
+  }
+  state.scope = state.scope.pop();
+  return returnType;
+}
+
+function compileStmt(state: CompilerState, stmt: Stmt): Type {
+  switch (stmt.tag) {
+    case "print":
+      compileExpr(state, stmt.expr);
+      state.output.writeByte(Opcode.Print);
+      return voidType;
+    case "let": {
+      const inferredType = compileExpr(state, stmt.expr);
+      state.output.writeByte(Opcode.InitLocal);
+      const name = stmt.binding.value;
+      state.scope.add(name, inferredType);
+      return voidType;
     }
-    this.scope = this.scope.pop();
-    return returnType;
+    case "expr":
+      return compileExpr(state, stmt.expr);
   }
-  private compileStmt(stmt: Stmt): Type {
-    switch (stmt.tag) {
-      case "print":
-        this.compileExpr(stmt.expr);
-        this.writeByte(Opcode.Print);
-        return voidType;
-      case "let": {
-        const inferredType = this.compileExpr(stmt.expr);
-        this.writeByte(Opcode.InitLocal);
-        const name = stmt.binding.value;
-        this.scope.add(name, inferredType);
-        return voidType;
-      }
-      case "expr":
-        return this.compileExpr(stmt.expr);
+}
+
+function compileExpr(state: CompilerState, expr: Expr): Type {
+  switch (expr.tag) {
+    case "identifier": {
+      return compileIdent(state, expr.value);
     }
-  }
-  private compileExpr(expr: Expr): Type {
-    switch (expr.tag) {
-      case "identifier": {
-        return this.compileIdent(expr.value);
+    case "typeConstructor": {
+      return compileIdent(state, expr.value);
+    }
+    case "integer": {
+      if (expr.value > -128 && expr.value < 127) {
+        state.output.writeByte(Opcode.IntImmediate);
+        state.output.writeByte(expr.value);
+      } else {
+        compileConstant(state, expr.value);
       }
-      case "typeConstructor": {
-        return this.compileIdent(expr.value);
-      }
-      case "integer": {
-        if (expr.value > -128 && expr.value < 127) {
-          this.writeByte(Opcode.IntImmediate);
-          this.writeByte(expr.value);
-        } else {
-          this.compileConstant(expr.value);
-        }
-        return integerType;
-      }
-      case "float": {
-        this.compileConstant(expr.value);
-        return floatType;
-      }
-      case "binaryOp": {
-        switch (expr.operator) {
-          case "+":
-            return this.arithmeticOp(expr, Opcode.AddInt, Opcode.AddFloat);
-          case "-":
-            return this.arithmeticOp(expr, Opcode.SubInt, Opcode.SubFloat);
-          case "*":
-            return this.arithmeticOp(expr, Opcode.MulInt, Opcode.MulFloat);
-          case "/":
-            this.arithmeticOp(expr, Opcode.DivInt, Opcode.DivFloat);
-            return floatType;
-          // istanbul ignore next
-          default:
-            throw new Error("unknown operator");
-        }
-      }
-      case "do": {
-        return this.compileBlock(expr.block);
+      return integerType;
+    }
+    case "float": {
+      compileConstant(state, expr.value);
+      return floatType;
+    }
+    case "binaryOp": {
+      switch (expr.operator) {
+        case "+":
+          return arithmeticOp(state, expr, Opcode.AddInt, Opcode.AddFloat);
+        case "-":
+          return arithmeticOp(state, expr, Opcode.SubInt, Opcode.SubFloat);
+        case "*":
+          return arithmeticOp(state, expr, Opcode.MulInt, Opcode.MulFloat);
+        case "/":
+          arithmeticOp(state, expr, Opcode.DivInt, Opcode.DivFloat);
+          return floatType;
+        // istanbul ignore next
+        default:
+          throw new Error("unknown operator");
       }
     }
-  }
-  private compileIdent(name: string): Type {
-    const result = this.scope.get(name);
-    if (result.constant) {
-      this.writeByte(Opcode.Constant);
-      this.writeByte(result.index);
-    } else {
-      this.writeByte(Opcode.GetLocal);
-      this.writeByte(result.index);
-    }
-    return result.type;
-  }
-  private compileConstant(value: any) {
-    const index = this.constants.push(value) - 1;
-    this.writeByte(Opcode.Constant);
-    this.writeByte(index); // TODO: more than 256 constants
-  }
-  private arithmeticOp(
-    expr: { left: Expr; right: Expr },
-    intOp: Opcode,
-    floatOp: Opcode
-  ): Type {
-    const leftType = this.compileExpr(expr.left);
-    const rightType = this.compileExpr(expr.right);
-    const exprType = this.unify(leftType, rightType);
-    switch (exprType.tag) {
-      case "float":
-        this.writeByte(floatOp);
-        return exprType;
-      case "integer":
-        this.writeByte(intOp);
-        return exprType;
-      default:
-        throw new Error("operands must be numbers");
+    case "do": {
+      return compileBlock(state, expr.block);
     }
   }
-  private unify(left: Type, right: Type) {
-    if (left.tag !== right.tag) {
-      throw new Error("type error");
-    }
-    return left;
+}
+
+function compileIdent(state: CompilerState, name: string): Type {
+  const result = state.scope.get(name);
+  if (result.constant) {
+    state.output.writeByte(Opcode.Constant);
+    state.output.writeByte(result.index);
+  } else {
+    state.output.writeByte(Opcode.GetLocal);
+    state.output.writeByte(result.index);
   }
+  return result.type;
+}
+
+function compileConstant(state: CompilerState, value: any) {
+  const index = state.constants.push(value) - 1;
+  state.output.writeByte(Opcode.Constant);
+  state.output.writeByte(index); // TODO: more than 256 constants
+}
+
+function arithmeticOp(
+  state: CompilerState,
+  expr: { left: Expr; right: Expr },
+  intOp: Opcode,
+  floatOp: Opcode
+): Type {
+  const leftType = compileExpr(state, expr.left);
+  const rightType = compileExpr(state, expr.right);
+  const exprType = unify(leftType, rightType);
+  switch (exprType.tag) {
+    case "float":
+      state.output.writeByte(floatOp);
+      return exprType;
+    case "integer":
+      state.output.writeByte(intOp);
+      return exprType;
+    default:
+      throw new Error("operands must be numbers");
+  }
+}
+
+function unify(left: Type, right: Type) {
+  if (left.tag !== right.tag) {
+    throw new Error("type error");
+  }
+  return left;
 }
