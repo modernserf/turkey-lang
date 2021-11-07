@@ -282,3 +282,27 @@ Array [
 ]
 `);
 });
+
+it("parses while statements", () => {
+  const code = `while (x) { print x }`;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [
+      Object {
+        "expr": Object {
+          "tag": "identifier",
+          "value": "x",
+        },
+        "tag": "print",
+      },
+    ],
+    "expr": Object {
+      "tag": "identifier",
+      "value": "x",
+    },
+    "tag": "while",
+  },
+]
+`);
+});

@@ -308,3 +308,34 @@ it("compiles conditionals", () => {
     Opcode.Halt,
   ]);
 });
+
+it("compiles while loops", () => {
+  const result = compile([
+    {
+      tag: "while",
+      expr: { tag: "typeConstructor", value: "True" },
+      block: [
+        {
+          tag: "print",
+          expr: { tag: "integer", value: 0 },
+        },
+      ],
+    },
+  ]);
+
+  // prettier-ignore
+  expect(Array.from(result.program)).toEqual([
+    Opcode.PushScope,
+    // loop:
+    Opcode.IntImmediate, 1, 
+    Opcode.JumpIfZero, 18, 0, 0, 0, // to out
+    Opcode.PushScope,
+    Opcode.IntImmediate, 0,
+    Opcode.Print,
+    Opcode.PopScopeVoid,
+    Opcode.Jump, 1, 0, 0, 0, // to loop
+    // end: 
+    Opcode.PopScopeVoid,
+    Opcode.Halt,
+  ]);
+});

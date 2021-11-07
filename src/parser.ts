@@ -42,6 +42,14 @@ const parseStatement: Parser<Stmt> = (state) => {
       const expr = parseExpr(state);
       return { tag: "let", binding, type: null, expr };
     }
+    case "while": {
+      state.advance();
+      match(state, "(");
+      const expr = parseExpr(state);
+      match(state, ")");
+      const block = parseBlock(state);
+      return { tag: "while", expr, block };
+    }
     default:
       return { tag: "expr", expr: parseExpr(state) };
   }

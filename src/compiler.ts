@@ -34,7 +34,7 @@ class Scope {
 
 class ByteWriter {
   private program = new Uint8Array(256);
-  private length = 0;
+  length = 0;
   result(): Uint8Array {
     return this.program.slice(0, this.length);
   }
@@ -98,9 +98,7 @@ function compileBlock(outerState: CompilerState, input: Stmt[]): Type {
     let returnType = voidType;
     for (const stmt of input) {
       // drop the result of the previous statement if its a non-void expr
-      if (returnType.tag !== "void") {
-        state.output.writeByte(Opcode.Drop);
-      }
+      dropExpr(state, returnType);
       returnType = compileStmt(state, stmt);
     }
     if (returnType.tag === "void") {
@@ -123,6 +121,20 @@ function compileStmt(state: CompilerState, stmt: Stmt): Type {
       state.output.writeByte(Opcode.InitLocal);
       const name = stmt.binding.value;
       state.scope.add(name, inferredType);
+      return voidType;
+    }
+    case "while": {
+      const backIntoLoopPtr = state.output.length;
+      unify(boolType, compileExpr(state, stmt.expr));
+      state.output.writeByte(Opcode.JumpIfZero);
+      const outOfLoopPtr = state.output.write32(0);
+
+      const returnType = compileBlock(state, stmt.block);
+      dropExpr(state, returnType);
+      state.output.writeByte(Opcode.Jump);
+      state.output.write32(backIntoLoopPtr);
+
+      state.output.writeBack(outOfLoopPtr);
       return voidType;
     }
     case "expr":
@@ -245,4 +257,9 @@ function unify(left: Type | null, right: Type): Type {
     throw new Error("type error");
   }
   return left;
+}
+
+function dropExpr(state: CompilerState, type: Type) {
+  if (type.tag === "void") return;
+  state.output.writeByte(Opcode.Drop);
 }

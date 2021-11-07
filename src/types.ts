@@ -6,6 +6,7 @@ export type Token =
   | { tag: "do" }
   | { tag: "if" }
   | { tag: "else" }
+  | { tag: "while" }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "identifier"; value: string }
@@ -32,6 +33,7 @@ export class ParseError extends Error {
 export type Stmt =
   | { tag: "print"; expr: Expr }
   | { tag: "let"; binding: Binding; type: null; expr: Expr }
+  | { tag: "while"; expr: Expr; block: Stmt[] }
   | { tag: "expr"; expr: Expr };
 
 export type Expr =

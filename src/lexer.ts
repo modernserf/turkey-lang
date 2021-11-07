@@ -23,6 +23,7 @@ export function lex(string: string): Token[] {
         case "do":
         case "if":
         case "else":
+        case "while":
           tokens.push({ tag: result[2] });
           break;
         default:
