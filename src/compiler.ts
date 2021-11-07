@@ -10,7 +10,7 @@ const integerType: Type = { tag: "integer" };
 const floatType: Type = { tag: "float" };
 const boolType: Type = { tag: "struct", value: "Boolean" };
 
-type ScopeRecord = { index: number; type: Type; constant: boolean };
+type ScopeRecord = { index: number; type: Type };
 
 class Scope {
   private map: Map<string, ScopeRecord> = new Map();
@@ -28,18 +28,7 @@ class Scope {
     if (this.map.has(key)) throw new Error(`Redefining variable ${key}`);
     const index = this.stackSize;
     this.stackSize++;
-    this.map.set(key, { type, index, constant: false });
-  }
-  addConstant(key: string, type: Type, index: number): void {
-    this.map.set(key, { type, index, constant: true });
-  }
-  push(): Scope {
-    return new Scope(this);
-  }
-  pop(): Scope {
-    // istanbul ignore next
-    if (!this.parent) throw new Error(`Cannot pop bottom scope`);
-    return this.parent;
+    this.map.set(key, { type, index });
   }
 }
 
@@ -49,10 +38,12 @@ class ByteWriter {
   result(): Uint8Array {
     return this.program.slice(0, this.length);
   }
-  writeByte(byte: number) {
+  writeByte(byte: number): number {
     this.checkSize();
     this.program[this.length] = byte;
+    const prevLength = this.length;
     this.length++;
+    return prevLength;
   }
   private checkSize() {
     if (this.length === this.program.length) {
@@ -64,38 +55,46 @@ class ByteWriter {
 }
 
 class CompilerState {
-  constants: any[] = [];
-  output = new ByteWriter();
-  scope = new Scope();
+  constructor(
+    public constants: number[] = [],
+    public output = new ByteWriter(),
+    public scope = new Scope()
+  ) {}
+  inScope<T>(fn: (state: CompilerState) => T): T {
+    const nextState = new CompilerState(
+      this.constants,
+      this.output,
+      new Scope(this.scope)
+    );
+    return fn(nextState);
+  }
 }
 
 export function compile(input: Stmt[]): CompileResult {
   const state = new CompilerState();
-  state.scope.addConstant("True", boolType, state.constants.push(true) - 1);
-  state.scope.addConstant("False", boolType, state.constants.push(false) - 1);
   compileBlock(state, input);
   state.output.writeByte(Opcode.Halt);
   return { constants: state.constants, program: state.output.result() };
 }
 
-function compileBlock(state: CompilerState, input: Stmt[]): Type {
-  state.scope = state.scope.push();
-  state.output.writeByte(Opcode.PushScope);
-  let returnType = voidType;
-  for (const stmt of input) {
-    // drop the result of the previous statement if its a non-void expr
-    if (returnType.tag !== "void") {
-      state.output.writeByte(Opcode.Drop);
+function compileBlock(outerState: CompilerState, input: Stmt[]): Type {
+  return outerState.inScope((state) => {
+    state.output.writeByte(Opcode.PushScope);
+    let returnType = voidType;
+    for (const stmt of input) {
+      // drop the result of the previous statement if its a non-void expr
+      if (returnType.tag !== "void") {
+        state.output.writeByte(Opcode.Drop);
+      }
+      returnType = compileStmt(state, stmt);
     }
-    returnType = compileStmt(state, stmt);
-  }
-  if (returnType.tag === "void") {
-    state.output.writeByte(Opcode.PopScopeVoid);
-  } else {
-    state.output.writeByte(Opcode.PopScope);
-  }
-  state.scope = state.scope.pop();
-  return returnType;
+    if (returnType.tag === "void") {
+      state.output.writeByte(Opcode.PopScopeVoid);
+    } else {
+      state.output.writeByte(Opcode.PopScope);
+    }
+    return returnType;
+  });
 }
 
 function compileStmt(state: CompilerState, stmt: Stmt): Type {
@@ -122,7 +121,19 @@ function compileExpr(state: CompilerState, expr: Expr): Type {
       return compileIdent(state, expr.value);
     }
     case "typeConstructor": {
-      return compileIdent(state, expr.value);
+      switch (expr.value) {
+        case "True":
+          state.output.writeByte(Opcode.IntImmediate);
+          state.output.writeByte(1);
+          return boolType;
+        case "False":
+          state.output.writeByte(Opcode.IntImmediate);
+          state.output.writeByte(0);
+          return boolType;
+        // istanbul ignore next
+        default:
+          throw new Error("TODO: type constructors");
+      }
     }
     case "integer": {
       if (expr.value > -128 && expr.value < 127) {
@@ -161,17 +172,12 @@ function compileExpr(state: CompilerState, expr: Expr): Type {
 
 function compileIdent(state: CompilerState, name: string): Type {
   const result = state.scope.get(name);
-  if (result.constant) {
-    state.output.writeByte(Opcode.Constant);
-    state.output.writeByte(result.index);
-  } else {
-    state.output.writeByte(Opcode.GetLocal);
-    state.output.writeByte(result.index);
-  }
+  state.output.writeByte(Opcode.GetLocal);
+  state.output.writeByte(result.index);
   return result.type;
 }
 
-function compileConstant(state: CompilerState, value: any) {
+function compileConstant(state: CompilerState, value: number) {
   const index = state.constants.push(value) - 1;
   state.output.writeByte(Opcode.Constant);
   state.output.writeByte(index); // TODO: more than 256 constants
