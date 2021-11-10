@@ -83,7 +83,6 @@ it("compiles let statements, do blocks, identifiers", () => {
     Opcode.PushScope,       // [<frame>]
     Opcode.PushScope,       // [<frame>,<frame>]
     Opcode.IntImmediate, 1, // [<frame>,<frame>, 1]
-    Opcode.InitLocal,       // [<frame>,<frame>, x = 1]
     Opcode.GetLocal, 2,     // [<frame>,<frame>, x = 1, 1]
     Opcode.PopScope,        // [<frame>, 1]
     Opcode.Print,           // [<frame>]
@@ -261,7 +260,7 @@ it("compiles bools", () => {
   expect(Array.from(result.program)).toEqual([
     Opcode.PushScope,
     Opcode.IntImmediate,
-    1,
+    255,
     Opcode.Print,
     Opcode.IntImmediate,
     0,
@@ -291,7 +290,7 @@ it("compiles conditionals", () => {
   // prettier-ignore
   expect(Array.from(result.program)).toEqual([
     Opcode.PushScope,
-    Opcode.IntImmediate, 1,
+    Opcode.IntImmediate, 255,
     Opcode.JumpIfZero, 17, 0, 0, 0, // to else
     // if
     Opcode.PushScope, 
@@ -327,7 +326,7 @@ it("compiles while loops", () => {
   expect(Array.from(result.program)).toEqual([
     Opcode.PushScope,
     // loop:
-    Opcode.IntImmediate, 1, 
+    Opcode.IntImmediate, 255, 
     Opcode.JumpIfZero, 18, 0, 0, 0, // to out
     Opcode.PushScope,
     Opcode.IntImmediate, 0,

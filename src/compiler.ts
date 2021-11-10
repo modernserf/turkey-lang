@@ -87,20 +87,32 @@ class CompilerState {
 
 export function compile(input: Stmt[]): CompileResult {
   const state = new CompilerState();
-  compileBlock(state, input);
+  compileBlock(state, input, false);
   state.output.writeByte(Opcode.Halt);
   return { constants: state.constants, program: state.output.result() };
 }
 
-function compileBlock(outerState: CompilerState, input: Stmt[]): Type {
+function compileBlock(
+  outerState: CompilerState,
+  input: Stmt[],
+  expectResult: boolean
+): Type {
   return outerState.inScope((state) => {
+    if (input.length === 0) return voidType;
+
     state.output.writeByte(Opcode.PushScope);
-    let returnType = voidType;
-    for (const stmt of input) {
-      // drop the result of the previous statement if its a non-void expr
-      dropExpr(state, returnType);
-      returnType = compileStmt(state, stmt);
+
+    // all but last statement
+    for (let i = 0; i < input.length - 1; i++) {
+      compileStmt(state, input[i], false);
     }
+
+    const returnType = compileStmt(
+      state,
+      input[input.length - 1],
+      expectResult
+    );
+
     if (returnType.tag === "void") {
       state.output.writeByte(Opcode.PopScopeVoid);
     } else {
@@ -110,39 +122,52 @@ function compileBlock(outerState: CompilerState, input: Stmt[]): Type {
   });
 }
 
-function compileStmt(state: CompilerState, stmt: Stmt): Type {
+function compileStmt(
+  state: CompilerState,
+  stmt: Stmt,
+  expectResult: boolean
+): Type {
   switch (stmt.tag) {
     case "print":
-      compileExpr(state, stmt.expr);
+      compileExpr(state, stmt.expr, true);
       state.output.writeByte(Opcode.Print);
       return voidType;
     case "let": {
-      const inferredType = compileExpr(state, stmt.expr);
-      state.output.writeByte(Opcode.InitLocal);
+      const inferredType = compileExpr(state, stmt.expr, true);
       const name = stmt.binding.value;
       state.scope.add(name, inferredType);
       return voidType;
     }
     case "while": {
       const backIntoLoopPtr = state.output.length;
-      unify(boolType, compileExpr(state, stmt.expr));
+      unify(boolType, compileExpr(state, stmt.expr, true));
       state.output.writeByte(Opcode.JumpIfZero);
       const outOfLoopPtr = state.output.write32(0);
 
-      const returnType = compileBlock(state, stmt.block);
-      dropExpr(state, returnType);
+      compileBlock(state, stmt.block, false);
       state.output.writeByte(Opcode.Jump);
       state.output.write32(backIntoLoopPtr);
 
       state.output.writeBack(outOfLoopPtr);
       return voidType;
     }
-    case "expr":
-      return compileExpr(state, stmt.expr);
+    case "expr": {
+      const type = compileExpr(state, stmt.expr, expectResult);
+      if (!expectResult && type.tag !== "void") {
+        state.output.writeByte(Opcode.Drop);
+        return voidType;
+      } else {
+        return type;
+      }
+    }
   }
 }
 
-function compileExpr(state: CompilerState, expr: Expr): Type {
+function compileExpr(
+  state: CompilerState,
+  expr: Expr,
+  expectResult: boolean
+): Type {
   switch (expr.tag) {
     case "identifier": {
       return compileIdent(state, expr.value);
@@ -151,7 +176,7 @@ function compileExpr(state: CompilerState, expr: Expr): Type {
       switch (expr.value) {
         case "True":
           state.output.writeByte(Opcode.IntImmediate);
-          state.output.writeByte(1);
+          state.output.writeByte(-1);
           return boolType;
         case "False":
           state.output.writeByte(Opcode.IntImmediate);
@@ -186,28 +211,62 @@ function compileExpr(state: CompilerState, expr: Expr): Type {
         case "/":
           arithmeticOp(state, expr, Opcode.DivInt, Opcode.DivFloat);
           return floatType;
+        case "==":
+        case "!=": {
+          const leftType = compileExpr(state, expr.left, true);
+          const rightType = compileExpr(state, expr.right, true);
+          const exprType = unify(leftType, rightType);
+          state.output.writeByte(Opcode.Eq);
+          if (expr.operator === "!=") {
+            state.output.writeByte(Opcode.BitNot);
+          }
+          return exprType;
+        }
         // istanbul ignore next
         default:
           throw new Error("unknown operator");
       }
     }
+    case "unaryOp":
+      switch (expr.operator) {
+        case "!":
+          unify(boolType, compileExpr(state, expr.expr, true));
+          state.output.writeByte(Opcode.BitNot);
+          return boolType;
+        case "-": {
+          const type = compileExpr(state, expr.expr, true);
+          switch (type.tag) {
+            case "integer":
+              state.output.writeByte(Opcode.NegInt);
+              return type;
+            case "float":
+              state.output.writeByte(Opcode.NegFloat);
+              return type;
+            default:
+              throw new Error("type error");
+          }
+        }
+        // istanbul ignore next
+        default:
+          throw new Error("unknown operator");
+      }
     case "do": {
-      return compileBlock(state, expr.block);
+      return compileBlock(state, expr.block, expectResult);
     }
     case "if": {
       const endJumps: number[] = [];
       let type: Type | null = null;
       for (const cond of expr.cases) {
-        unify(boolType, compileExpr(state, cond.predicate));
+        unify(boolType, compileExpr(state, cond.predicate, true));
         state.output.writeByte(Opcode.JumpIfZero);
         const skip = state.output.write32(0);
-        const blockType = compileBlock(state, cond.block);
+        const blockType = compileBlock(state, cond.block, expectResult);
         type = unify(type, blockType);
         state.output.writeByte(Opcode.Jump);
         endJumps.push(state.output.write32(0));
         state.output.writeBack(skip);
       }
-      type = unify(type, compileBlock(state, expr.elseBlock));
+      type = unify(type, compileBlock(state, expr.elseBlock, expectResult));
       for (const jump of endJumps) {
         state.output.writeBack(jump);
       }
@@ -235,8 +294,8 @@ function arithmeticOp(
   intOp: Opcode,
   floatOp: Opcode
 ): Type {
-  const leftType = compileExpr(state, expr.left);
-  const rightType = compileExpr(state, expr.right);
+  const leftType = compileExpr(state, expr.left, true);
+  const rightType = compileExpr(state, expr.right, true);
   const exprType = unify(leftType, rightType);
   switch (exprType.tag) {
     case "float":
@@ -257,9 +316,4 @@ function unify(left: Type | null, right: Type): Type {
     throw new Error("type error");
   }
   return left;
-}
-
-function dropExpr(state: CompilerState, type: Type) {
-  if (type.tag === "void") return;
-  state.output.writeByte(Opcode.Drop);
 }

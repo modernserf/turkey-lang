@@ -84,10 +84,10 @@ class Interpreter {
         this.push(left / right);
         return;
       }
-      case Opcode.InitLocal: {
-        // do nothing, leave the current value on the stack at this position
+      case Opcode.NegInt:
+      case Opcode.NegFloat:
+        this.push(-this.pop());
         return;
-      }
       case Opcode.GetLocal: {
         const index = this.next();
         this.push(this.stack[index]);

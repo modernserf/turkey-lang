@@ -11,11 +11,19 @@ export type Token =
   | { tag: "float"; value: number }
   | { tag: "identifier"; value: string }
   | { tag: "typeIdentifier"; value: string }
+  | { tag: "==" }
+  | { tag: "!=" }
+  | { tag: "<=" }
+  | { tag: ">=" }
+  | { tag: "!" }
   | { tag: "+" }
   | { tag: "-" }
   | { tag: "*" }
   | { tag: "/" }
+  | { tag: "%" }
   | { tag: "=" }
+  | { tag: "<" }
+  | { tag: ">" }
   | { tag: "(" }
   | { tag: ")" }
   | { tag: "{" }
@@ -42,6 +50,7 @@ export type Expr =
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "binaryOp"; left: Expr; right: Expr; operator: string }
+  | { tag: "unaryOp"; expr: Expr; operator: string }
   | { tag: "do"; block: Stmt[] }
   | { tag: "if"; cases: IfCase[]; elseBlock: Stmt[] };
 
@@ -57,22 +66,33 @@ export enum Opcode {
   IntImmediate = 0x02, // (value: i8)
   Print = 0x10,
   AddInt = 0x20,
-  AddFloat = 0x21,
-  SubInt = 0x22,
-  SubFloat = 0x23,
-  MulInt = 0x24,
-  MulFloat = 0x25,
-  DivInt = 0x26,
-  DivFloat = 0x27,
-  InitLocal = 0x30,
-  GetLocal = 0x31, // (index: u8)
-  // SetLocal = 0x32,
+  SubInt = 0x21,
+  MulInt = 0x22,
+  DivInt = 0x23,
+  ModInt = 0x24,
+  NegInt = 0x25,
+  BitNot = 0x26,
+  BitAnd = 0x27,
+  BitOr = 0x28,
+  BitXor = 0x29,
+  Eq = 0x2a,
+  Cmp = 0x2b,
+
+  GetLocal = 0x30, // (index: u8)
+  // SetLocal = 0x31,
   PushScope = 0x40,
   PopScope = 0x41,
   PopScopeVoid = 0x42,
   Drop = 0x43,
   Jump = 0x50, // (address: u32)
   JumpIfZero = 0x51, // (address: u32)
+
+  //
+  AddFloat = 0xf0,
+  SubFloat = 0xf1,
+  MulFloat = 0xf2,
+  DivFloat = 0xf3,
+  NegFloat = 0xf4,
 }
 
 export interface CompileResult {

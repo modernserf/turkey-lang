@@ -95,6 +95,20 @@ it("subtracts, multiplies, divides", () => {
   expect(result).toEqual([6 / (5 + (4 - 3 * 2))]);
 });
 
+it("negates", () => {
+  const result = interpret({
+    constants: [],
+    program: new Uint8Array([
+      Opcode.IntImmediate,
+      1,
+      Opcode.NegInt,
+      Opcode.Print,
+      Opcode.Halt,
+    ]),
+  });
+  expect(result).toEqual([-1]);
+});
+
 it("works with scopes", () => {
   /*
   let x = 1
@@ -108,16 +122,13 @@ it("works with scopes", () => {
     constants: [],
     // prettier-ignore
     program: new Uint8Array([ // stack:     
-      Opcode.IntImmediate, 1, // [1]
-      Opcode.InitLocal,       // [x = 1]
+      Opcode.IntImmediate, 1, // [x = 1]
       Opcode.PushScope,       // [x = 1, <frame>]
-      Opcode.IntImmediate, 2, // [x = 1, <frame>, 2]
-      Opcode.InitLocal,       // [x = 1, <frame>, z = 2]
+      Opcode.IntImmediate, 2, // [x = 1, <frame>, z = 2]
       Opcode.GetLocal, 2,     // [x = 1, <frame>, z = 2, 2]
       Opcode.IntImmediate, 3, // [x = 1, <frame>, z = 2, 2, 3]
       Opcode.AddInt,          // [x = 1, <frame>, z = 2, 5]
-      Opcode.PopScope,        // [x = 1, 5]
-      Opcode.InitLocal,       // [x = 1, y = 5]
+      Opcode.PopScope,        // [x = 1, y = 5]
       Opcode.GetLocal, 0,     // [x = 1, y = 5, 1]
       Opcode.GetLocal, 1,     // [x = 1, y = 5, 1, 5]
       Opcode.AddInt,          // [x = 1, y = 5, 6]

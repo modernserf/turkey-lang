@@ -56,11 +56,25 @@ const parseStatement: Parser<Stmt> = (state) => {
 };
 
 const parseExpr: Parser<Expr> = (state) => {
-  return infixLeft(state, parseTermExpr, ["+", "-"]);
+  return infixLeft(state, parseAddExpr, ["==", "!=", ">", "<", "<=", ">="]);
 };
 
-const parseTermExpr: Parser<Expr> = (state) => {
-  return infixLeft(state, parseBaseExpr, ["*", "/"]);
+const parseAddExpr: Parser<Expr> = (state) => {
+  return infixLeft(state, parseMulExpr, ["+", "-"]);
+};
+
+const parseMulExpr: Parser<Expr> = (state) => {
+  return infixLeft(state, parsePrefixExpr, ["*", "/", "%"]);
+};
+
+const parsePrefixExpr: Parser<Expr> = (state) => {
+  const tok = state.token();
+  if (tok.tag === "!" || tok.tag === "-") {
+    state.advance();
+    return { tag: "unaryOp", operator: tok.tag, expr: parsePrefixExpr(state) };
+  } else {
+    return parseBaseExpr(state);
+  }
 };
 
 const parseBaseExpr: Parser<Expr> = (state) => {
