@@ -181,7 +181,7 @@ it("runs fibonnaci recursively (without TCO)", () => {
 it("works with objects in the heap", () => {
   // prettier-ignore
   const sum = new Assembler()
-    .object(6).initLocal('arr') // note: const array, 0: size, values are 1-indexed
+    .newObject(6).initLocal('arr') // note: const array, 0: size, values are 1-indexed
     .local('arr').number(5).setHeap(0)
     .local('arr').number(1).setHeap(1)
     .local('arr').number(2).setHeap(2)
@@ -207,4 +207,33 @@ it("works with objects in the heap", () => {
     .assemble()
 
   expect(interpret(sum)).toEqual(["15"]);
+});
+
+it("works with closures", () => {
+  // prettier-ignore
+  const adder = new Assembler()
+    .call('getAdder', 0).initLocal('adder')
+    .number(1).local('adder').callClosure(1).print()
+    .number(2).local('adder').callClosure(1).print()
+    .number(3).local('adder').callClosure(1).print()
+    .halt()
+
+    .func('getAdder')
+      .newObject(1).initLocal('state')
+      .local('state').number(0).setHeap(0)
+      .newClosure(1, 'adderClosure').initLocal('fn')
+      .local('fn').local('state').setHeap(1)
+      .local('fn').return()
+    .endfunc()
+
+    .closure('adderClosure', ['add'], ['state'])
+      .local('state').getHeap(0).initLocal('value')
+      .local('value').local('add').add().setLocal('value')
+      .local('state').local('value').setHeap(0)
+      .local('value').return()
+    .endfunc()
+
+    .assemble()
+
+  expect(interpret(adder)).toEqual(["1", "3", "6"]);
 });

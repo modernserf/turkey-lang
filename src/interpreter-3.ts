@@ -8,10 +8,12 @@ export enum Opcode {
   StorePointerOffset, // offset
   Drop,
   New, // size
+  NewClosure, // size, target
   //
   Jump, // target
   JumpIfZero, // target
   Call, // arity, target
+  CallClosure, // arity
   Return,
   //
   Add,
@@ -48,6 +50,7 @@ type StackValue =
 type HeapInternalValue =
   | { tag: "string"; value: string }
   | { tag: "object"; size: number }
+  | { tag: "closure"; size: number; target: number }
   | { tag: "free" }
   | StackValue;
 
@@ -70,15 +73,28 @@ class Heap {
     if (res.tag !== "string") throw new Error();
     return res.value;
   }
+  getClosureTarget(address: number): number {
+    const res = assert(this.heap[address]);
+    if (res.tag !== "closure") throw new Error();
+    return res.target;
+  }
   set(address: number, offset: number, value: StackValue) {
     const idx = address + offset;
     if (idx >= this.heap.length) throw new Error("setting past allocated heap");
     this.heap[idx] = value;
   }
   // TODO: free, free list, garbage collection
-  allocate(size: number): number {
+  object(size: number): number {
     this.heap.push({ tag: "object", size });
     const addr = this.heap.length; // NOTE: pointing to first element, not header
+    for (let i = 0; i < size; i++) {
+      this.heap.push({ tag: "free" });
+    }
+    return addr;
+  }
+  closure(size: number, target: number) {
+    const addr = this.heap.length; // NOTE: pointing to header
+    this.heap.push({ tag: "closure", size, target });
     for (let i = 0; i < size; i++) {
       this.heap.push({ tag: "free" });
     }
@@ -91,6 +107,8 @@ class Heap {
         switch (cell.tag) {
           case "object":
             return `(${cell.size})`;
+          case "closure":
+            return `(${cell.size},${cell.target})`;
           case "string":
             return `"${cell.value}"`;
           case "free":
@@ -122,6 +140,9 @@ class Stack {
   push(value: StackValue): void {
     if (!value) throw new Error("missing value");
     this.stack.push(value);
+  }
+  peek(): StackValue {
+    return assert(this.stack[this.stack.length - 1]);
   }
   pop(): StackValue {
     return assert(this.stack.pop());
@@ -240,7 +261,14 @@ class Interpreter {
       }
       case Opcode.New: {
         const size = this.program.nextOp();
-        const addr = this.heap.allocate(size);
+        const addr = this.heap.object(size);
+        this.stack.push({ tag: "pointer", value: addr });
+        return;
+      }
+      case Opcode.NewClosure: {
+        const size = this.program.nextOp();
+        const target = this.program.nextOp();
+        const addr = this.heap.closure(size, target);
         this.stack.push({ tag: "pointer", value: addr });
         return;
       }
@@ -261,6 +289,14 @@ class Interpreter {
         const arity = this.program.nextOp();
         const target = this.program.nextOp();
         this.stack.pushFrame(arity, this.program.here());
+        this.program.jump(target);
+        return;
+      }
+      case Opcode.CallClosure: {
+        const arity = this.program.nextOp();
+        const ptr = this.stack.peek(); // leave closure ptr on stack to pass as additional arg
+        const target = this.heap.getClosureTarget(ptr.value);
+        this.stack.pushFrame(arity + 1, this.program.here());
         this.program.jump(target);
         return;
       }

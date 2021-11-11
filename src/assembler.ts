@@ -1,6 +1,6 @@
 import { Opcode } from "./interpreter-3";
 
-type FuncRecord = { args: string[] };
+type FuncRecord = { args: string[]; env?: string[] };
 
 class LabelState {
   private labels: Map<string, number> = new Map();
@@ -12,9 +12,14 @@ class LabelState {
     if (this.labels.has(name)) throw new Error("duplicate identifier");
     this.labels.set(name, index);
   }
-  createFunc(name: string, index: number, args: string[]): void {
+  createFunc(
+    name: string,
+    index: number,
+    args: string[],
+    env?: string[]
+  ): void {
     if (this.currentFunc) throw new Error("cannot nest functions");
-    this.currentFunc = { args };
+    this.currentFunc = { args, env };
     if (this.labels.has(name)) throw new Error("duplicate identifier");
     this.labels.set(name, index);
     this.funcs.set(name, this.currentFunc);
@@ -40,6 +45,9 @@ class LabelState {
         case Opcode.Jump:
         case Opcode.JumpIfZero:
           program[index + 1] = addr;
+          break;
+        case Opcode.NewClosure:
+          program[index + 2] = addr;
           break;
         case Opcode.Call: {
           const arity = program[index + 1];
@@ -135,8 +143,14 @@ export class Assembler {
     this.program.push(Opcode.Drop);
     return this;
   }
-  object(size: number): this {
+
+  newObject(size: number): this {
     this.program.push(Opcode.New, size);
+    return this;
+  }
+  newClosure(size: number, label: string): this {
+    this.labels.ref(label, this.program.length);
+    this.program.push(Opcode.NewClosure, size, 0);
     return this;
   }
   setHeap(offset: number): this {
@@ -187,14 +201,34 @@ export class Assembler {
     }
     return this;
   }
+  closure(name: string, args: string[], env: string[]): this {
+    this.labels.createFunc(name, this.program.length, args, env);
+    this.locals.reset();
+    for (const arg of args) {
+      this.initLocal(arg);
+    }
+    this.initLocal("$");
+    for (const [i, arg] of env.entries()) {
+      this.local("$")
+        .getHeap(i + 1)
+        .initLocal(arg);
+    }
+    return this;
+  }
+
   endfunc(): this {
     this.labels.endFunc();
     this.locals.reset();
     return this;
   }
+
   call(funcName: string, arity: number): this {
     this.labels.callFunc(funcName, arity, this.program.length);
     this.program.push(Opcode.Call, arity, 0);
+    return this;
+  }
+  callClosure(arity: number): this {
+    this.program.push(Opcode.CallClosure, arity);
     return this;
   }
   return(): this {
