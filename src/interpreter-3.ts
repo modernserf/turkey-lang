@@ -9,11 +9,6 @@ type StackValue =
   | { tag: "primitive"; value: number }
   | { tag: "pointer"; value: number };
 
-type HeapValue =
-  | { tag: "string"; value: string }
-  | { tag: "object"; value: StackValue[] }
-  | { tag: "closure"; index: number; args: StackValue[] };
-
 type PointerOperand = { tag: "constant"; value: number } | { tag: "stack" };
 
 type LoadSource =
@@ -29,11 +24,11 @@ type StoreDestination =
 
 type JumpTarget = { tag: "constant"; value: number } | { tag: "stack" };
 
-type Op =
+export type Op =
   | { tag: "halt" }
   | { tag: "load"; from: LoadSource }
   | { tag: "store"; to: StoreDestination }
-  | { tag: "new"; type: HeapValue["tag"] }
+  | { tag: "new"; size: number }
   | { tag: "jump"; target: JumpTarget }
   | { tag: "jumpIfZero"; target: JumpTarget }
   | { tag: "call"; argCount: number; target: JumpTarget }
@@ -61,226 +56,84 @@ type Op =
   // builtins
   | { tag: "print" };
 
-type FuncRecord = { args: string[] };
-
-class LabelState {
-  private labels: Map<string, number> = new Map();
-  private labelRefs: Array<{ label: string; index: number; arity?: number }> =
-    [];
-  private funcs: Map<string, FuncRecord> = new Map();
-  private currentFunc: FuncRecord | null = null;
-  create(name: string, index: number): void {
-    if (this.labels.has(name)) throw new Error("duplicate identifier");
-    this.labels.set(name, index);
-  }
-  createFunc(name: string, index: number, args: string[]): void {
-    if (this.currentFunc) throw new Error("cannot nest functions");
-    this.currentFunc = { args };
-    if (this.labels.has(name)) throw new Error("duplicate identifier");
-    this.labels.set(name, index);
-    this.funcs.set(name, this.currentFunc);
-  }
-  endFunc(): FuncRecord {
-    if (!this.currentFunc) throw new Error("not in a function");
-    const func = this.currentFunc;
-    this.currentFunc = null;
-    return func;
-  }
-  ref(label: string, index: number): void {
-    this.labelRefs.push({ label, index });
-  }
-  callFunc(label: string, arity: number, index: number): void {
-    this.labelRefs.push({ label, index, arity });
-  }
-  patch(program: Op[]): void {
-    for (const { label, index } of this.labelRefs) {
-      const addr = this.labels.get(label);
-      if (addr === undefined) throw new Error();
-      const op = program[index];
-      switch (op.tag) {
-        case "jump":
-        case "jumpIfZero":
-          op.target = { tag: "constant", value: addr };
-          break;
-        case "call": {
-          const expectedArity = this.funcs.get(label)?.args.length;
-          if (op.argCount !== expectedArity) throw new Error();
-          op.target = { tag: "constant", value: addr };
-          break;
-        }
-        default:
-          throw new Error();
-      }
-    }
-  }
-}
-
-class LocalsState {
-  private locals: Map<string, number> = new Map();
-  init(name: string): void {
-    const index = this.locals.size;
-    this.locals.set(name, index);
-  }
-  get(name: string): number {
-    const offset = this.locals.get(name);
-    if (offset === undefined) throw new Error("unknown identifier");
-    return offset;
-  }
-  delete(name: string): void {
-    const found = this.locals.delete(name);
-    if (!found) throw new Error("unknown identifier");
-  }
-}
-
-export class Assembler {
-  private program: Op[] = [];
-  private internedStrings: Map<string, number> = new Map();
-  private labels = new LabelState();
-  private locals = new LocalsState();
-  assemble(): { program: Op[]; constants: HeapValue[] } {
-    this.labels.patch(this.program);
-    return { program: this.program, constants: this.getConstants() };
-  }
-  private getConstants() {
-    const constants: Array<HeapValue> = [];
-    for (const [str, index] of this.internedStrings) {
-      constants[index - 1] = { tag: "string", value: str };
-    }
-    return constants;
-  }
-  halt(): this {
-    this.program.push({ tag: "halt" });
-    return this;
-  }
-  number(value: number): this {
-    this.program.push({
-      tag: "load",
-      from: { tag: "immediate", value: { tag: "primitive", value } },
-    });
-    return this;
-  }
-  string(value: string): this {
-    let index = this.internedStrings.size + 1;
-    if (this.internedStrings.has(value)) {
-      index = this.internedStrings.get(value)!;
-    } else {
-      this.internedStrings.set(value, index);
-    }
-    this.program.push({
-      tag: "load",
-      from: { tag: "immediate", value: { tag: "pointer", value: index } },
-    });
-    return this;
-  }
-  initLocal(name: string): this {
-    this.locals.init(name);
-    return this;
-  }
-  local(name: string): this {
-    const frameOffset = this.locals.get(name);
-    this.program.push({
-      tag: "load",
-      from: { tag: "local", frameOffset },
-    });
-    return this;
-  }
-  setLocal(name: string): this {
-    const frameOffset = this.locals.get(name);
-    this.program.push({
-      tag: "store",
-      to: { tag: "local", frameOffset },
-    });
-    return this;
-  }
-  dropLocal(name: string): this {
-    this.locals.delete(name);
-    this.program.push({
-      tag: "store",
-      to: { tag: "drop" },
-    });
-    return this;
-  }
-  label(name: string): this {
-    this.labels.create(name, this.program.length);
-    return this;
-  }
-  jump(label: string): this {
-    this.labels.ref(label, this.program.length);
-    this.program.push({
-      tag: "jump",
-      target: { tag: "constant", value: 0 },
-    });
-    return this;
-  }
-  jumpIfZero(label: string): this {
-    this.labels.ref(label, this.program.length);
-    this.program.push({
-      tag: "jumpIfZero",
-      target: { tag: "constant", value: 0 },
-    });
-    return this;
-  }
-  add(): this {
-    this.program.push({ tag: "add" });
-    return this;
-  }
-  sub(): this {
-    this.program.push({ tag: "sub" });
-    return this;
-  }
-  mod(): this {
-    this.program.push({ tag: "mod" });
-    return this;
-  }
-  print(): this {
-    this.program.push({ tag: "print" });
-    return this;
-  }
-
-  func(name: string, ...args: string[]): this {
-    this.labels.createFunc(name, this.program.length, args);
-    for (const arg of args) {
-      this.initLocal(arg);
-    }
-    return this;
-  }
-  endfunc(): this {
-    const { args } = this.labels.endFunc();
-    for (const arg of args) {
-      this.locals.delete(arg);
-    }
-    return this;
-  }
-  call(funcName: string, arity: number): this {
-    this.labels.callFunc(funcName, arity, this.program.length);
-    this.program.push({
-      tag: "call",
-      argCount: arity,
-      target: { tag: "constant", value: 0 },
-    });
-    return this;
-  }
-  return(): this {
-    this.program.push({ tag: "return" });
-    return this;
-  }
-}
-
-export function interpret(data: { program: Op[]; constants: HeapValue[] }) {
+export function interpret(data: { program: Op[]; constants: string[] }) {
   const state = new InterpreterState(data.program, data.constants);
   runAll(state);
   return state.getOutput();
 }
 
+function assert<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error("missing value");
+  return value;
+}
+
+type HeapInternalValue =
+  | { tag: "string"; value: string }
+  | { tag: "object"; size: number }
+  | { tag: "free" }
+  | StackValue;
+
+class Heap {
+  private heap: HeapInternalValue[];
+  constructor(constants: string[]) {
+    // heap[0] is placeholder for null
+    this.heap = [
+      { tag: "primitive", value: 0 },
+      ...constants.map((str) => ({ tag: "string" as const, value: str })),
+    ];
+  }
+  get(address: number, offset: number): StackValue {
+    const res = assert(this.heap[address + offset]);
+    if (res.tag === "primitive" || res.tag === "pointer") return res;
+    throw new Error();
+  }
+  getString(address: number): string {
+    const res = assert(this.heap[address]);
+    if (res.tag !== "string") throw new Error();
+    return res.value;
+  }
+  set(address: number, offset: number, value: StackValue) {
+    const idx = address + offset;
+    if (idx >= this.heap.length) throw new Error("setting past allocated heap");
+    this.heap[idx] = value;
+  }
+  // TODO: free, free list, garbage collection
+  allocate(size: number): number {
+    this.heap.push({ tag: "object", size });
+    const addr = this.heap.length; // NOTE: pointing to first element, not header
+    for (let i = 0; i < size; i++) {
+      this.heap.push({ tag: "free" });
+    }
+    return addr;
+  }
+  toString(): string {
+    return `[${this.heap
+      .map((cell) => {
+        switch (cell.tag) {
+          case "object":
+            return `(${cell.size})`;
+          case "string":
+            return `"${cell.value}"`;
+          case "free":
+            return "_";
+          case "primitive":
+            return String(cell.value);
+          case "pointer":
+            return `0x${cell.value.toString(16)}`;
+        }
+      })
+      .join(" ")}]`;
+  }
+}
+
 class InterpreterState {
   private stack: StackFrame[];
-  private heap: HeapValue[];
+  heap: Heap;
   private ip = 0;
   private output: string[] = [];
-  constructor(private program: Op[], constants: HeapValue[]) {
+  constructor(private program: Op[], constants: string[]) {
     this.stack = [new StackFrame([], 0)];
-    // heap[0] is placeholder for null
-    this.heap = [{ tag: "object", value: [] }, ...constants];
+    this.heap = new Heap(constants);
   }
   getOutput() {
     return this.output;
@@ -295,10 +148,11 @@ class InterpreterState {
     return this.stack[this.stack.length - 1];
   }
   push(value: StackValue) {
+    if (!value) throw new Error("missing value");
     this.frame().locals.push(value);
   }
   pop(): StackValue {
-    return this.frame().locals.pop()!;
+    return assert(this.frame().locals.pop());
   }
   local(offset: number): StackValue {
     return this.frame().locals[offset];
@@ -306,37 +160,15 @@ class InterpreterState {
   setLocal(offset: number, value: StackValue) {
     this.frame().locals[offset] = value;
   }
-  getHeap(address: number, offset: number): StackValue {
-    const heapValue = this.heap[address];
-    switch (heapValue.tag) {
-      case "object":
-        return heapValue.value[offset];
-      default:
-        throw new Error();
-    }
-  }
-  setHeap(address: number, offset: number, value: StackValue) {
-    const heapValue = this.heap[address];
-    if (!heapValue) throw new Error();
-    switch (heapValue.tag) {
-      case "object":
-        heapValue.value[offset] = value;
-        return;
-      default:
-        throw new Error();
-    }
-  }
-  allocate(value: HeapValue): number {
-    return this.heap.push(value) - 1;
-  }
+
   pushFrame(argCount: number) {
     const args = this.frame().locals.splice(-argCount, argCount);
     const returnAddress = this.ip;
     this.stack.push(new StackFrame(args, returnAddress));
   }
   popFrame() {
-    const prevFrame = this.stack.pop()!;
-    const result = prevFrame.locals.pop()!;
+    const prevFrame = assert(this.stack.pop());
+    const result = assert(prevFrame.locals.pop());
     const returnAddress = prevFrame.returnAddress;
     this.push(result);
     this.jump(returnAddress);
@@ -344,16 +176,29 @@ class InterpreterState {
   write(value: string) {
     this.output.push(value);
   }
-  getString(address: number): string {
-    const heapValue = this.heap[address];
-    if (!heapValue || heapValue.tag !== "string") throw new Error();
-    return heapValue.value;
+
+  printStack(): string {
+    return `[${this.stack
+      .map((frame) =>
+        frame.locals
+          .map((local) => {
+            switch (local.tag) {
+              case "primitive":
+                return String(local.value);
+              case "pointer":
+                return `0x${local.value.toString(16)}`;
+            }
+          })
+          .join(" ")
+      )
+      .join(" | ")}]`;
   }
 }
 
 function runAll(state: InterpreterState) {
   while (true) {
     const op = state.nextOp();
+    // console.log(op, state.printStack(), state.heap.toString());
     if (op.tag === "halt") return;
     run(state, op);
   }
@@ -378,7 +223,8 @@ function run(state: InterpreterState, op: Op) {
         case "pointer": {
           const offset = getOperand(state, op.from.offset);
           const addr = getOperand(state, op.from.address);
-          state.push(state.getHeap(addr, offset));
+          const result = state.heap.get(addr, offset);
+          state.push(result);
           return;
         }
         default:
@@ -396,20 +242,17 @@ function run(state: InterpreterState, op: Op) {
           const value = state.pop();
           const offset = getOperand(state, op.to.offset);
           const addr = getOperand(state, op.to.address);
-          state.setHeap(addr, offset, value);
+          state.heap.set(addr, offset, value);
           return;
         }
         default:
           throw new Error();
       }
-    case "new":
-      switch (op.type) {
-        case "object":
-          state.allocate({ tag: "object", value: [] });
-          return;
-        default:
-          throw new Error();
-      }
+    case "new": {
+      const addr = state.heap.allocate(op.size);
+      state.push({ tag: "pointer", value: addr });
+      return;
+    }
     case "jump": {
       const index = getOperand(state, op.target);
       state.jump(index);
@@ -457,12 +300,12 @@ function run(state: InterpreterState, op: Op) {
           state.write(String(value.value));
           return;
         case "pointer":
-          state.write(state.getString(value.value));
+          state.write(state.heap.getString(value.value));
           return;
+        default:
+          throw new Error();
       }
-      return;
     }
-
     default:
       console.error(op);
       throw new Error("unknown opcode");

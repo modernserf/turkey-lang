@@ -1,4 +1,5 @@
-import { Assembler, interpret } from "./interpreter-3";
+import { interpret } from "./interpreter-3";
+import { Assembler } from "./assembler";
 
 it("runs fizzbuzz", () => {
   // prettier-ignore
@@ -175,4 +176,35 @@ it("runs fibonnaci recursively (without TCO)", () => {
     .assemble()
 
   expect(interpret(fibonacci)).toEqual(["6765"]);
+});
+
+it("works with objects in the heap", () => {
+  // prettier-ignore
+  const sum = new Assembler()
+    .object(6).initLocal('arr') // note: const array, 0: size, values are 1-indexed
+    .local('arr').number(5).setHeap(0)
+    .local('arr').number(1).setHeap(1)
+    .local('arr').number(2).setHeap(2)
+    .local('arr').number(3).setHeap(3)
+    .local('arr').number(4).setHeap(4)
+    .local('arr').number(5).setHeap(5)
+    .local('arr').call('sum', 1).print().halt()
+
+    .func('sum', 'arr')
+      .number(0).initLocal('acc')
+      .local('arr').getHeap(0).initLocal('i')
+      .label('loop')
+        .local('i').jumpIfZero('end')
+        .local('arr').local('i').getHeap()
+        .local('acc')
+        .add()
+        .setLocal('acc')
+        .local('i').number(1).sub().setLocal('i')
+        .jump('loop')
+      .label('end')
+        .local('acc').return()
+    .endfunc()
+    .assemble()
+
+  expect(interpret(sum)).toEqual(["15"]);
 });
