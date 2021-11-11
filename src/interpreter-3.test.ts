@@ -1,28 +1,27 @@
 import { Assembler, interpret } from "./interpreter-3";
 
-// prettier-ignore
-const fizzbuzz = new Assembler()
-  .initLocal("i", 1)
-  .label('loop')
-    .local('i').number(15).mod().jumpIfZero('print_fizzbuzz')
-    .local('i').number(3).mod().jumpIfZero('print_fizz')
-    .local('i').number(5).mod().jumpIfZero('print_buzz')
-    .local('i').print()
-  .label('loop_iter')
-    .local('i').number(1).add().setLocal('i')
-    .local('i').number(101).sub().jumpIfZero('end')
-    .jump('loop')
-  .label('print_fizzbuzz')
-    .string('FizzBuzz').print().jump('loop_iter')
-  .label('print_fizz')
-    .string('Fizz').print().jump('loop_iter')
-  .label('print_buzz')
-    .string('Buzz').print().jump('loop_iter')
-  .label('end')
-    .halt()
-  .assemble()
-
 it("runs fizzbuzz", () => {
+  // prettier-ignore
+  const fizzbuzz = new Assembler()
+    .number(0).initLocal("i")
+    .label('loop')
+      .local('i').number(100).sub().jumpIfZero('end')
+      .local('i').number(1).add().setLocal('i')
+      .local('i').number(15).mod().jumpIfZero('print_fizzbuzz')
+      .local('i').number(3).mod().jumpIfZero('print_fizz')
+      .local('i').number(5).mod().jumpIfZero('print_buzz')
+      .local('i').print()
+      .jump('loop')
+    .label('print_fizzbuzz')
+      .string('FizzBuzz').print().jump('loop')
+    .label('print_fizz')
+      .string('Fizz').print().jump('loop')
+    .label('print_buzz')
+      .string('Buzz').print().jump('loop')
+    .label('end')
+      .halt()
+    .assemble()
+
   expect(interpret(fizzbuzz)).toMatchInlineSnapshot(`
 Array [
   "1",
@@ -127,4 +126,53 @@ Array [
   "Buzz",
 ]
 `);
+});
+
+it("runs fibonacci imperatively", () => {
+  // prettier-ignore
+  const fibonacci = new Assembler()
+    .number(20).initLocal('i')
+    .number(0).initLocal('a')
+    .number(1).initLocal('b')
+    .label('loop')
+      .local('i').jumpIfZero('end')
+      .local('i').number(1).sub().setLocal('i')
+      .local('b').initLocal('swap')
+      .local('b').local('a').add().setLocal('b')
+      .local('swap').setLocal('a')
+      .dropLocal('swap')
+      .jump('loop')
+    .label('end')
+      .local('a').print()
+      .halt()
+    .assemble()
+
+  expect(interpret(fibonacci)).toEqual(["6765"]);
+});
+
+it("runs fibonnaci recursively (without TCO)", () => {
+  // prettier-ignore
+  const fibonacci = new Assembler()
+    .number(20).call('fib', 1).print()
+    .halt()
+    
+    .func('fib', 'i')
+      .local('i').number(0).number(1).call('fib_inner', 3).return()
+    .endfunc()
+
+    .func('fib_inner', 'i', 'a', 'b')
+      .local('i').jumpIfZero('return_a')
+      .local('i').number(1).sub().jumpIfZero('return_b')
+      
+      .local('i').number(1).sub()
+      .local('b')
+      .local('b').local('a').add()
+      .call('fib_inner', 3).return()
+
+      .label('return_a').local('a').return()
+      .label('return_b').local('b').return()
+    .endfunc()
+    .assemble()
+
+  expect(interpret(fibonacci)).toEqual(["6765"]);
 });

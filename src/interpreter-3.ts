@@ -61,32 +61,70 @@ type Op =
   // builtins
   | { tag: "print" };
 
-export class Assembler {
-  private program: Op[] = [];
-  private internedStrings: Map<string, number> = new Map();
+type FuncRecord = { args: string[] };
+
+class LabelState {
   private labels: Map<string, number> = new Map();
-  private labelRefs: Array<{ label: string; index: number }> = [];
-  private locals: Map<string, number> = new Map();
-  assemble(): { program: Op[]; constants: HeapValue[] } {
-    this.patchLabels();
-    return { program: this.program, constants: this.getConstants() };
+  private labelRefs: Array<{ label: string; index: number; arity?: number }> =
+    [];
+  private funcs: Map<string, FuncRecord> = new Map();
+  private currentFunc: FuncRecord | null = null;
+  create(name: string, index: number): void {
+    if (this.labels.has(name)) throw new Error("duplicate identifier");
+    this.labels.set(name, index);
   }
-  private patchLabels() {
+  createFunc(name: string, index: number, args: string[]): void {
+    if (this.currentFunc) throw new Error("cannot nest functions");
+    this.currentFunc = { args };
+    if (this.labels.has(name)) throw new Error("duplicate identifier");
+    this.labels.set(name, index);
+    this.funcs.set(name, this.currentFunc);
+  }
+  endFunc(): FuncRecord {
+    if (!this.currentFunc) throw new Error("not in a function");
+    const func = this.currentFunc;
+    this.currentFunc = null;
+    return func;
+  }
+  ref(label: string, index: number): void {
+    this.labelRefs.push({ label, index });
+  }
+  callFunc(label: string, arity: number, index: number): void {
+    this.labelRefs.push({ label, index, arity });
+  }
+  patch(program: Op[]): void {
     for (const { label, index } of this.labelRefs) {
       const addr = this.labels.get(label);
       if (addr === undefined) throw new Error();
-      const op = this.program[index];
+      const op = program[index];
       switch (op.tag) {
         case "jump":
         case "jumpIfZero":
-        case "call":
           op.target = { tag: "constant", value: addr };
           break;
+        case "call": {
+          const expectedArity = this.funcs.get(label)?.args.length;
+          if (op.argCount !== expectedArity) throw new Error();
+          op.target = { tag: "constant", value: addr };
+          break;
+        }
         default:
           throw new Error();
       }
     }
   }
+}
+
+export class Assembler {
+  private program: Op[] = [];
+  private internedStrings: Map<string, number> = new Map();
+  private labels = new LabelState();
+  private locals: Map<string, number> = new Map();
+  assemble(): { program: Op[]; constants: HeapValue[] } {
+    this.labels.patch(this.program);
+    return { program: this.program, constants: this.getConstants() };
+  }
+
   private getConstants() {
     const constants: Array<HeapValue> = [];
     for (const [str, index] of this.internedStrings) {
@@ -118,14 +156,9 @@ export class Assembler {
     });
     return this;
   }
-  initLocal(name: string, value: number): this {
+  initLocal(name: string): this {
     const index = this.locals.size;
-    if (this.locals.has(name)) throw new Error("duplicate identifier");
     this.locals.set(name, index);
-    this.program.push({
-      tag: "load",
-      from: { tag: "immediate", value: { tag: "primitive", value } },
-    });
     return this;
   }
   local(name: string): this {
@@ -146,13 +179,21 @@ export class Assembler {
     });
     return this;
   }
+  dropLocal(name: string): this {
+    const found = this.locals.delete(name);
+    if (!found) throw new Error("unknown identifier");
+    this.program.push({
+      tag: "store",
+      to: { tag: "drop" },
+    });
+    return this;
+  }
   label(name: string): this {
-    if (this.labels.has(name)) throw new Error("duplicate identifier");
-    this.labels.set(name, this.program.length);
+    this.labels.create(name, this.program.length);
     return this;
   }
   jump(label: string): this {
-    this.labelRefs.push({ label, index: this.program.length });
+    this.labels.ref(label, this.program.length);
     this.program.push({
       tag: "jump",
       target: { tag: "constant", value: 0 },
@@ -160,7 +201,7 @@ export class Assembler {
     return this;
   }
   jumpIfZero(label: string): this {
-    this.labelRefs.push({ label, index: this.program.length });
+    this.labels.ref(label, this.program.length);
     this.program.push({
       tag: "jumpIfZero",
       target: { tag: "constant", value: 0 },
@@ -181,6 +222,35 @@ export class Assembler {
   }
   print(): this {
     this.program.push({ tag: "print" });
+    return this;
+  }
+
+  func(name: string, ...args: string[]): this {
+    this.labels.createFunc(name, this.program.length, args);
+    for (const arg of args) {
+      this.initLocal(arg);
+    }
+    return this;
+  }
+  endfunc(): this {
+    const { args } = this.labels.endFunc();
+    for (const arg of args) {
+      const found = this.locals.delete(arg);
+      if (!found) throw new Error("unknown identifier");
+    }
+    return this;
+  }
+  call(funcName: string, arity: number): this {
+    this.labels.callFunc(funcName, arity, this.program.length);
+    this.program.push({
+      tag: "call",
+      argCount: arity,
+      target: { tag: "constant", value: 0 },
+    });
+    return this;
+  }
+  return(): this {
+    this.program.push({ tag: "return" });
     return this;
   }
 }
