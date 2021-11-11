@@ -9,21 +9,14 @@ type StackValue =
   | { tag: "primitive"; value: number }
   | { tag: "pointer"; value: number };
 
-type LoadSource =
-  | { tag: "immediate"; value: StackValue } // ( -- value)
-  | { tag: "local"; frameOffset: number } // ( -- value)
-  | { tag: "pointer_offset"; offset: number }
-  | { tag: "dup" }; // (value -- value value)
-
-type StoreDestination =
-  | { tag: "drop" } // (value -- )
-  | { tag: "local"; frameOffset: number } // (value -- )
-  | { tag: "pointer_offset"; offset: number };
-
 export type Op =
   | { tag: "halt" }
-  | { tag: "load"; from: LoadSource }
-  | { tag: "store"; to: StoreDestination }
+  | { tag: "load_immediate"; value: StackValue }
+  | { tag: "load_local"; frameOffset: number }
+  | { tag: "load_pointer_offset"; offset: number }
+  | { tag: "store_local"; frameOffset: number }
+  | { tag: "store_pointer_offset"; offset: number }
+  | { tag: "drop" }
   | { tag: "new"; size: number }
   | { tag: "jump"; target: number }
   | { tag: "jumpIfZero"; target: number }
@@ -203,46 +196,29 @@ function runAll(state: InterpreterState) {
 
 function run(state: InterpreterState, op: Op) {
   switch (op.tag) {
-    case "load":
-      switch (op.from.tag) {
-        case "dup": {
-          const value = state.pop();
-          state.push(value);
-          state.push(value);
-          return;
-        }
-        case "immediate":
-          state.push(op.from.value);
-          return;
-        case "local":
-          state.push(state.local(op.from.frameOffset));
-          return;
-        case "pointer_offset": {
-          const addr = state.pop().value;
-          state.push(state.heap.get(addr, op.from.offset));
-          return;
-        }
-        default:
-          throw new Error();
-      }
-    case "store":
-      switch (op.to.tag) {
-        case "drop":
-          state.pop();
-          return;
-        case "local":
-          state.setLocal(op.to.frameOffset, state.pop());
-          return;
-        case "pointer_offset": {
-          const value = state.pop();
-          const offset = op.to.offset;
-          const addr = state.pop().value;
-          state.heap.set(addr, offset, value);
-          return;
-        }
-        default:
-          throw new Error();
-      }
+    case "load_immediate":
+      state.push(op.value);
+      return;
+    case "load_local":
+      state.push(state.local(op.frameOffset));
+      return;
+    case "load_pointer_offset": {
+      const addr = state.pop().value;
+      state.push(state.heap.get(addr, op.offset));
+      return;
+    }
+    case "drop":
+      state.pop();
+      return;
+    case "store_local":
+      state.setLocal(op.frameOffset, state.pop());
+      return;
+    case "store_pointer_offset": {
+      const value = state.pop();
+      const addr = state.pop().value;
+      state.heap.set(addr, op.offset, value);
+      return;
+    }
     case "new": {
       const addr = state.heap.allocate(op.size);
       state.push({ tag: "pointer", value: addr });

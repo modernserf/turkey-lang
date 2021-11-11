@@ -108,16 +108,16 @@ export class Assembler {
   }
   number(value: number): this {
     this.program.push({
-      tag: "load",
-      from: { tag: "immediate", value: { tag: "primitive", value } },
+      tag: "load_immediate",
+      value: { tag: "primitive", value },
     });
     return this;
   }
   string(value: string): this {
     const index = this.strings.use(value);
     this.program.push({
-      tag: "load",
-      from: { tag: "immediate", value: { tag: "pointer", value: index } },
+      tag: "load_immediate",
+      value: { tag: "pointer", value: index },
     });
     return this;
   }
@@ -127,26 +127,17 @@ export class Assembler {
   }
   local(name: string): this {
     const frameOffset = this.locals.get(name);
-    this.program.push({
-      tag: "load",
-      from: { tag: "local", frameOffset },
-    });
+    this.program.push({ tag: "load_local", frameOffset });
     return this;
   }
   setLocal(name: string): this {
     const frameOffset = this.locals.get(name);
-    this.program.push({
-      tag: "store",
-      to: { tag: "local", frameOffset },
-    });
+    this.program.push({ tag: "store_local", frameOffset });
     return this;
   }
   dropLocal(name: string): this {
     this.locals.delete(name);
-    this.program.push({
-      tag: "store",
-      to: { tag: "drop" },
-    });
+    this.program.push({ tag: "drop" });
     return this;
   }
   object(size: number): this {
@@ -154,17 +145,11 @@ export class Assembler {
     return this;
   }
   setHeap(offset: number): this {
-    this.program.push({
-      tag: "store",
-      to: { tag: "pointer_offset", offset },
-    });
+    this.program.push({ tag: "store_pointer_offset", offset });
     return this;
   }
   getHeap(offset: number): this {
-    this.program.push({
-      tag: "load",
-      from: { tag: "pointer_offset", offset },
-    });
+    this.program.push({ tag: "load_pointer_offset", offset });
     return this;
   }
 
