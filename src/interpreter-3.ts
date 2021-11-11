@@ -1,10 +1,3 @@
-class StackFrame {
-  constructor(
-    public locals: StackValue[],
-    public readonly returnAddress: number
-  ) {}
-}
-
 type StackValue =
   | { tag: "primitive"; value: number }
   | { tag: "pointer"; value: number };
@@ -116,13 +109,68 @@ class Heap {
   }
 }
 
+class StackFrame {
+  constructor(
+    public readonly offset: number,
+    public readonly returnAddress: number,
+    public readonly next: StackFrame | undefined
+  ) {}
+}
+
+class Stack {
+  private stack: StackValue[] = [];
+  private frame: StackFrame;
+  constructor() {
+    this.frame = new StackFrame(0, 0, undefined);
+  }
+  push(value: StackValue): void {
+    if (!value) throw new Error("missing value");
+    this.stack.push(value);
+  }
+  pop(): StackValue {
+    return assert(this.stack.pop());
+  }
+  local(offset: number): StackValue {
+    return assert(this.stack[this.frame.offset + offset]);
+  }
+  setLocal(offset: number, value: StackValue): void {
+    this.stack[this.frame.offset + offset] = value;
+  }
+  pushFrame(argCount: number, returnAddress: number): void {
+    this.frame = new StackFrame(
+      this.stack.length - argCount,
+      returnAddress,
+      this.frame
+    );
+  }
+  popFrame(): number {
+    const result = assert(this.stack.pop());
+    this.stack.length = this.frame.offset;
+    this.push(result);
+    const returnAddress = this.frame.returnAddress;
+    this.frame = assert(this.frame.next);
+    return returnAddress;
+  }
+  toString(): string {
+    return `[${this.stack
+      .map((local) => {
+        switch (local.tag) {
+          case "primitive":
+            return String(local.value);
+          case "pointer":
+            return `0x${local.value.toString(16)}`;
+        }
+      })
+      .join(" ")}]`;
+  }
+}
+
 class InterpreterState {
-  private stack: StackFrame[];
+  stack: Stack = new Stack();
   heap: Heap;
   private ip = 0;
   private output: string[] = [];
   constructor(private program: Op[], constants: string[]) {
-    this.stack = [new StackFrame([], 0)];
     this.heap = new Heap(constants);
   }
   getOutput() {
@@ -131,57 +179,14 @@ class InterpreterState {
   nextOp() {
     return this.program[this.ip++];
   }
+  here(): number {
+    return this.ip;
+  }
   jump(address: number) {
     this.ip = address;
   }
-  private frame(): StackFrame {
-    return this.stack[this.stack.length - 1];
-  }
-  push(value: StackValue) {
-    if (!value) throw new Error("missing value");
-    this.frame().locals.push(value);
-  }
-  pop(): StackValue {
-    return assert(this.frame().locals.pop());
-  }
-  local(offset: number): StackValue {
-    return this.frame().locals[offset];
-  }
-  setLocal(offset: number, value: StackValue) {
-    this.frame().locals[offset] = value;
-  }
-
-  pushFrame(argCount: number) {
-    const args = this.frame().locals.splice(-argCount, argCount);
-    const returnAddress = this.ip;
-    this.stack.push(new StackFrame(args, returnAddress));
-  }
-  popFrame() {
-    const prevFrame = assert(this.stack.pop());
-    const result = assert(prevFrame.locals.pop());
-    const returnAddress = prevFrame.returnAddress;
-    this.push(result);
-    this.jump(returnAddress);
-  }
-  write(value: string) {
+  write(value: string): void {
     this.output.push(value);
-  }
-
-  printStack(): string {
-    return `[${this.stack
-      .map((frame) =>
-        frame.locals
-          .map((local) => {
-            switch (local.tag) {
-              case "primitive":
-                return String(local.value);
-              case "pointer":
-                return `0x${local.value.toString(16)}`;
-            }
-          })
-          .join(" ")
-      )
-      .join(" | ")}]`;
   }
 }
 
@@ -197,31 +202,31 @@ function runAll(state: InterpreterState) {
 function run(state: InterpreterState, op: Op) {
   switch (op.tag) {
     case "load_immediate":
-      state.push(op.value);
+      state.stack.push(op.value);
       return;
     case "load_local":
-      state.push(state.local(op.frameOffset));
+      state.stack.push(state.stack.local(op.frameOffset));
       return;
     case "load_pointer_offset": {
-      const addr = state.pop().value;
-      state.push(state.heap.get(addr, op.offset));
+      const addr = state.stack.pop().value;
+      state.stack.push(state.heap.get(addr, op.offset));
       return;
     }
     case "drop":
-      state.pop();
+      state.stack.pop();
       return;
     case "store_local":
-      state.setLocal(op.frameOffset, state.pop());
+      state.stack.setLocal(op.frameOffset, state.stack.pop());
       return;
     case "store_pointer_offset": {
-      const value = state.pop();
-      const addr = state.pop().value;
+      const value = state.stack.pop();
+      const addr = state.stack.pop().value;
       state.heap.set(addr, op.offset, value);
       return;
     }
     case "new": {
       const addr = state.heap.allocate(op.size);
-      state.push({ tag: "pointer", value: addr });
+      state.stack.push({ tag: "pointer", value: addr });
       return;
     }
     case "jump": {
@@ -229,40 +234,40 @@ function run(state: InterpreterState, op: Op) {
       return;
     }
     case "jumpIfZero": {
-      const predicate = state.pop();
+      const predicate = state.stack.pop();
       if (predicate.value === 0) {
         state.jump(op.target);
       }
       return;
     }
     case "call": {
-      state.pushFrame(op.argCount);
+      state.stack.pushFrame(op.argCount, state.here());
       state.jump(op.target);
       return;
     }
     case "return":
-      state.popFrame();
+      state.jump(state.stack.popFrame());
       return;
     case "add": {
-      const right = state.pop();
-      const left = state.pop();
-      state.push({ tag: "primitive", value: left.value + right.value });
+      const right = state.stack.pop();
+      const left = state.stack.pop();
+      state.stack.push({ tag: "primitive", value: left.value + right.value });
       return;
     }
     case "sub": {
-      const right = state.pop();
-      const left = state.pop();
-      state.push({ tag: "primitive", value: left.value - right.value });
+      const right = state.stack.pop();
+      const left = state.stack.pop();
+      state.stack.push({ tag: "primitive", value: left.value - right.value });
       return;
     }
     case "mod": {
-      const right = state.pop();
-      const left = state.pop();
-      state.push({ tag: "primitive", value: left.value % right.value });
+      const right = state.stack.pop();
+      const left = state.stack.pop();
+      state.stack.push({ tag: "primitive", value: left.value % right.value });
       return;
     }
     case "print": {
-      const value = state.pop();
+      const value = state.stack.pop();
       switch (value.tag) {
         case "primitive":
           state.write(String(value.value));
