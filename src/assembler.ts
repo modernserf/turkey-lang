@@ -1,4 +1,4 @@
-import { Op } from "./interpreter-3";
+import { Opcode } from "./interpreter-3";
 
 type FuncRecord = { args: string[] };
 
@@ -31,20 +31,21 @@ class LabelState {
   callFunc(label: string, arity: number, index: number): void {
     this.labelRefs.push({ label, index, arity });
   }
-  patch(program: Op[]): void {
+  patch(program: number[]): void {
     for (const { label, index } of this.labelRefs) {
       const addr = this.labels.get(label);
       if (addr === undefined) throw new Error();
       const op = program[index];
-      switch (op.tag) {
-        case "jump":
-        case "jumpIfZero":
-          op.target = addr;
+      switch (op) {
+        case Opcode.Jump:
+        case Opcode.JumpIfZero:
+          program[index + 1] = addr;
           break;
-        case "call": {
+        case Opcode.Call: {
+          const arity = program[index + 1];
           const expectedArity = this.funcs.get(label)?.args.length;
-          if (op.argCount !== expectedArity) throw new Error();
-          op.target = addr;
+          if (arity !== expectedArity) throw new Error();
+          program[index + 2] = addr;
           break;
         }
         default:
@@ -94,31 +95,25 @@ class InternedStringsState {
 }
 
 export class Assembler {
-  private program: Op[] = [];
+  private program: number[] = [];
   private labels = new LabelState();
   private locals = new LocalsState();
   private strings = new InternedStringsState();
-  assemble(): { program: Op[]; constants: string[] } {
+  assemble(): { program: number[]; constants: string[] } {
     this.labels.patch(this.program);
     return { program: this.program, constants: this.strings.getConstants() };
   }
   halt(): this {
-    this.program.push({ tag: "halt" });
+    this.program.push(Opcode.Halt);
     return this;
   }
   number(value: number): this {
-    this.program.push({
-      tag: "load_immediate",
-      value: { tag: "primitive", value },
-    });
+    this.program.push(Opcode.LoadPrimitive, value);
     return this;
   }
   string(value: string): this {
     const index = this.strings.use(value);
-    this.program.push({
-      tag: "load_immediate",
-      value: { tag: "pointer", value: index },
-    });
+    this.program.push(Opcode.LoadPointer, index);
     return this;
   }
   initLocal(name: string): this {
@@ -127,29 +122,29 @@ export class Assembler {
   }
   local(name: string): this {
     const frameOffset = this.locals.get(name);
-    this.program.push({ tag: "load_local", frameOffset });
+    this.program.push(Opcode.LoadLocal, frameOffset);
     return this;
   }
   setLocal(name: string): this {
     const frameOffset = this.locals.get(name);
-    this.program.push({ tag: "store_local", frameOffset });
+    this.program.push(Opcode.StoreLocal, frameOffset);
     return this;
   }
   dropLocal(name: string): this {
     this.locals.delete(name);
-    this.program.push({ tag: "drop" });
+    this.program.push(Opcode.Drop);
     return this;
   }
   object(size: number): this {
-    this.program.push({ tag: "new", size });
+    this.program.push(Opcode.New, size);
     return this;
   }
   setHeap(offset: number): this {
-    this.program.push({ tag: "store_pointer_offset", offset });
+    this.program.push(Opcode.StorePointerOffset, offset);
     return this;
   }
   getHeap(offset: number): this {
-    this.program.push({ tag: "load_pointer_offset", offset });
+    this.program.push(Opcode.LoadPointerOffset, offset);
     return this;
   }
 
@@ -159,28 +154,28 @@ export class Assembler {
   }
   jump(label: string): this {
     this.labels.ref(label, this.program.length);
-    this.program.push({ tag: "jump", target: 0 });
+    this.program.push(Opcode.Jump, 0);
     return this;
   }
   jumpIfZero(label: string): this {
     this.labels.ref(label, this.program.length);
-    this.program.push({ tag: "jumpIfZero", target: 0 });
+    this.program.push(Opcode.JumpIfZero, 0);
     return this;
   }
   add(): this {
-    this.program.push({ tag: "add" });
+    this.program.push(Opcode.Add);
     return this;
   }
   sub(): this {
-    this.program.push({ tag: "sub" });
+    this.program.push(Opcode.Sub);
     return this;
   }
   mod(): this {
-    this.program.push({ tag: "mod" });
+    this.program.push(Opcode.Mod);
     return this;
   }
   print(): this {
-    this.program.push({ tag: "print" });
+    this.program.push(Opcode.Print);
     return this;
   }
 
@@ -199,11 +194,11 @@ export class Assembler {
   }
   call(funcName: string, arity: number): this {
     this.labels.callFunc(funcName, arity, this.program.length);
-    this.program.push({ tag: "call", argCount: arity, target: 0 });
+    this.program.push(Opcode.Call, arity, 0);
     return this;
   }
   return(): this {
-    this.program.push({ tag: "return" });
+    this.program.push(Opcode.Return);
     return this;
   }
 }

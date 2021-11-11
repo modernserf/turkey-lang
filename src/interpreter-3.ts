@@ -1,48 +1,49 @@
-type StackValue =
-  | { tag: "primitive"; value: number }
-  | { tag: "pointer"; value: number };
-
-export type Op =
-  | { tag: "halt" }
-  | { tag: "load_immediate"; value: StackValue }
-  | { tag: "load_local"; frameOffset: number }
-  | { tag: "load_pointer_offset"; offset: number }
-  | { tag: "store_local"; frameOffset: number }
-  | { tag: "store_pointer_offset"; offset: number }
-  | { tag: "drop" }
-  | { tag: "new"; size: number }
-  | { tag: "jump"; target: number }
-  | { tag: "jumpIfZero"; target: number }
-  | { tag: "call"; argCount: number; target: number }
-  // TODO: call_closure
-  | { tag: "return" }
-
-  // arithmetic
-  | { tag: "add" }
-  | { tag: "sub" }
-  | { tag: "mul" }
-  | { tag: "div" }
-  | { tag: "mod" }
-  | { tag: "neg" }
-  // compare
-  | { tag: "eq" }
-  | { tag: "neq" }
-  | { tag: "lt" }
-  | { tag: "lte" }
-  | { tag: "gt" }
-  | { tag: "gte" }
-  // logical
-  | { tag: "and" }
-  | { tag: "or" }
-  | { tag: "xor" }
-  | { tag: "not" }
-  // builtins
-  | { tag: "print" };
+export enum Opcode {
+  Halt,
+  LoadPrimitive, // value
+  LoadPointer, // value
+  LoadLocal, // frameOffset
+  LoadPointerOffset, // heapOffset
+  StoreLocal, // frameOffset
+  StorePointerOffset, // offset
+  Drop,
+  New, // size
+  //
+  Jump, // target
+  JumpIfZero, // target
+  Call, // arity, target
+  Return,
+  //
+  Add,
+  Sub,
+  Mul,
+  Div,
+  Mod,
+  Neg,
+  //
+  Eq,
+  Neq,
+  Lt,
+  Lte,
+  Gt,
+  Gte,
+  //
+  And,
+  Or,
+  Xor,
+  Not,
+  //
+  Print,
+}
 
 function assert<T>(value: T | undefined): T {
   if (value === undefined) throw new Error("missing value");
   return value;
 }
+
+type StackValue =
+  | { tag: "primitive"; value: number }
+  | { tag: "pointer"; value: number };
 
 type HeapInternalValue =
   | { tag: "string"; value: string }
@@ -55,7 +56,7 @@ class Heap {
   constructor(constants: string[]) {
     // heap[0] is placeholder for null
     this.heap = [
-      { tag: "primitive", value: 0 },
+      { tag: "free" },
       ...constants.map((str) => ({ tag: "string" as const, value: str })),
     ];
   }
@@ -83,6 +84,7 @@ class Heap {
     }
     return addr;
   }
+  // istanbul ignore next
   toString(): string {
     return `[${this.heap
       .map((cell) => {
@@ -145,6 +147,7 @@ class Stack {
     this.frame = assert(this.frame.next);
     return returnAddress;
   }
+  // istanbul ignore next
   toString(): string {
     return `[${this.stack
       .map((local) => {
@@ -161,7 +164,7 @@ class Stack {
 
 class Program {
   private ip = 0;
-  constructor(private program: Op[]) {}
+  constructor(private program: number[]) {}
   nextOp() {
     return this.program[this.ip++];
   }
@@ -173,12 +176,12 @@ class Program {
   }
 }
 
-export function interpret(data: { program: Op[]; constants: string[] }) {
+export function interpret(data: { program: number[]; constants: string[] }) {
   return Interpreter.interpret(data);
 }
 
 class Interpreter {
-  static interpret(data: { program: Op[]; constants: string[] }) {
+  static interpret(data: { program: number[]; constants: string[] }) {
     const state = new Interpreter(data.program, data.constants);
     return state.runAll();
   }
@@ -186,7 +189,7 @@ class Interpreter {
   private heap: Heap;
   private program: Program;
   private output: string[] = [];
-  constructor(program: Op[], constants: string[]) {
+  constructor(program: number[], constants: string[]) {
     this.program = new Program(program);
     this.heap = new Heap(constants);
   }
@@ -196,80 +199,93 @@ class Interpreter {
   private runAll() {
     while (true) {
       const op = this.program.nextOp();
-      // console.log(op, this.printStack(), this.heap.toString());
-      if (op.tag === "halt") break;
+      // console.log(
+      //   this.program.here(),
+      //   Opcode[op],
+      //   this.stack.toString(),
+      //   this.heap.toString()
+      // );
+      if (op === Opcode.Halt) break;
       this.run(op);
     }
     return this.output;
   }
-  private run(op: Op) {
-    switch (op.tag) {
-      case "load_immediate":
-        this.stack.push(op.value);
+  private run(op: Opcode) {
+    switch (op) {
+      case Opcode.LoadPrimitive:
+        this.stack.push({ tag: "primitive", value: this.program.nextOp() });
         return;
-      case "load_local":
-        this.stack.push(this.stack.local(op.frameOffset));
+      case Opcode.LoadPointer:
+        this.stack.push({ tag: "pointer", value: this.program.nextOp() });
         return;
-      case "load_pointer_offset": {
+      case Opcode.LoadLocal:
+        this.stack.push(this.stack.local(this.program.nextOp()));
+        return;
+      case Opcode.LoadPointerOffset: {
         const addr = this.stack.pop().value;
-        this.stack.push(this.heap.get(addr, op.offset));
+        this.stack.push(this.heap.get(addr, this.program.nextOp()));
         return;
       }
-      case "drop":
+      case Opcode.Drop:
         this.stack.pop();
         return;
-      case "store_local":
-        this.stack.setLocal(op.frameOffset, this.stack.pop());
+      case Opcode.StoreLocal:
+        this.stack.setLocal(this.program.nextOp(), this.stack.pop());
         return;
-      case "store_pointer_offset": {
+      case Opcode.StorePointerOffset: {
         const value = this.stack.pop();
         const addr = this.stack.pop().value;
-        this.heap.set(addr, op.offset, value);
+        this.heap.set(addr, this.program.nextOp(), value);
         return;
       }
-      case "new": {
-        const addr = this.heap.allocate(op.size);
+      case Opcode.New: {
+        const size = this.program.nextOp();
+        const addr = this.heap.allocate(size);
         this.stack.push({ tag: "pointer", value: addr });
         return;
       }
-      case "jump": {
-        this.program.jump(op.target);
+      case Opcode.Jump: {
+        const target = this.program.nextOp();
+        this.program.jump(target);
         return;
       }
-      case "jumpIfZero": {
+      case Opcode.JumpIfZero: {
+        const target = this.program.nextOp();
         const predicate = this.stack.pop();
         if (predicate.value === 0) {
-          this.program.jump(op.target);
+          this.program.jump(target);
         }
         return;
       }
-      case "call": {
-        this.stack.pushFrame(op.argCount, this.program.here());
-        this.program.jump(op.target);
+      case Opcode.Call: {
+        const arity = this.program.nextOp();
+        const target = this.program.nextOp();
+        this.stack.pushFrame(arity, this.program.here());
+        this.program.jump(target);
         return;
       }
-      case "return":
+      case Opcode.Return:
         this.program.jump(this.stack.popFrame());
         return;
-      case "add": {
+      case Opcode.Add: {
         const right = this.stack.pop();
         const left = this.stack.pop();
         this.stack.push({ tag: "primitive", value: left.value + right.value });
         return;
       }
-      case "sub": {
+      case Opcode.Sub: {
         const right = this.stack.pop();
         const left = this.stack.pop();
         this.stack.push({ tag: "primitive", value: left.value - right.value });
         return;
       }
-      case "mod": {
+      case Opcode.Mod: {
         const right = this.stack.pop();
         const left = this.stack.pop();
         this.stack.push({ tag: "primitive", value: left.value % right.value });
         return;
       }
-      case "print": {
+      case Opcode.Print: {
         const value = this.stack.pop();
         switch (value.tag) {
           case "primitive":
@@ -278,12 +294,14 @@ class Interpreter {
           case "pointer":
             this.write(this.heap.getString(value.value));
             return;
+          // istanbul ignore next
           default:
             throw new Error();
         }
       }
+      // istanbul ignore next
       default:
-        console.error(op);
+        console.error(Opcode[op]);
         throw new Error("unknown opcode");
     }
   }
