@@ -195,7 +195,7 @@ it("works with objects in the heap", () => {
       .local('arr').getHeap(0).initLocal('i')
       .label('loop')
         .local('i').jumpIfZero('end')
-        .local('arr').local('i').getHeap()
+        .local('arr').local('i').add().getHeap(0)
         .local('acc')
         .add()
         .setLocal('acc')

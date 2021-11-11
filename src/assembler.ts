@@ -39,12 +39,12 @@ class LabelState {
       switch (op.tag) {
         case "jump":
         case "jumpIfZero":
-          op.target = { tag: "constant", value: addr };
+          op.target = addr;
           break;
         case "call": {
           const expectedArity = this.funcs.get(label)?.args.length;
           if (op.argCount !== expectedArity) throw new Error();
-          op.target = { tag: "constant", value: addr };
+          op.target = addr;
           break;
         }
         default:
@@ -153,31 +153,17 @@ export class Assembler {
     this.program.push({ tag: "new", size });
     return this;
   }
-  setHeap(offset?: number): this {
+  setHeap(offset: number): this {
     this.program.push({
       tag: "store",
-      to: {
-        tag: "pointer",
-        address: { tag: "stack" },
-        offset:
-          offset === undefined
-            ? { tag: "stack" }
-            : { tag: "constant", value: offset },
-      },
+      to: { tag: "pointer_offset", offset },
     });
     return this;
   }
-  getHeap(offset?: number): this {
+  getHeap(offset: number): this {
     this.program.push({
       tag: "load",
-      from: {
-        tag: "pointer",
-        address: { tag: "stack" },
-        offset:
-          offset === undefined
-            ? { tag: "stack" }
-            : { tag: "constant", value: offset },
-      },
+      from: { tag: "pointer_offset", offset },
     });
     return this;
   }
@@ -188,18 +174,12 @@ export class Assembler {
   }
   jump(label: string): this {
     this.labels.ref(label, this.program.length);
-    this.program.push({
-      tag: "jump",
-      target: { tag: "constant", value: 0 },
-    });
+    this.program.push({ tag: "jump", target: 0 });
     return this;
   }
   jumpIfZero(label: string): this {
     this.labels.ref(label, this.program.length);
-    this.program.push({
-      tag: "jumpIfZero",
-      target: { tag: "constant", value: 0 },
-    });
+    this.program.push({ tag: "jumpIfZero", target: 0 });
     return this;
   }
   add(): this {
@@ -234,11 +214,7 @@ export class Assembler {
   }
   call(funcName: string, arity: number): this {
     this.labels.callFunc(funcName, arity, this.program.length);
-    this.program.push({
-      tag: "call",
-      argCount: arity,
-      target: { tag: "constant", value: 0 },
-    });
+    this.program.push({ tag: "call", argCount: arity, target: 0 });
     return this;
   }
   return(): this {

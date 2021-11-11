@@ -9,29 +9,26 @@ type StackValue =
   | { tag: "primitive"; value: number }
   | { tag: "pointer"; value: number };
 
-type PointerOperand = { tag: "constant"; value: number } | { tag: "stack" };
-
 type LoadSource =
   | { tag: "immediate"; value: StackValue } // ( -- value)
   | { tag: "local"; frameOffset: number } // ( -- value)
-  | { tag: "pointer"; address: PointerOperand; offset: PointerOperand }
+  | { tag: "pointer_offset"; offset: number }
   | { tag: "dup" }; // (value -- value value)
 
 type StoreDestination =
   | { tag: "drop" } // (value -- )
   | { tag: "local"; frameOffset: number } // (value -- )
-  | { tag: "pointer"; address: PointerOperand; offset: PointerOperand };
-
-type JumpTarget = { tag: "constant"; value: number } | { tag: "stack" };
+  | { tag: "pointer_offset"; offset: number };
 
 export type Op =
   | { tag: "halt" }
   | { tag: "load"; from: LoadSource }
   | { tag: "store"; to: StoreDestination }
   | { tag: "new"; size: number }
-  | { tag: "jump"; target: JumpTarget }
-  | { tag: "jumpIfZero"; target: JumpTarget }
-  | { tag: "call"; argCount: number; target: JumpTarget }
+  | { tag: "jump"; target: number }
+  | { tag: "jumpIfZero"; target: number }
+  | { tag: "call"; argCount: number; target: number }
+  // TODO: call_closure
   | { tag: "return" }
 
   // arithmetic
@@ -220,11 +217,9 @@ function run(state: InterpreterState, op: Op) {
         case "local":
           state.push(state.local(op.from.frameOffset));
           return;
-        case "pointer": {
-          const offset = getOperand(state, op.from.offset);
-          const addr = getOperand(state, op.from.address);
-          const result = state.heap.get(addr, offset);
-          state.push(result);
+        case "pointer_offset": {
+          const addr = state.pop().value;
+          state.push(state.heap.get(addr, op.from.offset));
           return;
         }
         default:
@@ -238,10 +233,10 @@ function run(state: InterpreterState, op: Op) {
         case "local":
           state.setLocal(op.to.frameOffset, state.pop());
           return;
-        case "pointer": {
+        case "pointer_offset": {
           const value = state.pop();
-          const offset = getOperand(state, op.to.offset);
-          const addr = getOperand(state, op.to.address);
+          const offset = op.to.offset;
+          const addr = state.pop().value;
           state.heap.set(addr, offset, value);
           return;
         }
@@ -254,22 +249,19 @@ function run(state: InterpreterState, op: Op) {
       return;
     }
     case "jump": {
-      const index = getOperand(state, op.target);
-      state.jump(index);
+      state.jump(op.target);
       return;
     }
     case "jumpIfZero": {
       const predicate = state.pop();
-      const index = getOperand(state, op.target);
       if (predicate.value === 0) {
-        state.jump(index);
+        state.jump(op.target);
       }
       return;
     }
     case "call": {
-      const index = getOperand(state, op.target);
       state.pushFrame(op.argCount);
-      state.jump(index);
+      state.jump(op.target);
       return;
     }
     case "return":
@@ -309,14 +301,5 @@ function run(state: InterpreterState, op: Op) {
     default:
       console.error(op);
       throw new Error("unknown opcode");
-  }
-}
-
-function getOperand(state: InterpreterState, operand: PointerOperand): number {
-  switch (operand.tag) {
-    case "constant":
-      return operand.value;
-    case "stack":
-      return state.pop().value;
   }
 }
