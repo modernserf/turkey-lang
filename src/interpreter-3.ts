@@ -115,16 +115,32 @@ class LabelState {
   }
 }
 
+class LocalsState {
+  private locals: Map<string, number> = new Map();
+  init(name: string): void {
+    const index = this.locals.size;
+    this.locals.set(name, index);
+  }
+  get(name: string): number {
+    const offset = this.locals.get(name);
+    if (offset === undefined) throw new Error("unknown identifier");
+    return offset;
+  }
+  delete(name: string): void {
+    const found = this.locals.delete(name);
+    if (!found) throw new Error("unknown identifier");
+  }
+}
+
 export class Assembler {
   private program: Op[] = [];
   private internedStrings: Map<string, number> = new Map();
   private labels = new LabelState();
-  private locals: Map<string, number> = new Map();
+  private locals = new LocalsState();
   assemble(): { program: Op[]; constants: HeapValue[] } {
     this.labels.patch(this.program);
     return { program: this.program, constants: this.getConstants() };
   }
-
   private getConstants() {
     const constants: Array<HeapValue> = [];
     for (const [str, index] of this.internedStrings) {
@@ -157,31 +173,27 @@ export class Assembler {
     return this;
   }
   initLocal(name: string): this {
-    const index = this.locals.size;
-    this.locals.set(name, index);
+    this.locals.init(name);
     return this;
   }
   local(name: string): this {
-    const offset = this.locals.get(name);
-    if (offset === undefined) throw new Error("unknown identifier");
+    const frameOffset = this.locals.get(name);
     this.program.push({
       tag: "load",
-      from: { tag: "local", frameOffset: offset },
+      from: { tag: "local", frameOffset },
     });
     return this;
   }
   setLocal(name: string): this {
-    const offset = this.locals.get(name);
-    if (offset === undefined) throw new Error("unknown identifier");
+    const frameOffset = this.locals.get(name);
     this.program.push({
       tag: "store",
-      to: { tag: "local", frameOffset: offset },
+      to: { tag: "local", frameOffset },
     });
     return this;
   }
   dropLocal(name: string): this {
-    const found = this.locals.delete(name);
-    if (!found) throw new Error("unknown identifier");
+    this.locals.delete(name);
     this.program.push({
       tag: "store",
       to: { tag: "drop" },
@@ -235,8 +247,7 @@ export class Assembler {
   endfunc(): this {
     const { args } = this.labels.endFunc();
     for (const arg of args) {
-      const found = this.locals.delete(arg);
-      if (!found) throw new Error("unknown identifier");
+      this.locals.delete(arg);
     }
     return this;
   }
