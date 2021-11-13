@@ -223,8 +223,12 @@ export class Assembler {
     this.program.push(Opcode.Mod);
     return this;
   }
-  print(): this {
-    this.program.push(Opcode.Print);
+  printNum(): this {
+    this.program.push(Opcode.PrintNum);
+    return this;
+  }
+  printStr(): this {
+    this.program.push(Opcode.PrintStr);
     return this;
   }
 

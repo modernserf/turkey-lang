@@ -11,14 +11,14 @@ it("runs fizzbuzz", () => {
       .local('i').number(15).mod().jumpIfZero('print_fizzbuzz')
       .local('i').number(3).mod().jumpIfZero('print_fizz')
       .local('i').number(5).mod().jumpIfZero('print_buzz')
-      .local('i').print()
+      .local('i').printNum()
       .jump('loop')
     .label('print_fizzbuzz')
-      .string('FizzBuzz').print().jump('loop')
+      .string('FizzBuzz').printStr().jump('loop')
     .label('print_fizz')
-      .string('Fizz').print().jump('loop')
+      .string('Fizz').printStr().jump('loop')
     .label('print_buzz')
-      .string('Buzz').print().jump('loop')
+      .string('Buzz').printStr().jump('loop')
     .label('end')
       .halt()
     .assemble()
@@ -145,7 +145,7 @@ it("runs fibonacci imperatively", () => {
       .endScopeVoid()
       .jump('loop')
     .label('end')
-      .local('a').print()
+      .local('a').printNum()
       .halt()
     .assemble()
 
@@ -155,7 +155,7 @@ it("runs fibonacci imperatively", () => {
 it("runs fibonnaci recursively (without TCO)", () => {
   // prettier-ignore
   const fibonacci = new Assembler()
-    .number(20).call('fib', 1).print()
+    .number(20).call('fib', 1).printNum()
     .halt()
     
     .func('fib', 'i')
@@ -189,7 +189,7 @@ it("works with objects in the heap", () => {
     .local('arr').number(3).setHeap(3)
     .local('arr').number(4).setHeap(4)
     .local('arr').number(5).setHeap(5)
-    .local('arr').call('sum', 1).print().halt()
+    .local('arr').call('sum', 1).printNum().halt()
 
     .func('sum', 'arr')
       .number(0).initLocal('acc')
@@ -214,9 +214,9 @@ it("works with closures", () => {
   // prettier-ignore
   const adder = new Assembler()
     .call('getAdder', 0).initLocal('adder')
-    .number(1).local('adder').callClosure(1).print()
-    .number(2).local('adder').callClosure(1).print()
-    .number(3).local('adder').callClosure(1).print()
+    .number(1).local('adder').callClosure(1).printNum()
+    .number(2).local('adder').callClosure(1).printNum()
+    .number(3).local('adder').callClosure(1).printNum()
     .halt()
 
     .func('getAdder')
@@ -281,8 +281,8 @@ it("enforces function arity", () => {
 it("interns strings", () => {
   // prettier-ignore
   const program = new Assembler()
-    .string("foo").print()
-    .string("foo").print()
+    .string("foo").printStr()
+    .string("foo").printStr()
     .halt()
     .assemble()
 

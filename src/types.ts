@@ -98,5 +98,6 @@ export enum Opcode {
   Xor,
   Not,
   //
-  Print,
+  PrintNum,
+  PrintStr,
 }

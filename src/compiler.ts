@@ -67,7 +67,7 @@ function compileStmt(state: CompileState, stmt: Stmt): Type {
     }
     case "print": {
       compileExpr(state, stmt.expr);
-      state.asm.print();
+      state.asm.printNum();
       return voidType;
     }
     case "expr": {
