@@ -1,23 +1,21 @@
-import { Opcode } from "./interpreter-3";
+import { Scope } from "./scope";
+import { Opcode } from "./types";
+
+type Label = string | symbol;
 
 type FuncRecord = { args: string[]; env?: string[] };
 
 class LabelState {
-  private labels: Map<string, number> = new Map();
-  private labelRefs: Array<{ label: string; index: number; arity?: number }> =
+  private labels: Map<Label, number> = new Map();
+  private labelRefs: Array<{ label: Label; index: number; arity?: number }> =
     [];
-  private funcs: Map<string, FuncRecord> = new Map();
+  private funcs: Map<Label, FuncRecord> = new Map();
   private currentFunc: FuncRecord | null = null;
-  create(name: string, index: number): void {
+  create(name: Label, index: number): void {
     if (this.labels.has(name)) throw new Error("duplicate identifier");
     this.labels.set(name, index);
   }
-  createFunc(
-    name: string,
-    index: number,
-    args: string[],
-    env?: string[]
-  ): void {
+  createFunc(name: Label, index: number, args: string[], env?: string[]): void {
     if (this.currentFunc) throw new Error("cannot nest functions");
     this.currentFunc = { args, env };
     if (this.labels.has(name)) throw new Error("duplicate identifier");
@@ -30,10 +28,10 @@ class LabelState {
     this.currentFunc = null;
     return func;
   }
-  ref(label: string, index: number): void {
+  ref(label: Label, index: number): void {
     this.labelRefs.push({ label, index });
   }
-  callFunc(label: string, arity: number, index: number): void {
+  callFunc(label: Label, arity: number, index: number): void {
     this.labelRefs.push({ label, index, arity });
   }
   patch(program: number[]): void {
@@ -64,22 +62,28 @@ class LabelState {
 }
 
 class LocalsState {
-  private locals: Map<string, number> = new Map();
+  private locals: Scope<string, number> = new Scope();
   reset() {
-    this.locals = new Map();
+    this.locals = new Scope();
+  }
+  size() {
+    return this.locals.size;
   }
   init(name: string): void {
     const index = this.locals.size;
     this.locals.set(name, index);
   }
   get(name: string): number {
-    const offset = this.locals.get(name);
-    if (offset === undefined) throw new Error("unknown identifier");
-    return offset;
+    return this.locals.get(name);
   }
-  delete(name: string): void {
-    const found = this.locals.delete(name);
-    if (!found) throw new Error("unknown identifier");
+  pushScope(): void {
+    this.locals = this.locals.push();
+  }
+  popScope(): number {
+    const before = this.locals.size;
+    this.locals = this.locals.pop();
+    const after = this.locals.size;
+    return before - after;
   }
 }
 
@@ -111,6 +115,10 @@ export class Assembler {
     this.labels.patch(this.program);
     return { program: this.program, constants: this.strings.getConstants() };
   }
+  write(opcode: Opcode): this {
+    this.program.push(opcode);
+    return this;
+  }
   halt(): this {
     this.program.push(Opcode.Halt);
     return this;
@@ -122,6 +130,10 @@ export class Assembler {
   string(value: string): this {
     const index = this.strings.use(value);
     this.program.push(Opcode.LoadPointer, index);
+    return this;
+  }
+  drop(): this {
+    this.program.push(Opcode.Drop);
     return this;
   }
   initLocal(name: string): this {
@@ -138,9 +150,27 @@ export class Assembler {
     this.program.push(Opcode.StoreLocal, frameOffset);
     return this;
   }
-  dropLocal(name: string): this {
-    this.locals.delete(name);
-    this.program.push(Opcode.Drop);
+
+  scope(): this {
+    this.locals.pushScope();
+    return this;
+  }
+  endScopeVoid(): this {
+    const count = this.locals.popScope();
+    for (let i = 0; i < count; i++) {
+      this.program.push(Opcode.Drop);
+    }
+    return this;
+  }
+  endScopeValue(): this {
+    const count = this.locals.popScope();
+    // copy the value at the previouss top of the stack
+    // to the eventual new top of the stack
+    this.program.push(Opcode.StoreLocal, this.locals.size());
+    // drop everything else
+    for (let i = 0; i < count - 1; i++) {
+      this.program.push(Opcode.Drop);
+    }
     return this;
   }
 
@@ -162,16 +192,16 @@ export class Assembler {
     return this;
   }
 
-  label(name: string): this {
+  label(name: Label): this {
     this.labels.create(name, this.program.length);
     return this;
   }
-  jump(label: string): this {
+  jump(label: Label): this {
     this.labels.ref(label, this.program.length);
     this.program.push(Opcode.Jump, 0);
     return this;
   }
-  jumpIfZero(label: string): this {
+  jumpIfZero(label: Label): this {
     this.labels.ref(label, this.program.length);
     this.program.push(Opcode.JumpIfZero, 0);
     return this;
@@ -193,7 +223,7 @@ export class Assembler {
     return this;
   }
 
-  func(name: string, ...args: string[]): this {
+  func(name: Label, ...args: string[]): this {
     this.labels.createFunc(name, this.program.length, args);
     this.locals.reset();
     for (const arg of args) {
@@ -201,7 +231,7 @@ export class Assembler {
     }
     return this;
   }
-  closure(name: string, args: string[], env: string[]): this {
+  closure(name: Label, args: string[], env: string[]): this {
     this.labels.createFunc(name, this.program.length, args, env);
     this.locals.reset();
     for (const arg of args) {
@@ -222,7 +252,7 @@ export class Assembler {
     return this;
   }
 
-  call(funcName: string, arity: number): this {
+  call(funcName: Label, arity: number): this {
     this.labels.callFunc(funcName, arity, this.program.length);
     this.program.push(Opcode.Call, arity, 0);
     return this;

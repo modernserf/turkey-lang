@@ -1,4 +1,6 @@
-import { Stmt, Expr, Opcode, CompileResult } from "./types";
+import { Stmt, Expr, Opcode } from "./types";
+import { Assembler } from "./assembler";
+import { Scope } from "./scope";
 
 type Type =
   | { tag: "void" }
@@ -10,310 +12,200 @@ const integerType: Type = { tag: "integer" };
 const floatType: Type = { tag: "float" };
 const boolType: Type = { tag: "struct", value: "Boolean" };
 
-type ScopeRecord = { index: number; type: Type };
-
-class Scope {
-  private map: Map<string, ScopeRecord> = new Map();
-  private stackSize = 0;
-  constructor(private parent?: Scope) {
-    if (parent) this.stackSize = parent.stackSize + 1; // +1 for frame pointer
+class CompileState {
+  asm = new Assembler();
+  private types: Scope<string, Type> = new Scope();
+  bindType(name: string, type: Type) {
+    this.types.set(name, type);
   }
-  get(key: string): ScopeRecord {
-    const value = this.map.get(key);
-    if (value !== undefined) return value;
-    if (this.parent) return this.parent.get(key);
-    throw new Error(`Unidentified variable ${key}`);
+  getType(name: string): Type {
+    return this.types.get(name);
   }
-  add(key: string, type: Type): void {
-    if (this.map.has(key)) throw new Error(`Redefining variable ${key}`);
-    const index = this.stackSize;
-    this.stackSize++;
-    this.map.set(key, { type, index });
+  scope() {
+    this.types = this.types.push();
+    this.asm.scope();
   }
-}
-
-class ByteWriter {
-  private program = new Uint8Array(256);
-  length = 0;
-  result(): Uint8Array {
-    return this.program.slice(0, this.length);
-  }
-  writeByte(byte: number): number {
-    this.checkSize();
-    const prevLength = this.length;
-    this.program[this.length++] = byte;
-    return prevLength;
-  }
-  write32(number: number): number {
-    this.checkSize();
-    const prevLength = this.length;
-    // little endian i guess?
-    this.program[this.length++] = number & 0xff;
-    this.program[this.length++] = (number >> 8) & 0xff;
-    this.program[this.length++] = (number >> 16) & 0xff;
-    this.program[this.length++] = (number >> 24) & 0xff;
-    return prevLength;
-  }
-  writeBack(index: number): void {
-    this.program[index++] = this.length & 0xff;
-    this.program[index++] = (this.length >> 8) & 0xff;
-    this.program[index++] = (this.length >> 16) & 0xff;
-    this.program[index++] = (this.length >> 24) & 0xff;
-  }
-  private checkSize() {
-    if (this.length > this.program.length - 16) {
-      const old = this.program;
-      this.program = new Uint8Array(this.program.length << 1);
-      this.program.set(old);
-    }
-  }
-}
-
-class CompilerState {
-  constructor(
-    public constants: number[] = [],
-    public output = new ByteWriter(),
-    public scope = new Scope()
-  ) {}
-  inScope<T>(fn: (state: CompilerState) => T): T {
-    const nextState = new CompilerState(
-      this.constants,
-      this.output,
-      new Scope(this.scope)
-    );
-    return fn(nextState);
-  }
-}
-
-export function compile(input: Stmt[]): CompileResult {
-  const state = new CompilerState();
-  compileBlock(state, input, false);
-  state.output.writeByte(Opcode.Halt);
-  return { constants: state.constants, program: state.output.result() };
-}
-
-function compileBlock(
-  outerState: CompilerState,
-  input: Stmt[],
-  expectResult: boolean
-): Type {
-  return outerState.inScope((state) => {
-    if (input.length === 0) return voidType;
-
-    state.output.writeByte(Opcode.PushScope);
-
-    // all but last statement
-    for (let i = 0; i < input.length - 1; i++) {
-      compileStmt(state, input[i], false);
-    }
-
-    const returnType = compileStmt(
-      state,
-      input[input.length - 1],
-      expectResult
-    );
-
-    if (returnType.tag === "void") {
-      state.output.writeByte(Opcode.PopScopeVoid);
+  popScope(type: Type) {
+    this.types = this.types.pop();
+    if (type.tag === "void") {
+      this.asm.endScopeVoid();
     } else {
-      state.output.writeByte(Opcode.PopScope);
+      this.asm.endScopeValue();
     }
-    return returnType;
-  });
+  }
 }
 
-function compileStmt(
-  state: CompilerState,
-  stmt: Stmt,
-  expectResult: boolean
-): Type {
+export function compile(program: Stmt[]) {
+  const state = new CompileState();
+  for (const stmt of program) {
+    compileStmt(state, stmt);
+  }
+  return state.asm.assemble();
+}
+
+// if these return non-void, it put a value on the stack
+
+function compileStmt(state: CompileState, stmt: Stmt): Type {
   switch (stmt.tag) {
-    case "print":
-      compileExpr(state, stmt.expr, true);
-      state.output.writeByte(Opcode.Print);
-      return voidType;
     case "let": {
-      const inferredType = compileExpr(state, stmt.expr, true);
+      const type = compileExpr(state, stmt.expr);
       const name = stmt.binding.value;
-      state.scope.add(name, inferredType);
+      state.asm.initLocal(name);
+      state.bindType(name, type);
       return voidType;
     }
     case "while": {
-      const backIntoLoopPtr = state.output.length;
-      unify(boolType, compileExpr(state, stmt.expr, true));
-      state.output.writeByte(Opcode.JumpIfZero);
-      const outOfLoopPtr = state.output.write32(0);
-
-      compileBlock(state, stmt.block, false);
-      state.output.writeByte(Opcode.Jump);
-      state.output.write32(backIntoLoopPtr);
-
-      state.output.writeBack(outOfLoopPtr);
+      const loopBegin = Symbol("loop_begin");
+      const loopEnd = Symbol("loop_end");
+      state.asm.label(loopBegin);
+      unify(boolType, compileExpr(state, stmt.expr));
+      state.asm.jumpIfZero(loopEnd);
+      const blockType = compileBlock(state, stmt.block);
+      if (blockType.tag !== "void") state.asm.drop();
+      state.asm //
+        .jump(loopBegin)
+        .label(loopEnd);
+      return voidType;
+    }
+    case "print": {
+      compileExpr(state, stmt.expr);
+      state.asm.print();
       return voidType;
     }
     case "expr": {
-      const type = compileExpr(state, stmt.expr, expectResult);
-      if (!expectResult && type.tag !== "void") {
-        state.output.writeByte(Opcode.Drop);
-        return voidType;
-      } else {
-        return type;
-      }
+      return compileExpr(state, stmt.expr);
     }
   }
 }
 
-function compileExpr(
-  state: CompilerState,
-  expr: Expr,
-  expectResult: boolean
-): Type {
-  switch (expr.tag) {
-    case "identifier": {
-      return compileIdent(state, expr.value);
+function compileBlock(state: CompileState, block: Stmt[]): Type {
+  state.scope();
+  let returnType = voidType;
+  for (const stmt of block) {
+    if (returnType.tag !== "void") {
+      state.asm.drop();
     }
-    case "typeConstructor": {
+    returnType = compileStmt(state, stmt);
+  }
+  state.popScope(returnType);
+  return returnType;
+}
+
+function compileExpr(state: CompileState, expr: Expr): Type {
+  switch (expr.tag) {
+    case "integer":
+      state.asm.number(expr.value);
+      return integerType;
+    case "float":
+      state.asm.number(expr.value);
+      return floatType;
+    case "identifier":
+      state.asm.local(expr.value);
+      return state.getType(expr.value);
+    case "typeConstructor":
       switch (expr.value) {
         case "True":
-          state.output.writeByte(Opcode.IntImmediate);
-          state.output.writeByte(-1);
+          state.asm.number(1);
           return boolType;
         case "False":
-          state.output.writeByte(Opcode.IntImmediate);
-          state.output.writeByte(0);
+          state.asm.number(0);
           return boolType;
-        // istanbul ignore next
         default:
-          throw new Error("TODO: type constructors");
+          throw new Error("not yet implemented");
       }
-    }
-    case "integer": {
-      if (expr.value > -128 && expr.value < 127) {
-        state.output.writeByte(Opcode.IntImmediate);
-        state.output.writeByte(expr.value);
+    case "do":
+      return compileBlock(state, expr.block);
+    case "if": {
+      let returnType: Type | null = null;
+      const condEnd = Symbol("cond_end");
+      const condElse = Symbol("cond_else");
+      const conds = expr.cases.map((_, i) => Symbol(`cond_${i}`));
+      if (expr.elseBlock) {
+        conds.push(condElse);
       } else {
-        compileConstant(state, expr.value);
+        conds.push(condEnd);
       }
-      return integerType;
-    }
-    case "float": {
-      compileConstant(state, expr.value);
-      return floatType;
-    }
-    case "binaryOp": {
-      switch (expr.operator) {
-        case "+":
-          return arithmeticOp(state, expr, Opcode.AddInt, Opcode.AddFloat);
-        case "-":
-          return arithmeticOp(state, expr, Opcode.SubInt, Opcode.SubFloat);
-        case "*":
-          return arithmeticOp(state, expr, Opcode.MulInt, Opcode.MulFloat);
-        case "/":
-          arithmeticOp(state, expr, Opcode.DivInt, Opcode.DivFloat);
-          return floatType;
-        case "==":
-        case "!=": {
-          const leftType = compileExpr(state, expr.left, true);
-          const rightType = compileExpr(state, expr.right, true);
-          const exprType = unify(leftType, rightType);
-          state.output.writeByte(Opcode.Eq);
-          if (expr.operator === "!=") {
-            state.output.writeByte(Opcode.BitNot);
-          }
-          return exprType;
+
+      for (const [i, { predicate, block }] of expr.cases.entries()) {
+        state.asm.label(conds[i]);
+        unify(boolType, compileExpr(state, predicate));
+        state.asm.jumpIfZero(conds[i + 1]);
+        const type = compileBlock(state, block);
+        if (returnType) {
+          unify(type, returnType);
+        } else {
+          returnType = type;
         }
-        // istanbul ignore next
-        default:
-          throw new Error("unknown operator");
+        state.asm.jump(condEnd);
       }
+
+      if (expr.elseBlock) {
+        state.asm.label(condElse);
+        const type = compileBlock(state, expr.elseBlock);
+        if (returnType) {
+          unify(type, returnType);
+        } else {
+          returnType = type;
+        }
+      }
+
+      state.asm.label(condEnd);
+      return returnType || voidType;
     }
-    case "unaryOp":
+    case "unaryOp": {
+      const type = compileExpr(state, expr.expr);
       switch (expr.operator) {
         case "!":
-          unify(boolType, compileExpr(state, expr.expr, true));
-          state.output.writeByte(Opcode.BitNot);
-          return boolType;
-        case "-": {
-          const type = compileExpr(state, expr.expr, true);
-          switch (type.tag) {
-            case "integer":
-              state.output.writeByte(Opcode.NegInt);
-              return type;
-            case "float":
-              state.output.writeByte(Opcode.NegFloat);
-              return type;
-            default:
-              throw new Error("type error");
-          }
-        }
-        // istanbul ignore next
+          unify(boolType, type);
+          state.asm.write(Opcode.Not);
+          return type;
+        case "-":
+          checkNumber(type);
+          state.asm.write(Opcode.Neg);
+          return type;
         default:
           throw new Error("unknown operator");
       }
-    case "do": {
-      return compileBlock(state, expr.block, expectResult);
     }
-    case "if": {
-      const endJumps: number[] = [];
-      let type: Type | null = null;
-      for (const cond of expr.cases) {
-        unify(boolType, compileExpr(state, cond.predicate, true));
-        state.output.writeByte(Opcode.JumpIfZero);
-        const skip = state.output.write32(0);
-        const blockType = compileBlock(state, cond.block, expectResult);
-        type = unify(type, blockType);
-        state.output.writeByte(Opcode.Jump);
-        endJumps.push(state.output.write32(0));
-        state.output.writeBack(skip);
+    case "binaryOp": {
+      const left = compileExpr(state, expr.left);
+      const right = compileExpr(state, expr.right);
+      switch (expr.operator) {
+        case "+":
+          return arithmeticOp(state, Opcode.Add, left, right);
+        case "-":
+          return arithmeticOp(state, Opcode.Sub, left, right);
+        case "*":
+          return arithmeticOp(state, Opcode.Mul, left, right);
+        case "/":
+          arithmeticOp(state, Opcode.Div, left, right);
+          return floatType;
+        default:
+          throw new Error("unknown operator");
       }
-      type = unify(type, compileBlock(state, expr.elseBlock, expectResult));
-      for (const jump of endJumps) {
-        state.output.writeBack(jump);
-      }
-      return type;
     }
   }
-}
-
-function compileIdent(state: CompilerState, name: string): Type {
-  const result = state.scope.get(name);
-  state.output.writeByte(Opcode.GetLocal);
-  state.output.writeByte(result.index);
-  return result.type;
-}
-
-function compileConstant(state: CompilerState, value: number) {
-  const index = state.constants.push(value) - 1;
-  state.output.writeByte(Opcode.Constant);
-  state.output.writeByte(index); // TODO: more than 256 constants
 }
 
 function arithmeticOp(
-  state: CompilerState,
-  expr: { left: Expr; right: Expr },
-  intOp: Opcode,
-  floatOp: Opcode
-): Type {
-  const leftType = compileExpr(state, expr.left, true);
-  const rightType = compileExpr(state, expr.right, true);
-  const exprType = unify(leftType, rightType);
-  switch (exprType.tag) {
-    case "float":
-      state.output.writeByte(floatOp);
-      return exprType;
-    case "integer":
-      state.output.writeByte(intOp);
-      return exprType;
-    default:
-      throw new Error("operands must be numbers");
+  state: CompileState,
+  op: Opcode,
+  left: Type,
+  right: Type
+) {
+  unify(left, right);
+  checkNumber(left);
+  state.asm.write(op);
+  return left;
+}
+
+function checkNumber(type: Type) {
+  if (type.tag !== "float" && type.tag !== "integer") {
+    throw new Error("type mismatch");
   }
 }
 
-function unify(left: Type | null, right: Type): Type {
-  if (!left) return right;
-
-  if (left.tag !== right.tag) {
-    throw new Error("type error");
-  }
+function unify(left: Type, right: Type) {
+  if (left !== right) throw new Error("type mismatch");
   return left;
 }

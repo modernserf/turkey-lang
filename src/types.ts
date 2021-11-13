@@ -61,41 +61,41 @@ export type Binding = { tag: "identifier"; value: string };
 // compiler -> interpreter
 
 export enum Opcode {
-  Halt = 0x00,
-  Constant = 0x01, // (index: u8)
-  IntImmediate = 0x02, // (value: i8)
-  Print = 0x10,
-  AddInt = 0x20,
-  SubInt = 0x21,
-  MulInt = 0x22,
-  DivInt = 0x23,
-  ModInt = 0x24,
-  NegInt = 0x25,
-  BitNot = 0x26,
-  BitAnd = 0x27,
-  BitOr = 0x28,
-  BitXor = 0x29,
-  Eq = 0x2a,
-  Cmp = 0x2b,
-
-  GetLocal = 0x30, // (index: u8)
-  // SetLocal = 0x31,
-  PushScope = 0x40,
-  PopScope = 0x41,
-  PopScopeVoid = 0x42,
-  Drop = 0x43,
-  Jump = 0x50, // (address: u32)
-  JumpIfZero = 0x51, // (address: u32)
-
+  Halt,
+  LoadPrimitive, // value
+  LoadPointer, // value
+  LoadLocal, // frameOffset
+  LoadPointerOffset, // heapOffset
+  StoreLocal, // frameOffset
+  StorePointerOffset, // offset
+  Drop,
+  New, // size
+  NewClosure, // size, target
   //
-  AddFloat = 0xf0,
-  SubFloat = 0xf1,
-  MulFloat = 0xf2,
-  DivFloat = 0xf3,
-  NegFloat = 0xf4,
-}
-
-export interface CompileResult {
-  constants: any[];
-  program: Uint8Array;
+  Jump, // target
+  JumpIfZero, // target
+  Call, // arity, target
+  CallClosure, // arity
+  Return,
+  //
+  Add,
+  Sub,
+  Mul,
+  Div,
+  Mod,
+  Neg,
+  //
+  Eq,
+  Neq,
+  Lt,
+  Lte,
+  Gt,
+  Gte,
+  //
+  And,
+  Or,
+  Xor,
+  Not,
+  //
+  Print,
 }
