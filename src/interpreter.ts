@@ -37,7 +37,7 @@ class Heap {
     return res.value;
   }
   getClosureTarget(address: number): number {
-    const res = assert(this.heap[address]);
+    const res = assert(this.heap[address - 1]); // -1 to get header from ptr to first item
     // istanbul ignore next
     if (res.tag !== "closure") throw new Error();
     return res.target;
@@ -57,8 +57,8 @@ class Heap {
     return addr;
   }
   closure(size: number, target: number) {
-    const addr = this.heap.length; // NOTE: pointing to header
     this.heap.push({ tag: "closure", size, target });
+    const addr = this.heap.length; // NOTE: pointing to first arg
     for (let i = 0; i < size; i++) {
       this.heap.push({ tag: "free" });
     }
@@ -210,6 +210,9 @@ class Interpreter {
         this.stack.push(this.heap.get(addr, this.program.nextOp()));
         return;
       }
+      case Opcode.Dup:
+        this.stack.push(this.stack.peek());
+        return;
       case Opcode.Drop:
         this.stack.pop();
         return;

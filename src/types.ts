@@ -68,6 +68,7 @@ export enum Opcode {
   LoadPointerOffset, // heapOffset
   StoreLocal, // frameOffset
   StorePointerOffset, // offset
+  Dup,
   Drop,
   New, // size
   NewClosure, // size, target

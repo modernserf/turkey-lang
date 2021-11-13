@@ -109,6 +109,7 @@ export class Assembler {
   private labels = new LabelState();
   private locals = new LocalsState();
   private strings = new InternedStringsState();
+  private closureValues: Scope<string, number> = new Scope();
   assemble(): { program: number[]; constants: string[] } {
     this.labels.patch(this.program);
     return { program: this.program, constants: this.strings.getConstants() };
@@ -176,9 +177,15 @@ export class Assembler {
     this.program.push(Opcode.New, size);
     return this;
   }
-  newClosure(size: number, label: string): this {
+  newClosure(label: string, ...capturedVars: string[]): this {
     this.labels.ref(label, this.program.length);
-    this.program.push(Opcode.NewClosure, size, 0);
+
+    this.program.push(Opcode.NewClosure, capturedVars.length, 0);
+    for (const [i, name] of capturedVars.entries()) {
+      this.program.push(Opcode.Dup);
+      this.local(name).setHeap(i);
+    }
+
     return this;
   }
   setHeap(offset: number): this {
@@ -229,6 +236,12 @@ export class Assembler {
     }
     return this;
   }
+  endfunc(): this {
+    this.labels.endFunc();
+    this.locals.reset();
+    return this;
+  }
+
   closure(name: Label, args: string[], env: string[]): this {
     this.labels.createFunc(name, this.program.length, args, env);
     this.locals.reset();
@@ -236,17 +249,14 @@ export class Assembler {
       this.initLocal(arg);
     }
     this.initLocal("$");
+    this.closureValues = new Scope();
     for (const [i, arg] of env.entries()) {
-      this.local("$")
-        .getHeap(i + 1)
-        .initLocal(arg);
+      this.closureValues.init(arg, i);
     }
     return this;
   }
-
-  endfunc(): this {
-    this.labels.endFunc();
-    this.locals.reset();
+  closureValue(name: string): this {
+    this.local("$").getHeap(this.closureValues.get(name));
     return this;
   }
 
