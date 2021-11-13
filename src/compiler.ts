@@ -16,7 +16,7 @@ class CompileState {
   asm = new Assembler();
   private types: Scope<string, Type> = new Scope();
   bindType(name: string, type: Type) {
-    this.types.set(name, type);
+    this.types.init(name, type);
   }
   getType(name: string): Type {
     return this.types.get(name);
@@ -37,10 +37,8 @@ class CompileState {
 
 export function compile(program: Stmt[]) {
   const state = new CompileState();
-  for (const stmt of program) {
-    compileStmt(state, stmt);
-  }
-  return state.asm.assemble();
+  compileBlock(state, program);
+  return state.asm.halt().assemble();
 }
 
 // if these return non-void, it put a value on the stack
@@ -110,6 +108,7 @@ function compileExpr(state: CompileState, expr: Expr): Type {
         case "False":
           state.asm.number(0);
           return boolType;
+        // istanbul ignore next
         default:
           throw new Error("not yet implemented");
       }
@@ -120,37 +119,23 @@ function compileExpr(state: CompileState, expr: Expr): Type {
       const condEnd = Symbol("cond_end");
       const condElse = Symbol("cond_else");
       const conds = expr.cases.map((_, i) => Symbol(`cond_${i}`));
-      if (expr.elseBlock) {
-        conds.push(condElse);
-      } else {
-        conds.push(condEnd);
-      }
+      conds.push(condElse);
 
       for (const [i, { predicate, block }] of expr.cases.entries()) {
         state.asm.label(conds[i]);
         unify(boolType, compileExpr(state, predicate));
         state.asm.jumpIfZero(conds[i + 1]);
         const type = compileBlock(state, block);
-        if (returnType) {
-          unify(type, returnType);
-        } else {
-          returnType = type;
-        }
+        returnType = unify(returnType, type);
         state.asm.jump(condEnd);
       }
 
-      if (expr.elseBlock) {
-        state.asm.label(condElse);
-        const type = compileBlock(state, expr.elseBlock);
-        if (returnType) {
-          unify(type, returnType);
-        } else {
-          returnType = type;
-        }
-      }
+      state.asm.label(condElse);
+      const type = compileBlock(state, expr.elseBlock);
+      returnType = unify(returnType, type);
 
       state.asm.label(condEnd);
-      return returnType || voidType;
+      return returnType;
     }
     case "unaryOp": {
       const type = compileExpr(state, expr.expr);
@@ -163,6 +148,7 @@ function compileExpr(state: CompileState, expr: Expr): Type {
           checkNumber(type);
           state.asm.write(Opcode.Neg);
           return type;
+        // istanbul ignore next
         default:
           throw new Error("unknown operator");
       }
@@ -180,6 +166,7 @@ function compileExpr(state: CompileState, expr: Expr): Type {
         case "/":
           arithmeticOp(state, Opcode.Div, left, right);
           return floatType;
+        // istanbul ignore next
         default:
           throw new Error("unknown operator");
       }
@@ -205,7 +192,8 @@ function checkNumber(type: Type) {
   }
 }
 
-function unify(left: Type, right: Type) {
+function unify(left: Type | null, right: Type) {
+  if (!left) return right;
   if (left !== right) throw new Error("type mismatch");
   return left;
 }

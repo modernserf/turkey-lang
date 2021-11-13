@@ -238,3 +238,86 @@ it("works with closures", () => {
 
   expect(interpret(adder)).toEqual(["1", "3", "6"]);
 });
+
+it("enforces balanced scope", () => {
+  expect(() => {
+    // prettier-ignore
+    new Assembler()
+      .scope()
+      .endScopeVoid()
+      .endScopeVoid()
+      .assemble()
+  }).toThrow();
+});
+
+it("enforces a single level of functions", () => {
+  expect(() => {
+    // prettier-ignore
+    new Assembler()
+      .func('foo')
+      .func('bar')
+      .assemble()
+  }).toThrow();
+  expect(() => {
+    // prettier-ignore
+    new Assembler()
+      .func('foo')
+      .endfunc()
+      .endfunc()
+      .assemble()
+  }).toThrow();
+});
+
+it("enforces function arity", () => {
+  expect(() => {
+    // prettier-ignore
+    new Assembler()
+      .number(1).number(2).call('foo', 2)
+      .halt()
+      .func('foo', 'arg')
+      .endfunc()
+      .assemble()
+  }).toThrow();
+});
+
+it("interns strings", () => {
+  // prettier-ignore
+  const program = new Assembler()
+    .string("foo").print()
+    .string("foo").print()
+    .halt()
+    .assemble()
+
+  expect(interpret(program)).toEqual(["foo", "foo"]);
+});
+
+it("rejects out-of-bounds heap access", () => {
+  expect(() => {
+    // prettier-ignore
+    const program = new Assembler()
+      .getHeap(100)
+      .halt()
+      .assemble()
+
+    interpret(program);
+  }).toThrow();
+  expect(() => {
+    // prettier-ignore
+    const program = new Assembler()
+      .newObject(1).number(2).setHeap(100)
+      .halt()
+      .assemble()
+
+    interpret(program);
+  }).toThrow();
+});
+
+it("rejects memory access on heap headers", () => {
+  // prettier-ignore
+  const program = new Assembler()
+    .newObject(1).getHeap(-1)
+    .halt()
+    .assemble()
+
+  expect(() => interpret(program)).toThrow();
+});

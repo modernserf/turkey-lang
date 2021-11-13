@@ -9,15 +9,6 @@ it("compiles print statements, ints", () => {
   ]);
 });
 
-it("resizes the buffer", () => {
-  const size = 100;
-  const result = compile(
-    Array(size)
-      .fill(null)
-      .map(() => ({ tag: "print", expr: { tag: "integer", value: 1 } }))
-  );
-});
-
 it("drops exprs evaluated for side effects", () => {
   const result = compile([
     { tag: "expr", expr: { tag: "integer", value: 1 } },

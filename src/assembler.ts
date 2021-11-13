@@ -6,20 +6,18 @@ type Label = string | symbol;
 type FuncRecord = { args: string[]; env?: string[] };
 
 class LabelState {
-  private labels: Map<Label, number> = new Map();
+  private labels: Scope<Label, number> = new Scope();
   private labelRefs: Array<{ label: Label; index: number; arity?: number }> =
     [];
   private funcs: Map<Label, FuncRecord> = new Map();
   private currentFunc: FuncRecord | null = null;
   create(name: Label, index: number): void {
-    if (this.labels.has(name)) throw new Error("duplicate identifier");
-    this.labels.set(name, index);
+    this.labels.init(name, index);
   }
   createFunc(name: Label, index: number, args: string[], env?: string[]): void {
     if (this.currentFunc) throw new Error("cannot nest functions");
     this.currentFunc = { args, env };
-    if (this.labels.has(name)) throw new Error("duplicate identifier");
-    this.labels.set(name, index);
+    this.labels.init(name, index);
     this.funcs.set(name, this.currentFunc);
   }
   endFunc(): FuncRecord {
@@ -37,7 +35,6 @@ class LabelState {
   patch(program: number[]): void {
     for (const { label, index } of this.labelRefs) {
       const addr = this.labels.get(label);
-      if (addr === undefined) throw new Error();
       const op = program[index];
       switch (op) {
         case Opcode.Jump:
@@ -54,6 +51,7 @@ class LabelState {
           program[index + 2] = addr;
           break;
         }
+        // istanbul ignore next
         default:
           throw new Error();
       }
@@ -158,7 +156,7 @@ export class Assembler {
   endScopeVoid(): this {
     const count = this.locals.popScope();
     for (let i = 0; i < count; i++) {
-      this.program.push(Opcode.Drop);
+      this.drop();
     }
     return this;
   }
@@ -169,7 +167,7 @@ export class Assembler {
     this.program.push(Opcode.StoreLocal, this.locals.size());
     // drop everything else
     for (let i = 0; i < count - 1; i++) {
-      this.program.push(Opcode.Drop);
+      this.drop();
     }
     return this;
   }

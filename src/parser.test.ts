@@ -306,3 +306,66 @@ Array [
 ]
 `);
 });
+
+it("parses comparison expressions", () => {
+  const code = `a < b <= c > d >= e == f != g`;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "left": Object {
+        "left": Object {
+          "left": Object {
+            "left": Object {
+              "left": Object {
+                "left": Object {
+                  "tag": "identifier",
+                  "value": "a",
+                },
+                "operator": "<",
+                "right": Object {
+                  "tag": "identifier",
+                  "value": "b",
+                },
+                "tag": "binaryOp",
+              },
+              "operator": "<=",
+              "right": Object {
+                "tag": "identifier",
+                "value": "c",
+              },
+              "tag": "binaryOp",
+            },
+            "operator": ">",
+            "right": Object {
+              "tag": "identifier",
+              "value": "d",
+            },
+            "tag": "binaryOp",
+          },
+          "operator": ">=",
+          "right": Object {
+            "tag": "identifier",
+            "value": "e",
+          },
+          "tag": "binaryOp",
+        },
+        "operator": "==",
+        "right": Object {
+          "tag": "identifier",
+          "value": "f",
+        },
+        "tag": "binaryOp",
+      },
+      "operator": "!=",
+      "right": Object {
+        "tag": "identifier",
+        "value": "g",
+      },
+      "tag": "binaryOp",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});

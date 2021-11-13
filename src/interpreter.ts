@@ -28,15 +28,17 @@ class Heap {
   get(address: number, offset: number): StackValue {
     const res = assert(this.heap[address + offset]);
     if (res.tag === "primitive" || res.tag === "pointer") return res;
-    throw new Error();
+    throw new Error("illegal memory access");
   }
   getString(address: number): string {
     const res = assert(this.heap[address]);
+    // istanbul ignore next
     if (res.tag !== "string") throw new Error();
     return res.value;
   }
   getClosureTarget(address: number): number {
     const res = assert(this.heap[address]);
+    // istanbul ignore next
     if (res.tag !== "closure") throw new Error();
     return res.target;
   }
@@ -100,7 +102,6 @@ class Stack {
     this.frame = new StackFrame(0, 0, undefined);
   }
   push(value: StackValue): void {
-    if (!value) throw new Error("missing value");
     this.stack.push(value);
   }
   peek(): StackValue {
@@ -265,6 +266,16 @@ class Interpreter {
       case Opcode.Return:
         this.program.jump(this.stack.popFrame());
         return;
+      case Opcode.Not: {
+        const { value } = this.stack.pop();
+        this.stack.push({ tag: "primitive", value: value === 0 ? 1 : 0 });
+        return;
+      }
+      case Opcode.Neg: {
+        const { value } = this.stack.pop();
+        this.stack.push({ tag: "primitive", value: -value });
+        return;
+      }
       case Opcode.Add: {
         const right = this.stack.pop();
         const left = this.stack.pop();
