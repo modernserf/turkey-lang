@@ -34,7 +34,7 @@ export type Token =
   | { tag: "," }
   | { tag: "endOfInput" };
 
-// parser -> compiler
+// parser -> typechecker
 
 export class ParseError extends Error {
   constructor(expected: string, received: Token) {
@@ -73,6 +73,42 @@ export type Binding = { tag: "identifier"; value: string };
 
 export type TypeExpr = { tag: "identifier"; value: string };
 
+// typechecker -> compiler
+
+export type Type =
+  | { tag: "void" }
+  | { tag: "integer" }
+  | { tag: "float" }
+  | { tag: "struct"; value: string }
+  | { tag: "func"; parameters: Type[]; returnType: Type };
+
+export type CheckedExpr =
+  | { tag: "primitive"; value: number; type: Type }
+  | { tag: "identifier"; value: string; type: Type }
+  | { tag: "callBuiltIn"; opcode: Opcode; args: CheckedExpr[]; type: Type }
+  | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: Type }
+  | { tag: "do"; block: CheckedStmt[]; type: Type }
+  | {
+      tag: "if";
+      cases: Array<{ predicate: CheckedExpr; block: CheckedStmt[] }>;
+      elseBlock: CheckedStmt[];
+      type: Type;
+    };
+
+export type CheckedStmt =
+  | { tag: "let"; binding: Binding; expr: CheckedExpr }
+  | { tag: "return"; expr: CheckedExpr | null }
+  | {
+      tag: "func";
+      name: string;
+      parameters: Array<{ binding: Binding; type: Type }>;
+      upvalues: Array<{ name: string; type: Type }>;
+      type: Type;
+      block: CheckedStmt[];
+    }
+  | { tag: "while"; expr: CheckedExpr; block: CheckedStmt[] }
+  | { tag: "expr"; expr: CheckedExpr };
+
 // compiler -> interpreter
 
 export enum Opcode {
@@ -92,7 +128,8 @@ export enum Opcode {
   JumpIfZero, // target
   Call, // arity, target
   CallClosure, // arity
-  Return,
+  ReturnValue,
+  ReturnVoid,
   //
   Add,
   Sub,

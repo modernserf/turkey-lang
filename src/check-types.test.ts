@@ -1,8 +1,8 @@
-import { check as checkAST, CheckedStmt } from "./check-types";
+import { check as checkAST } from "./check-types";
 import { parse } from "./parser";
 import { lex } from "./lexer";
 
-function check(program: string): CheckedStmt[] {
+function check(program: string) {
   return checkAST(parse(lex(program)));
 }
 
@@ -72,14 +72,14 @@ Array [
               "value": 2,
             },
           ],
-          "name": "+",
+          "opcode": 17,
           "tag": "callBuiltIn",
           "type": Object {
             "tag": "integer",
           },
         },
       ],
-      "name": "print",
+      "opcode": 33,
       "tag": "callBuiltIn",
       "type": Object {
         "tag": "void",
@@ -107,14 +107,14 @@ Array [
               "value": 2.5,
             },
           ],
-          "name": "+",
+          "opcode": 17,
           "tag": "callBuiltIn",
           "type": Object {
             "tag": "float",
           },
         },
       ],
-      "name": "print",
+      "opcode": 33,
       "tag": "callBuiltIn",
       "type": Object {
         "tag": "void",
@@ -153,14 +153,14 @@ Array [
                             "value": "a",
                           },
                         ],
-                        "name": "negate",
+                        "opcode": 22,
                         "tag": "callBuiltIn",
                         "type": Object {
                           "tag": "integer",
                         },
                       },
                     ],
-                    "name": "print",
+                    "opcode": 33,
                     "tag": "callBuiltIn",
                     "type": Object {
                       "tag": "void",
@@ -197,7 +197,7 @@ Array [
                               "value": 1,
                             },
                           ],
-                          "name": "not",
+                          "opcode": 32,
                           "tag": "callBuiltIn",
                           "type": Object {
                             "tag": "struct",
@@ -214,7 +214,7 @@ Array [
                     },
                   },
                 ],
-                "name": "print",
+                "opcode": 33,
                 "tag": "callBuiltIn",
                 "type": Object {
                   "tag": "void",
@@ -280,14 +280,14 @@ Array [
                       "value": 3,
                     },
                   ],
-                  "name": "*",
+                  "opcode": 19,
                   "tag": "callBuiltIn",
                   "type": Object {
                     "tag": "integer",
                   },
                 },
               ],
-              "name": "+",
+              "opcode": 17,
               "tag": "callBuiltIn",
               "type": Object {
                 "tag": "integer",
@@ -301,7 +301,7 @@ Array [
               "value": 4,
             },
           ],
-          "name": "-",
+          "opcode": 18,
           "tag": "callBuiltIn",
           "type": Object {
             "tag": "integer",
@@ -315,7 +315,7 @@ Array [
           "value": 5,
         },
       ],
-      "name": "/",
+      "opcode": 20,
       "tag": "callBuiltIn",
       "type": Object {
         "tag": "float",
@@ -400,7 +400,7 @@ Array [
               "value": 1,
             },
           ],
-          "name": "print",
+          "opcode": 33,
           "tag": "callBuiltIn",
           "type": Object {
             "tag": "void",
@@ -447,7 +447,7 @@ Array [
               "value": 1,
             },
           ],
-          "name": "print",
+          "opcode": 33,
           "tag": "callBuiltIn",
           "type": Object {
             "tag": "void",
@@ -504,7 +504,7 @@ Array [
               "value": 1,
             },
           ],
-          "name": "+",
+          "opcode": 17,
           "tag": "callBuiltIn",
           "type": Object {
             "tag": "integer",
@@ -588,7 +588,7 @@ Array [
               "value": "y",
             },
           ],
-          "name": "+",
+          "opcode": 17,
           "tag": "callBuiltIn",
           "type": Object {
             "tag": "integer",
@@ -675,7 +675,7 @@ Array [
                   "value": 1,
                 },
               ],
-              "name": "print",
+              "opcode": 33,
               "tag": "callBuiltIn",
               "type": Object {
                 "tag": "void",
@@ -769,7 +769,7 @@ Array [
               "value": 1,
             },
           ],
-          "name": "+",
+          "opcode": 17,
           "tag": "callBuiltIn",
           "type": Object {
             "tag": "integer",

@@ -109,7 +109,6 @@ export class Assembler {
   private labels = new LabelState();
   private locals = new LocalsState();
   private strings = new InternedStringsState();
-  private closureValues: Scope<string, number> = new Scope();
   assemble(): { program: number[]; constants: string[] } {
     this.labels.patch(this.program);
     return { program: this.program, constants: this.strings.getConstants() };
@@ -249,14 +248,9 @@ export class Assembler {
   closure(name: Label, args: string[], env: string[]): this {
     this.func(name, ...args);
     this.initLocal("$");
-    this.closureValues = new Scope();
     for (const [i, arg] of env.entries()) {
-      this.closureValues.init(arg, i);
+      this.local("$").getHeap(i).initLocal(arg);
     }
-    return this;
-  }
-  closureValue(name: string): this {
-    this.local("$").getHeap(this.closureValues.get(name));
     return this;
   }
 
@@ -270,7 +264,11 @@ export class Assembler {
     return this;
   }
   return(): this {
-    this.program.push(Opcode.Return);
+    this.program.push(Opcode.ReturnValue);
+    return this;
+  }
+  returnVoid(): this {
+    this.program.push(Opcode.ReturnVoid);
     return this;
   }
 }

@@ -160,6 +160,12 @@ class Stack {
     this.frame = assert(this.frame.next);
     return returnAddress;
   }
+  popFrameVoid(): number {
+    this.stack.length = this.frame.offset;
+    const returnAddress = this.frame.returnAddress;
+    this.frame = assert(this.frame.next);
+    return returnAddress;
+  }
   // istanbul ignore next
   toString(): string {
     return `[${this.stack.map(printStackValue).join(" ")}]`;
@@ -284,8 +290,11 @@ class Interpreter {
         this.program.jump(target);
         return;
       }
-      case Opcode.Return:
+      case Opcode.ReturnValue:
         this.program.jump(this.stack.popFrame());
+        return;
+      case Opcode.ReturnVoid:
+        this.program.jump(this.stack.popFrameVoid());
         return;
       case Opcode.Not: {
         const value = this.stack.pop();

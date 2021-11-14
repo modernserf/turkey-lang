@@ -1,362 +1,162 @@
-import { Stmt, Expr, Opcode, TypeExpr as TypeExpr, Binding } from "./types";
 import { Assembler } from "./assembler";
-import { Scope } from "./scope";
+import { CheckedExpr, CheckedStmt } from "./types";
 
-type Type =
-  | { tag: "void" }
-  | { tag: "integer" }
-  | { tag: "float" }
-  | { tag: "struct"; value: string }
-  | { tag: "func"; parameters: Type[]; returnType: Type };
-const voidType: Type = { tag: "void" };
-const integerType: Type = { tag: "integer" };
-const floatType: Type = { tag: "float" };
-const boolType: Type = { tag: "struct", value: "Boolean" };
+function noMatch(value: never) {
+  throw new Error("no match");
+}
 
 type QueuedFunc = {
-  parameters: Array<{ binding: Binding; type: Type }>;
-  returnType: Type;
-  funcLabel: symbol;
-  parentScope: Scope<string, Type>;
+  label: symbol;
+  block: CheckedStmt[];
+
+  parameters: string[];
+  upvalues: string[];
 };
 
-class CompileState {
+export function compile(program: CheckedStmt[]) {
+  return new Compiler().compileProgram(program);
+}
+
+class Compiler {
   asm = new Assembler();
-  types: Scope<string, Type> = new Scope();
-  currentFunc: QueuedFunc | null = null;
-  scope() {
-    this.types = this.types.push();
+  funcs: QueuedFunc[] = [];
+  compileProgram(program: CheckedStmt[]) {
+    for (const stmt of program) {
+      this.compileStmt(stmt);
+    }
+    this.asm.halt();
+    for (const func of this.funcs) {
+      this.asm.closure(func.label, func.parameters, func.upvalues);
+      for (const stmt of func.block) {
+        this.compileStmt(stmt);
+      }
+      this.asm.endfunc();
+    }
+    return this.asm.assemble();
+  }
+  compileBlock(block: CheckedStmt[]) {
     this.asm.scope();
-  }
-  popScope(type: Type) {
-    this.types = this.types.pop();
-    if (type.tag === "void") {
-      this.asm.endScopeVoid();
-    } else {
+    let valueOnStack = false;
+    for (const stmt of block) {
+      if (valueOnStack) {
+        this.asm.drop();
+      }
+      this.compileStmt(stmt);
+      valueOnStack = stmt.tag === "expr";
+    }
+    if (hasValue(block)) {
       this.asm.endScopeValue();
+    } else {
+      this.asm.endScopeVoid();
+    }
+  }
+  compileStmt(stmt: CheckedStmt) {
+    switch (stmt.tag) {
+      case "expr":
+        this.compileExpr(stmt.expr);
+        return;
+      case "let":
+        this.compileExpr(stmt.expr);
+        this.asm.initLocal(stmt.binding.value);
+        return;
+      case "return":
+        if (stmt.expr) {
+          this.compileExpr(stmt.expr);
+          this.asm.return();
+        } else {
+          this.asm.returnVoid();
+        }
+        return;
+      case "while": {
+        const loopBegin = Symbol("loop_begin");
+        const loopEnd = Symbol("loop_end");
+        this.asm.label(loopBegin);
+        this.compileExpr(stmt.expr);
+        this.asm.jumpIfZero(loopEnd);
+
+        this.compileBlock(stmt.block);
+        if (hasValue(stmt.block)) {
+          this.asm.drop();
+        }
+
+        this.asm //
+          .jump(loopBegin)
+          .label(loopEnd);
+        return;
+      }
+      case "func": {
+        const label = Symbol(stmt.name);
+        const parameters = stmt.parameters.map((param) => param.binding.value);
+        const upvalues = stmt.upvalues.map((val) => val.name);
+        this.funcs.push({
+          label,
+          block: stmt.block,
+          parameters,
+          upvalues,
+        });
+
+        this.asm //
+          .newClosure(label, ...upvalues)
+          .initLocal(stmt.name);
+        return;
+      }
+      // istanbul ignore next
+      default:
+        noMatch(stmt);
+    }
+  }
+  compileExpr(expr: CheckedExpr) {
+    switch (expr.tag) {
+      case "identifier":
+        this.asm.local(expr.value);
+        return;
+      case "primitive":
+        this.asm.number(expr.value);
+        return;
+      case "do":
+        this.compileBlock(expr.block);
+        return;
+      case "if": {
+        const condEnd = Symbol("cond_end");
+        const condElse = Symbol("cond_else");
+        const conds = expr.cases.map((_, i) => Symbol(`cond_${i}`));
+        conds.push(condElse);
+
+        for (const [i, { predicate, block }] of expr.cases.entries()) {
+          this.asm.label(conds[i]);
+          this.compileExpr(predicate);
+          this.asm.jumpIfZero(conds[i + 1]);
+          this.compileBlock(block);
+          this.asm.jump(condEnd);
+        }
+
+        this.asm.label(condElse);
+        this.compileBlock(expr.elseBlock);
+        this.asm.label(condEnd);
+        return;
+      }
+      case "callBuiltIn":
+        for (const arg of expr.args) {
+          this.compileExpr(arg);
+        }
+        this.asm.write(expr.opcode);
+        return;
+      case "call":
+        for (const arg of expr.args) {
+          this.compileExpr(arg);
+        }
+        this.compileExpr(expr.callee);
+        this.asm.callClosure(expr.args.length);
+        return;
+      // istanbul ignore next
+      default:
+        noMatch(expr);
     }
   }
 }
 
-export function compile(program: Stmt[]) {
-  const state = new CompileState();
-  compileBlock(state, program);
-  state.asm.halt();
-  return state.asm.assemble();
+function hasValue(block: CheckedStmt[]): boolean {
+  if (!block.length) return false;
+  const stmt = block[block.length - 1];
+  return stmt.tag === "expr" && stmt.expr.type.tag !== "void";
 }
-
-// if these return non-void, it put a value on the stack
-
-function compileStmt(state: CompileState, stmt: Stmt): Type {
-  switch (stmt.tag) {
-    case "let": {
-      const type = compileExpr(state, stmt.expr);
-      const name = stmt.binding.value;
-      state.asm.initLocal(name);
-      state.types.init(name, type);
-      return voidType;
-    }
-    case "while": {
-      const loopBegin = Symbol("loop_begin");
-      const loopEnd = Symbol("loop_end");
-      state.asm.label(loopBegin);
-      unify(boolType, compileExpr(state, stmt.expr));
-      state.asm.jumpIfZero(loopEnd);
-      const blockType = compileBlock(state, stmt.block);
-      if (blockType.tag !== "void") state.asm.drop();
-      state.asm //
-        .jump(loopBegin)
-        .label(loopEnd);
-      return voidType;
-    }
-    case "print": {
-      compileExpr(state, stmt.expr);
-      state.asm.printNum();
-      return voidType;
-    }
-    case "func": {
-      throw new Error("not implemented");
-    }
-    case "return": {
-      if (!state.currentFunc) {
-        throw new Error("cannot return from top level");
-      }
-      if (stmt.expr) {
-        unify(state.currentFunc.returnType, compileExpr(state, stmt.expr));
-      } else {
-        unify(state.currentFunc.returnType, voidType);
-        state.asm.number(0);
-      }
-      state.asm.return();
-      return voidType;
-    }
-    case "expr": {
-      return compileExpr(state, stmt.expr);
-    }
-  }
-}
-
-function compileTypeExpr(type: TypeExpr): Type {
-  switch (type.value) {
-    case "Int":
-      return integerType;
-    case "Float":
-      return floatType;
-    case "Boolean":
-      return boolType;
-    case "Void":
-      return voidType;
-    default:
-      throw new Error("unknown type");
-  }
-}
-
-function compileBlock(state: CompileState, block: Stmt[]): Type {
-  state.scope();
-  let returnType = voidType;
-  for (const stmt of block) {
-    if (returnType.tag !== "void") {
-      state.asm.drop();
-    }
-    returnType = compileStmt(state, stmt);
-  }
-  state.popScope(returnType);
-  return returnType;
-}
-
-function compileExpr(state: CompileState, expr: Expr): Type {
-  switch (expr.tag) {
-    case "integer":
-      state.asm.number(expr.value);
-      return integerType;
-    case "float":
-      state.asm.number(expr.value);
-      return floatType;
-    case "identifier":
-      state.asm.local(expr.value);
-      return state.types.get(expr.value);
-    case "typeConstructor":
-      switch (expr.value) {
-        case "True":
-          state.asm.number(1);
-          return boolType;
-        case "False":
-          state.asm.number(0);
-          return boolType;
-        // istanbul ignore next
-        default:
-          throw new Error("not yet implemented");
-      }
-    case "do":
-      return compileBlock(state, expr.block);
-    case "if": {
-      let returnType: Type | null = null;
-      const condEnd = Symbol("cond_end");
-      const condElse = Symbol("cond_else");
-      const conds = expr.cases.map((_, i) => Symbol(`cond_${i}`));
-      conds.push(condElse);
-
-      for (const [i, { predicate, block }] of expr.cases.entries()) {
-        state.asm.label(conds[i]);
-        unify(boolType, compileExpr(state, predicate));
-        state.asm.jumpIfZero(conds[i + 1]);
-        const type = compileBlock(state, block);
-        returnType = unify(returnType, type);
-        state.asm.jump(condEnd);
-      }
-
-      state.asm.label(condElse);
-      const type = compileBlock(state, expr.elseBlock);
-      returnType = unify(returnType, type);
-
-      state.asm.label(condEnd);
-      return returnType;
-    }
-    case "unaryOp": {
-      const type = compileExpr(state, expr.expr);
-      switch (expr.operator) {
-        case "!":
-          unify(boolType, type);
-          state.asm.write(Opcode.Not);
-          return type;
-        case "-":
-          checkNumber(type);
-          state.asm.write(Opcode.Neg);
-          return type;
-        // istanbul ignore next
-        default:
-          throw new Error("unknown operator");
-      }
-    }
-    case "binaryOp": {
-      const left = compileExpr(state, expr.left);
-      const right = compileExpr(state, expr.right);
-      switch (expr.operator) {
-        case "+":
-          return arithmeticOp(state, Opcode.Add, left, right);
-        case "-":
-          return arithmeticOp(state, Opcode.Sub, left, right);
-        case "*":
-          return arithmeticOp(state, Opcode.Mul, left, right);
-        case "/":
-          arithmeticOp(state, Opcode.Div, left, right);
-          return floatType;
-        // istanbul ignore next
-        default:
-          throw new Error("unknown operator");
-      }
-    }
-    case "call": {
-      const args = expr.args.map((arg) => compileExpr(state, arg));
-      const func = compileExpr(state, expr.expr);
-      if (func.tag !== "func") throw new Error("not callable");
-      for (let i = 0; i < Math.max(args.length, func.parameters.length); i++) {
-        unify(args[i] ?? voidType, func.parameters[i] ?? voidType);
-      }
-      state.asm.callClosure(args.length);
-      return func.returnType;
-    }
-  }
-}
-
-// function compileFunc(
-//   state: CompileState,
-//   func: FuncDecl,
-//   envTypes: Map<string, Type>
-// ) {
-//   state.types = state.types.push();
-//   for (const param of func.parameters) {
-//     // TODO: this should be compiled already
-//     state.types.init(param.binding.value, compileTypeExpr(param.type));
-//   }
-//   for (const [name, type] of envTypes) {
-//     state.types.init(name, type);
-//   }
-
-//   state.asm.closure(
-//     func.pointer!,
-//     func.parameters.map((param) => param.binding.value),
-//     func.environment!
-//   );
-//   // TODO: use closureValue directly instead of copying to stack
-//   for (const envVar of func.environment!) {
-//     state.asm.closureValue(envVar).initLocal(envVar);
-//   }
-
-//   compileBlock(state, func.block);
-//   state.asm.endfunc();
-//   state.types = state.types.pop();
-// }
-
-function arithmeticOp(
-  state: CompileState,
-  op: Opcode,
-  left: Type,
-  right: Type
-) {
-  unify(left, right);
-  checkNumber(left);
-  state.asm.write(op);
-  return left;
-}
-
-function checkNumber(type: Type) {
-  if (type.tag !== "float" && type.tag !== "integer") {
-    throw new Error("type mismatch");
-  }
-}
-
-function unify(left: Type | null, right: Type) {
-  if (!left) return right;
-  if (left !== right) throw new Error("type mismatch");
-  return left;
-}
-
-// class FuncOrganizer {
-//   private funcs: FuncDecl[] = [];
-//   private stack: Array<{ params: Set<string>; env: Set<string> }> = [];
-//   static run(program: Stmt[]) {
-//     const funcOrganizer = new FuncOrganizer();
-//     funcOrganizer.block(program);
-//     return funcOrganizer.funcs;
-//   }
-//   private func(func: FuncDecl) {
-//     this.funcs.push(func);
-//     this.stack.push({
-//       params: new Set(func.parameters.map(({ binding }) => binding.value)),
-//       env: new Set(),
-//     });
-//     this.block(func.block);
-//     const frame = this.stack.pop()!;
-//     func.environment = Array.from(frame.env);
-//   }
-//   private identifier(name: string) {
-//     if (!this.stack.length) return;
-//     const { params, env } = this.stack[this.stack.length - 1];
-//     if (params.has(name)) return;
-//     env.add(name);
-//   }
-//   private block(block: Stmt[]) {
-//     for (const stmt of block) {
-//       this.stmt(stmt);
-//     }
-//   }
-//   private stmt(stmt: Stmt) {
-//     switch (stmt.tag) {
-//       case "func":
-//         this.func(stmt);
-//         return;
-//       case "let":
-//       case "expr":
-//       case "print":
-//         this.expr(stmt.expr);
-//         return;
-//       case "return":
-//         if (stmt.expr) this.expr(stmt.expr);
-//         return;
-//       case "while":
-//         this.block(stmt.block);
-//         return;
-//       // istanbul ignore next
-//       default:
-//         throw new Error();
-//     }
-//   }
-//   private expr(expr: Expr) {
-//     switch (expr.tag) {
-//       case "identifier":
-//         this.identifier(expr.value);
-//         return;
-//       case "integer":
-//       case "float":
-//       case "typeConstructor":
-//         return;
-//       case "unaryOp":
-//         this.expr(expr.expr);
-//         return;
-//       case "binaryOp":
-//         this.expr(expr.left);
-//         this.expr(expr.right);
-//         return;
-//       case "call":
-//         this.expr(expr.expr);
-//         for (const arg of expr.args) {
-//           this.expr(arg);
-//         }
-//         return;
-//       case "do":
-//         this.block(expr.block);
-//         return;
-//       case "if":
-//         for (const ifCase of expr.cases) {
-//           this.expr(ifCase.predicate);
-//           this.block(ifCase.block);
-//         }
-//         this.block(expr.elseBlock);
-//         return;
-//       // istanbul ignore next
-//       default:
-//         throw new Error();
-//     }
-//   }
-// }

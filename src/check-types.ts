@@ -1,43 +1,18 @@
-import { Stmt, Expr, TypeExpr, Binding } from "./types";
+import {
+  Stmt,
+  Expr,
+  TypeExpr,
+  Type,
+  CheckedStmt,
+  CheckedExpr,
+  Opcode,
+} from "./types";
 import { Scope } from "./scope";
 
-export type Type =
-  | { tag: "void" }
-  | { tag: "integer" }
-  | { tag: "float" }
-  | { tag: "struct"; value: string }
-  | { tag: "func"; parameters: Type[]; returnType: Type };
 const voidType: Type = { tag: "void" };
 const integerType: Type = { tag: "integer" };
 const floatType: Type = { tag: "float" };
 const boolType: Type = { tag: "struct", value: "Boolean" };
-
-export type CheckedExpr =
-  | { tag: "primitive"; value: number; type: Type }
-  | { tag: "identifier"; value: string; type: Type }
-  | { tag: "callBuiltIn"; name: string; args: CheckedExpr[]; type: Type }
-  | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: Type }
-  | { tag: "do"; block: CheckedStmt[]; type: Type }
-  | {
-      tag: "if";
-      cases: Array<{ predicate: CheckedExpr; block: CheckedStmt[] }>;
-      elseBlock: CheckedStmt[];
-      type: Type;
-    };
-
-export type CheckedStmt =
-  | { tag: "let"; binding: Binding; expr: CheckedExpr }
-  | { tag: "return"; expr: CheckedExpr | null }
-  | {
-      tag: "func";
-      name: string;
-      parameters: Array<{ binding: Binding; type: Type }>;
-      upvalues: Array<{ name: string; type: Type }>;
-      type: Type;
-      block: CheckedStmt[];
-    }
-  | { tag: "while"; expr: CheckedExpr; block: CheckedStmt[] }
-  | { tag: "expr"; expr: CheckedExpr };
 
 type CurrentFunc = {
   returnType: Type;
@@ -76,16 +51,19 @@ class TypeChecker {
     switch (stmt.tag) {
       case "expr":
         return { tag: "expr", expr: this.checkExpr(stmt.expr) };
-      case "print":
+      case "print": {
+        const expr = this.checkExpr(stmt.expr);
+        // TODO: support printing strings, forbid printing other values?
         return {
           tag: "expr",
           expr: {
             tag: "callBuiltIn",
-            name: "print",
-            args: [this.checkExpr(stmt.expr)],
+            opcode: Opcode.PrintNum,
+            args: [expr],
             type: voidType,
           },
         };
+      }
       case "let": {
         const expr = this.checkExpr(stmt.expr);
         if (stmt.type) {
@@ -219,14 +197,14 @@ class TypeChecker {
           case "!":
             return {
               tag: "callBuiltIn",
-              name: "not",
+              opcode: Opcode.Not,
               args: [checked],
               type: this.unify(boolType, checked.type),
             };
           case "-":
             return {
               tag: "callBuiltIn",
-              name: "negate",
+              opcode: Opcode.Neg,
               args: [checked],
               type: this.checkNumber(checked.type),
             };
@@ -238,13 +216,13 @@ class TypeChecker {
       case "binaryOp": {
         switch (expr.operator) {
           case "+":
-            return this.arithmeticOp("+", expr.left, expr.right);
+            return this.arithmeticOp(Opcode.Add, expr.left, expr.right);
           case "-":
-            return this.arithmeticOp("-", expr.left, expr.right);
+            return this.arithmeticOp(Opcode.Sub, expr.left, expr.right);
           case "*":
-            return this.arithmeticOp("*", expr.left, expr.right);
+            return this.arithmeticOp(Opcode.Mul, expr.left, expr.right);
           case "/": {
-            const res = this.arithmeticOp("/", expr.left, expr.right);
+            const res = this.arithmeticOp(Opcode.Div, expr.left, expr.right);
             res.type = floatType;
             return res;
           }
@@ -316,7 +294,7 @@ class TypeChecker {
     return left;
   }
 
-  private arithmeticOp(name: string, left: Expr, right: Expr): CheckedExpr {
+  private arithmeticOp(opcode: Opcode, left: Expr, right: Expr): CheckedExpr {
     const checkedLeft = this.checkExpr(left);
     const checkedRight = this.checkExpr(right);
     const type = this.checkNumber(
@@ -324,7 +302,7 @@ class TypeChecker {
     );
     return {
       tag: "callBuiltIn",
-      name,
+      opcode,
       args: [checkedLeft, checkedRight],
       type,
     };
