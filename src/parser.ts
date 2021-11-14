@@ -1,4 +1,12 @@
-import { Token, Stmt, Expr, Binding, ParseError, IfCase, Type } from "./types";
+import {
+  Token,
+  Stmt,
+  Expr,
+  Binding,
+  ParseError,
+  IfCase,
+  TypeExpr,
+} from "./types";
 
 interface IParseState {
   token(): Token;
@@ -178,7 +186,7 @@ const checkBinding: Parser<Binding | null> = (state) => {
   }
 };
 
-const parseType: Parser<Type> = (state) => {
+const parseType: Parser<TypeExpr> = (state) => {
   const token = state.token();
   switch (token.tag) {
     case "typeIdentifier":
@@ -189,7 +197,7 @@ const parseType: Parser<Type> = (state) => {
   }
 };
 
-const checkFuncParam: Parser<{ binding: Binding; type: Type } | null> = (
+const checkFuncParam: Parser<{ binding: Binding; type: TypeExpr } | null> = (
   state
 ) => {
   const binding = checkBinding(state);

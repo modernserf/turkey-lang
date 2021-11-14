@@ -44,17 +44,15 @@ export class ParseError extends Error {
 
 export type Stmt =
   | { tag: "print"; expr: Expr }
-  | { tag: "let"; binding: Binding; type: Type | null; expr: Expr }
+  | { tag: "let"; binding: Binding; type: TypeExpr | null; expr: Expr }
   | { tag: "while"; expr: Expr; block: Stmt[] }
   | { tag: "return"; expr: Expr | null }
   | {
       tag: "func";
       name: string;
-      parameters: Array<{ binding: Binding; type: Type }>;
-      returnType: Type;
+      parameters: Array<{ binding: Binding; type: TypeExpr }>;
+      returnType: TypeExpr;
       block: Stmt[];
-      environment?: string[];
-      pointer?: symbol;
     }
   | { tag: "expr"; expr: Expr };
 
@@ -73,7 +71,7 @@ export type IfCase = { tag: "cond"; predicate: Expr; block: Stmt[] };
 
 export type Binding = { tag: "identifier"; value: string };
 
-export type Type = { tag: "identifier"; value: string };
+export type TypeExpr = { tag: "identifier"; value: string };
 
 // compiler -> interpreter
 

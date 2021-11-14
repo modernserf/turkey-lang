@@ -92,7 +92,7 @@ it("drops expressions called for their side effects", () => {
   expect(run(code)).toEqual(["4"]);
 });
 
-it("calls functions", () => {
+it.skip("calls functions", () => {
   const code = `
     func print_twice (x: Int): Void {
       print x
@@ -105,7 +105,7 @@ it("calls functions", () => {
   expect(run(code)).toEqual(["2", "2"]);
 });
 
-it("calls closures", () => {
+it.skip("calls closures", () => {
   const code = `
     let x = 1.5
     func get_x (): Float {

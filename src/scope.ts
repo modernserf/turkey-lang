@@ -19,11 +19,11 @@ export class NoParentScopeError extends Error {
 export class Scope<K, V> {
   private map: Map<K, V> = new Map();
   constructor(private parent: Scope<K, V> | null = null) {}
-  // has(key: K): boolean {
-  //   if (this.map.has(key)) return true;
-  //   if (this.parent) return this.parent.has(key);
-  //   return false;
-  // }
+  has(key: K): boolean {
+    if (this.map.has(key)) return true;
+    if (this.parent) return this.parent.has(key);
+    return false;
+  }
   get(key: K): V {
     if (this.map.has(key)) return this.map.get(key)!;
     if (this.parent) return this.parent.get(key);
@@ -47,5 +47,15 @@ export class Scope<K, V> {
   }
   get size(): number {
     return this.map.size + (this.parent ? this.parent.size : 0);
+  }
+
+  isUpvalue(key: K, parentScope: Scope<K, V>): boolean {
+    if (this === parentScope) {
+      if (this.has(key)) return true;
+      throw new KeyNotFoundError(key);
+    }
+    if (!this.parent) throw new Error("parent scope not in scope chain");
+    if (this.map.has(key)) return false;
+    return this.parent.isUpvalue(key, parentScope);
   }
 }

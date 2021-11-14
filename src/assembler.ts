@@ -247,11 +247,7 @@ export class Assembler {
   }
 
   closure(name: Label, args: string[], env: string[]): this {
-    this.labels.createFunc(name, this.program.length, args, env);
-    this.locals.reset();
-    for (const arg of args) {
-      this.initLocal(arg);
-    }
+    this.func(name, ...args);
     this.initLocal("$");
     this.closureValues = new Scope();
     for (const [i, arg] of env.entries()) {
