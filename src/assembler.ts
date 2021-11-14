@@ -177,7 +177,7 @@ export class Assembler {
     this.program.push(Opcode.New, size);
     return this;
   }
-  newClosure(label: string, ...capturedVars: string[]): this {
+  newClosure(label: Label, ...capturedVars: string[]): this {
     this.labels.ref(label, this.program.length);
 
     this.program.push(Opcode.NewClosure, capturedVars.length, 0);

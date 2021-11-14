@@ -91,3 +91,45 @@ it("drops expressions called for their side effects", () => {
   `;
   expect(run(code)).toEqual(["4"]);
 });
+
+it("calls functions", () => {
+  const code = `
+    func print_twice (x: Int): Void {
+      print x
+      print x
+      return
+    }
+
+    print_twice(2)
+  `;
+  expect(run(code)).toEqual(["2", "2"]);
+});
+
+it("calls closures", () => {
+  const code = `
+    let x = 1.5
+    func get_x (): Float {
+      return x
+    }
+
+    print get_x()
+  `;
+
+  expect(run(code)).toEqual(["1.5"]);
+});
+
+it("forbids returning from top level", () => {
+  const code = `
+    return 1
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("forbids unknown types", () => {
+  const code = `
+    func get_x (): Nope {
+      return 1
+    }
+  `;
+  expect(() => run(code)).toThrow();
+});

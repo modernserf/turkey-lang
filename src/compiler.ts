@@ -1,4 +1,4 @@
-import { Stmt, Expr, Opcode } from "./types";
+import { Stmt, Expr, Opcode, Type as TypeExpr } from "./types";
 import { Assembler } from "./assembler";
 import { Scope } from "./scope";
 
@@ -6,15 +6,20 @@ type Type =
   | { tag: "void" }
   | { tag: "integer" }
   | { tag: "float" }
-  | { tag: "struct"; value: string };
+  | { tag: "struct"; value: string }
+  | { tag: "func"; parameters: Type[]; returnType: Type };
 const voidType: Type = { tag: "void" };
 const integerType: Type = { tag: "integer" };
 const floatType: Type = { tag: "float" };
 const boolType: Type = { tag: "struct", value: "Boolean" };
 
+type FuncDecl = Stmt & { tag: "func" };
+
 class CompileState {
   asm = new Assembler();
-  private types: Scope<string, Type> = new Scope();
+  mode: "script" | "func" = "script";
+  types: Scope<string, Type> = new Scope();
+  envTypes: Map<FuncDecl, Map<string, Type>> = new Map();
   bindType(name: string, type: Type) {
     this.types.init(name, type);
   }
@@ -36,9 +41,15 @@ class CompileState {
 }
 
 export function compile(program: Stmt[]) {
+  const funcs = FuncOrganizer.run(program);
   const state = new CompileState();
   compileBlock(state, program);
-  return state.asm.halt().assemble();
+  state.asm.halt();
+  state.mode = "func";
+  for (const func of funcs) {
+    compileFunc(state, func, state.envTypes.get(func)!);
+  }
+  return state.asm.assemble();
 }
 
 // if these return non-void, it put a value on the stack
@@ -70,9 +81,52 @@ function compileStmt(state: CompileState, stmt: Stmt): Type {
       state.asm.printNum();
       return voidType;
     }
+    case "func": {
+      const environmentTypes = new Map(
+        stmt.environment!.map((env) => [env, state.getType(env)])
+      );
+      state.envTypes.set(stmt, environmentTypes);
+
+      state.asm
+        .newClosure(stmt.pointer!, ...stmt.environment!)
+        .initLocal(stmt.name);
+
+      state.bindType(stmt.name, {
+        tag: "func",
+        parameters: stmt.parameters.map((param) => compileTypeExpr(param.type)),
+        returnType: compileTypeExpr(stmt.returnType),
+      });
+      return voidType;
+    }
+    case "return":
+      if (state.mode === "func") {
+        if (stmt.expr) {
+          compileExpr(state, stmt.expr);
+        } else {
+          state.asm.number(0);
+        }
+        state.asm.return();
+        return voidType;
+      }
+      throw new Error("cannot return from top level");
     case "expr": {
       return compileExpr(state, stmt.expr);
     }
+  }
+}
+
+function compileTypeExpr(type: TypeExpr): Type {
+  switch (type.value) {
+    case "Int":
+      return integerType;
+    case "Float":
+      return floatType;
+    case "Boolean":
+      return boolType;
+    case "Void":
+      return voidType;
+    default:
+      throw new Error("unknown type");
   }
 }
 
@@ -171,7 +225,46 @@ function compileExpr(state: CompileState, expr: Expr): Type {
           throw new Error("unknown operator");
       }
     }
+    case "call": {
+      const args = expr.args.map((arg) => compileExpr(state, arg));
+      const func = compileExpr(state, expr.expr);
+      if (func.tag !== "func") throw new Error("not callable");
+      for (let i = 0; i < Math.max(args.length, func.parameters.length); i++) {
+        unify(args[i] ?? voidType, func.parameters[i] ?? voidType);
+      }
+      state.asm.callClosure(args.length);
+      return func.returnType;
+    }
   }
+}
+
+function compileFunc(
+  state: CompileState,
+  func: FuncDecl,
+  envTypes: Map<string, Type>
+) {
+  state.types = state.types.push();
+  for (const param of func.parameters) {
+    // TODO: this should be compiled already
+    state.types.init(param.binding.value, compileTypeExpr(param.type));
+  }
+  for (const [name, type] of envTypes) {
+    state.types.init(name, type);
+  }
+
+  state.asm.closure(
+    func.pointer!,
+    func.parameters.map((param) => param.binding.value),
+    func.environment!
+  );
+  // TODO: use closureValue directly instead of copying to stack
+  for (const envVar of func.environment!) {
+    state.asm.closureValue(envVar).initLocal(envVar);
+  }
+
+  compileBlock(state, func.block);
+  state.asm.endfunc();
+  state.types = state.types.pop();
 }
 
 function arithmeticOp(
@@ -196,4 +289,93 @@ function unify(left: Type | null, right: Type) {
   if (!left) return right;
   if (left !== right) throw new Error("type mismatch");
   return left;
+}
+
+class FuncOrganizer {
+  private funcs: FuncDecl[] = [];
+  private stack: Array<{ params: Set<string>; env: Set<string> }> = [];
+  static run(program: Stmt[]) {
+    const funcOrganizer = new FuncOrganizer();
+    funcOrganizer.block(program);
+    return funcOrganizer.funcs;
+  }
+  private func(func: FuncDecl) {
+    this.funcs.push(func);
+    this.stack.push({
+      params: new Set(func.parameters.map(({ binding }) => binding.value)),
+      env: new Set(),
+    });
+    this.block(func.block);
+    const frame = this.stack.pop()!;
+    func.environment = Array.from(frame.env);
+  }
+  private identifier(name: string) {
+    if (!this.stack.length) return;
+    const { params, env } = this.stack[this.stack.length - 1];
+    if (params.has(name)) return;
+    env.add(name);
+  }
+  private block(block: Stmt[]) {
+    for (const stmt of block) {
+      this.stmt(stmt);
+    }
+  }
+  private stmt(stmt: Stmt) {
+    switch (stmt.tag) {
+      case "func":
+        this.func(stmt);
+        return;
+      case "let":
+      case "expr":
+      case "print":
+        this.expr(stmt.expr);
+        return;
+      case "return":
+        if (stmt.expr) this.expr(stmt.expr);
+        return;
+      case "while":
+        this.block(stmt.block);
+        return;
+      // istanbul ignore next
+      default:
+        throw new Error();
+    }
+  }
+  private expr(expr: Expr) {
+    switch (expr.tag) {
+      case "identifier":
+        this.identifier(expr.value);
+        return;
+      case "integer":
+      case "float":
+      case "typeConstructor":
+        return;
+      case "unaryOp":
+        this.expr(expr.expr);
+        return;
+      case "binaryOp":
+        this.expr(expr.left);
+        this.expr(expr.right);
+        return;
+      case "call":
+        this.expr(expr.expr);
+        for (const arg of expr.args) {
+          this.expr(arg);
+        }
+        return;
+      case "do":
+        this.block(expr.block);
+        return;
+      case "if":
+        for (const ifCase of expr.cases) {
+          this.expr(ifCase.predicate);
+          this.block(ifCase.block);
+        }
+        this.block(expr.elseBlock);
+        return;
+      // istanbul ignore next
+      default:
+        throw new Error();
+    }
+  }
 }

@@ -1,4 +1,4 @@
-import { Token, Stmt, Expr, Binding, ParseError, IfCase } from "./types";
+import { Token, Stmt, Expr, Binding, ParseError, IfCase, Type } from "./types";
 
 interface IParseState {
   token(): Token;
@@ -34,55 +34,93 @@ const parseStatement: Parser<Stmt> = (state) => {
   switch (token.tag) {
     case "print":
       state.advance();
-      return { tag: "print", expr: parseExpr(state) };
+      return { tag: "print", expr: matchExpr(state) };
     case "let": {
       state.advance();
-      const binding = parseBinding(state);
+      const binding = matchBinding(state);
       match(state, "=");
-      const expr = parseExpr(state);
+      const expr = matchExpr(state);
       return { tag: "let", binding, type: null, expr };
     }
     case "while": {
       state.advance();
       match(state, "(");
-      const expr = parseExpr(state);
+      const expr = matchExpr(state);
       match(state, ")");
       const block = parseBlock(state);
       return { tag: "while", expr, block };
     }
+    case "return": {
+      state.advance();
+      const expr = checkExpr(state);
+      return { tag: "return", expr };
+    }
+    case "func": {
+      state.advance();
+      const name = match(state, "identifier").value;
+      match(state, "(");
+      const parameters = commaList(state, checkFuncParam);
+      match(state, ")");
+      match(state, ":");
+      const returnType = parseType(state);
+      const block = parseBlock(state);
+      return { tag: "func", name, parameters, returnType, block };
+    }
     default:
-      return { tag: "expr", expr: parseExpr(state) };
+      return { tag: "expr", expr: matchExpr(state) };
   }
 };
 
-const parseExpr: Parser<Expr> = (state) => {
+const matchExpr: Parser<Expr> = (state) => {
+  return assert(state, "expression", checkExpr(state));
+};
+
+const checkExpr: Parser<Expr | null> = (state) => {
   return infixLeft(state, parseAddExpr, ["==", "!=", ">", "<", "<=", ">="]);
 };
 
-const parseAddExpr: Parser<Expr> = (state) => {
+const parseAddExpr: Parser<Expr | null> = (state) => {
   return infixLeft(state, parseMulExpr, ["+", "-"]);
 };
 
-const parseMulExpr: Parser<Expr> = (state) => {
+const parseMulExpr: Parser<Expr | null> = (state) => {
   return infixLeft(state, parsePrefixExpr, ["*", "/", "%"]);
 };
 
-const parsePrefixExpr: Parser<Expr> = (state) => {
+const parsePrefixExpr: Parser<Expr | null> = (state) => {
   const tok = state.token();
   if (tok.tag === "!" || tok.tag === "-") {
     state.advance();
-    return { tag: "unaryOp", operator: tok.tag, expr: parsePrefixExpr(state) };
+    const expr = assert(state, "expression", parsePrefixExpr(state));
+    return { tag: "unaryOp", operator: tok.tag, expr };
   } else {
-    return parseBaseExpr(state);
+    return parsePostfixExpr(state);
   }
 };
 
-const parseBaseExpr: Parser<Expr> = (state) => {
+const parsePostfixExpr: Parser<Expr | null> = (state) => {
+  const expr = parseBaseExpr(state);
+  if (!expr) return null;
+
   const token = state.token();
   switch (token.tag) {
     case "(": {
       state.advance();
-      const expr = parseExpr(state);
+      const args = commaList(state, checkExpr);
+      match(state, ")");
+      return { tag: "call", expr, args };
+    }
+    default:
+      return expr;
+  }
+};
+
+const parseBaseExpr: Parser<Expr | null> = (state) => {
+  const token = state.token();
+  switch (token.tag) {
+    case "(": {
+      state.advance();
+      const expr = matchExpr(state);
       match(state, ")");
       return expr;
     }
@@ -106,7 +144,7 @@ const parseBaseExpr: Parser<Expr> = (state) => {
       const cases: IfCase[] = [];
       while (true) {
         match(state, "(");
-        const predicate = parseExpr(state);
+        const predicate = matchExpr(state);
         match(state, ")");
         const block = parseBlock(state);
         cases.push({ tag: "cond", predicate, block });
@@ -121,19 +159,44 @@ const parseBaseExpr: Parser<Expr> = (state) => {
     }
 
     default:
-      throw new ParseError("expression", token);
+      return null;
   }
 };
 
-const parseBinding: Parser<Binding> = (state) => {
+const matchBinding: Parser<Binding> = (state) => {
+  return assert(state, "binding", checkBinding(state));
+};
+
+const checkBinding: Parser<Binding | null> = (state) => {
   const token = state.token();
   switch (token.tag) {
     case "identifier":
       state.advance();
       return { tag: "identifier", value: token.value };
     default:
-      throw new ParseError("binding", token);
+      return null;
   }
+};
+
+const parseType: Parser<Type> = (state) => {
+  const token = state.token();
+  switch (token.tag) {
+    case "typeIdentifier":
+      state.advance();
+      return { tag: "identifier", value: token.value };
+    default:
+      throw new ParseError("type", token);
+  }
+};
+
+const checkFuncParam: Parser<{ binding: Binding; type: Type } | null> = (
+  state
+) => {
+  const binding = checkBinding(state);
+  if (!binding) return null;
+  match(state, ":");
+  const type = parseType(state);
+  return { binding, type };
 };
 
 const parseEndOfInput: Parser<boolean> = (state) => {
@@ -152,11 +215,14 @@ function check(state: IParseState, tag: Token["tag"]): Token | null {
   }
 }
 
-function match(state: IParseState, tag: Token["tag"]): Token {
+function match<Tag extends Token["tag"]>(
+  state: IParseState,
+  tag: Tag
+): Token & { tag: Tag } {
   const token = state.token();
   if (token.tag === tag) {
     state.advance();
-    return token;
+    return token as Token & { tag: Tag };
   } else {
     throw new ParseError(tag, token);
   }
@@ -184,18 +250,38 @@ function parseUntil<T>(
 
 function infixLeft(
   state: IParseState,
-  nextParser: Parser<Expr>,
+  nextParser: Parser<Expr | null>,
   operators: Token["tag"][]
-): Expr {
-  let left = nextParser(state);
+): Expr | null {
+  const first = nextParser(state);
+  if (!first) return null;
+  let left: Expr = first;
   while (true) {
     const operator = state.token().tag;
     if (!operators.includes(operator)) {
       break;
     }
     state.advance();
-    const right = nextParser(state);
+    const right = assert(state, "expression", nextParser(state));
     left = { tag: "binaryOp", left, right, operator };
   }
   return left;
+}
+
+function commaList<T>(state: IParseState, checkParser: Parser<T | null>): T[] {
+  const out: T[] = [];
+  while (true) {
+    const res = checkParser(state);
+    if (res === null) break;
+    out.push(res);
+    if (!check(state, ",")) break;
+  }
+  return out;
+}
+
+function assert<T>(state: IParseState, type: string, res: T | null) {
+  if (!res) {
+    throw new ParseError(type, state.token());
+  }
+  return res;
 }

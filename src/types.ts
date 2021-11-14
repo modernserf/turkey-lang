@@ -7,6 +7,8 @@ export type Token =
   | { tag: "if" }
   | { tag: "else" }
   | { tag: "while" }
+  | { tag: "func" }
+  | { tag: "return" }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "identifier"; value: string }
@@ -28,6 +30,8 @@ export type Token =
   | { tag: ")" }
   | { tag: "{" }
   | { tag: "}" }
+  | { tag: ":" }
+  | { tag: "," }
   | { tag: "endOfInput" };
 
 // parser -> compiler
@@ -40,8 +44,18 @@ export class ParseError extends Error {
 
 export type Stmt =
   | { tag: "print"; expr: Expr }
-  | { tag: "let"; binding: Binding; type: null; expr: Expr }
+  | { tag: "let"; binding: Binding; type: Type | null; expr: Expr }
   | { tag: "while"; expr: Expr; block: Stmt[] }
+  | { tag: "return"; expr: Expr | null }
+  | {
+      tag: "func";
+      name: string;
+      parameters: Array<{ binding: Binding; type: Type }>;
+      returnType: Type;
+      block: Stmt[];
+      environment?: string[];
+      pointer?: symbol;
+    }
   | { tag: "expr"; expr: Expr };
 
 export type Expr =
@@ -52,11 +66,14 @@ export type Expr =
   | { tag: "binaryOp"; left: Expr; right: Expr; operator: string }
   | { tag: "unaryOp"; expr: Expr; operator: string }
   | { tag: "do"; block: Stmt[] }
-  | { tag: "if"; cases: IfCase[]; elseBlock: Stmt[] };
+  | { tag: "if"; cases: IfCase[]; elseBlock: Stmt[] }
+  | { tag: "call"; expr: Expr; args: Expr[] };
 
 export type IfCase = { tag: "cond"; predicate: Expr; block: Stmt[] };
 
 export type Binding = { tag: "identifier"; value: string };
+
+export type Type = { tag: "identifier"; value: string };
 
 // compiler -> interpreter
 

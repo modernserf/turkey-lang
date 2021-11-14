@@ -369,3 +369,132 @@ Array [
 ]
 `);
 });
+
+it("parses function declarations without arguments", () => {
+  const code = `
+  func foo (): Void {
+    return
+  }
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [
+      Object {
+        "expr": null,
+        "tag": "return",
+      },
+    ],
+    "name": "foo",
+    "parameters": Array [],
+    "returnType": Object {
+      "tag": "identifier",
+      "value": "Void",
+    },
+    "tag": "func",
+  },
+]
+`);
+});
+
+it("parses function declarations", () => {
+  const code = `
+    func foo (a: Int): Int {
+      return a
+    }
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [
+      Object {
+        "expr": Object {
+          "tag": "identifier",
+          "value": "a",
+        },
+        "tag": "return",
+      },
+    ],
+    "name": "foo",
+    "parameters": Array [
+      Object {
+        "binding": Object {
+          "tag": "identifier",
+          "value": "a",
+        },
+        "type": Object {
+          "tag": "identifier",
+          "value": "Int",
+        },
+      },
+    ],
+    "returnType": Object {
+      "tag": "identifier",
+      "value": "Int",
+    },
+    "tag": "func",
+  },
+]
+`);
+});
+
+it("rejects missing function type annotations", () => {
+  expect(() => {
+    parse(lex(`func foo (bar): Void {}`));
+  }).toThrow();
+
+  expect(() => {
+    parse(lex(`func foo (bar: 1): Void {}`));
+  }).toThrow();
+
+  expect(() => {
+    parse(lex(`func foo (bar: Int) {}`));
+  }).toThrow();
+});
+
+it("parses func calls", () => {
+  const code = `
+    foo(bar(1,2), baz())
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "args": Array [
+        Object {
+          "args": Array [
+            Object {
+              "tag": "integer",
+              "value": 1,
+            },
+            Object {
+              "tag": "integer",
+              "value": 2,
+            },
+          ],
+          "expr": Object {
+            "tag": "identifier",
+            "value": "bar",
+          },
+          "tag": "call",
+        },
+        Object {
+          "args": Array [],
+          "expr": Object {
+            "tag": "identifier",
+            "value": "baz",
+          },
+          "tag": "call",
+        },
+      ],
+      "expr": Object {
+        "tag": "identifier",
+        "value": "foo",
+      },
+      "tag": "call",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
