@@ -14,6 +14,12 @@ const integerType: Type = { tag: "integer" };
 const floatType: Type = { tag: "float" };
 const stringType: Type = { tag: "string" };
 const boolType: Type = { tag: "struct", value: "Boolean" };
+const builtInTypes = new Scope<string, Type>()
+  .set("Int", integerType)
+  .set("Float", floatType)
+  .set("Boolean", boolType)
+  .set("String", stringType)
+  .set("Void", voidType);
 
 type CurrentFunc = {
   returnType: Type;
@@ -21,22 +27,20 @@ type CurrentFunc = {
   outerScope: Scope<string, Type>;
 };
 
-// istanbul ignore next
-function noMatch(value: never) {
-  throw new Error("no match");
-}
-
 export function check(program: Stmt[]): CheckedStmt[] {
   return TypeChecker.check(program);
 }
 
 class TypeChecker {
+  private types: Scope<string, Type>;
   private scope: Scope<string, Type> = new Scope();
   private currentFunc: CurrentFunc | null = null;
   static check(program: Stmt[]): CheckedStmt[] {
     return new TypeChecker().checkBlock(program).block;
   }
-
+  constructor() {
+    this.types = builtInTypes.push();
+  }
   private checkBlock(block: Stmt[]): { block: CheckedStmt[]; type: Type } {
     const checkedBlock: CheckedStmt[] = [];
     let type = voidType;
@@ -221,7 +225,7 @@ class TypeChecker {
             };
           // istanbul ignore next
           default:
-            throw new Error("unknown operator");
+            throw new Error(`unknown operator ${expr.operator}`);
         }
       }
       case "binaryOp": {
@@ -232,14 +236,34 @@ class TypeChecker {
             return this.arithmeticOp(Opcode.Sub, expr.left, expr.right);
           case "*":
             return this.arithmeticOp(Opcode.Mul, expr.left, expr.right);
-          case "/": {
-            const res = this.arithmeticOp(Opcode.Div, expr.left, expr.right);
-            res.type = floatType;
-            return res;
+          case "%":
+            return this.arithmeticOp(Opcode.Mod, expr.left, expr.right);
+          case "/":
+            return this.arithmeticOp(
+              Opcode.Div,
+              expr.left,
+              expr.right,
+              floatType
+            );
+          case ">":
+            return this.arithmeticOp(
+              Opcode.Gt,
+              expr.left,
+              expr.right,
+              boolType
+            );
+          case "==": {
+            return this.arithmeticOp(
+              Opcode.Eq,
+              expr.left,
+              expr.right,
+              boolType
+            );
           }
+
           // istanbul ignore next
           default:
-            throw new Error("unknown operator");
+            throw new Error(`unknown operator ${expr.operator}`);
         }
       }
       case "call": {
@@ -299,13 +323,46 @@ class TypeChecker {
     return type;
   }
 
-  private unify(left: Type | null, right: Type) {
+  private unify(left: Type | null, right: Type): Type {
     if (!left) return right;
-    if (left !== right) throw new Error("type mismatch");
-    return left;
+    if (left.tag === right.tag) {
+      switch (left.tag) {
+        case "void":
+        case "integer":
+        case "float":
+        case "string":
+          return left;
+        case "struct":
+          if (left.value === (right as typeof left).value) return left;
+          break;
+        case "func": {
+          const returnType = this.unify(
+            left.returnType,
+            (right as typeof left).returnType
+          );
+          if (
+            left.parameters.length !== (right as typeof left).parameters.length
+          ) {
+            throw new Error("arity mismatch");
+          }
+          const parameters = left.parameters.map((param, i) => {
+            return this.unify(param, (right as typeof left).parameters[i]);
+          });
+
+          return { tag: "func", parameters, returnType };
+        }
+      }
+    }
+
+    throw new Error("type mismatch");
   }
 
-  private arithmeticOp(opcode: Opcode, left: Expr, right: Expr): CheckedExpr {
+  private arithmeticOp(
+    opcode: Opcode,
+    left: Expr,
+    right: Expr,
+    outType?: Type
+  ): CheckedExpr {
     const checkedLeft = this.checkExpr(left);
     const checkedRight = this.checkExpr(right);
     const type = this.checkNumber(
@@ -315,24 +372,20 @@ class TypeChecker {
       tag: "callBuiltIn",
       opcode,
       args: [checkedLeft, checkedRight],
-      type,
+      type: outType ?? type,
     };
   }
 
   private checkTypeExpr(type: TypeExpr): Type {
-    switch (type.value) {
-      case "Int":
-        return integerType;
-      case "Float":
-        return floatType;
-      case "Boolean":
-        return boolType;
-      case "String":
-        return stringType;
-      case "Void":
-        return voidType;
-      default:
-        throw new Error("unknown type");
+    switch (type.tag) {
+      case "identifier":
+        return this.types.get(type.value);
+      case "func":
+        return {
+          tag: "func",
+          parameters: type.parameters.map((param) => this.checkTypeExpr(param)),
+          returnType: this.checkTypeExpr(type.returnType),
+        };
     }
   }
 }

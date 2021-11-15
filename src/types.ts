@@ -73,7 +73,9 @@ export type IfCase = { tag: "cond"; predicate: Expr; block: Stmt[] };
 
 export type Binding = { tag: "identifier"; value: string };
 
-export type TypeExpr = { tag: "identifier"; value: string };
+export type TypeExpr =
+  | { tag: "identifier"; value: string }
+  | { tag: "func"; parameters: TypeExpr[]; returnType: TypeExpr };
 
 // typechecker -> compiler
 

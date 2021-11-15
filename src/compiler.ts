@@ -49,7 +49,7 @@ class Compiler {
         this.asm.drop();
       }
       this.compileStmt(stmt);
-      valueOnStack = stmt.tag === "expr";
+      valueOnStack = stmt.tag === "expr" && stmt.expr.type.tag !== "void";
     }
   }
   private compileStmt(stmt: CheckedStmt) {
@@ -97,9 +97,7 @@ class Compiler {
           upvalues,
         });
 
-        this.asm //
-          .newClosure(label, ...upvalues)
-          .initLocal(stmt.name);
+        this.asm.newClosure(stmt.name, label, upvalues);
         return;
       }
       // istanbul ignore next

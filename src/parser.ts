@@ -11,8 +11,6 @@ import {
 interface IParseState {
   token(): Token;
   advance(): void;
-  // save(): number;
-  // reset(num: number): void;
 }
 
 type Parser<T> = (state: IParseState) => T;
@@ -48,7 +46,7 @@ const parseStatement: Parser<Stmt> = (state) => {
       const binding = matchBinding(state);
       let type = null;
       if (check(state, ":")) {
-        type = parseType(state);
+        type = matchType(state);
       }
 
       match(state, "=");
@@ -75,7 +73,7 @@ const parseStatement: Parser<Stmt> = (state) => {
       const parameters = commaList(state, checkFuncParam);
       match(state, ")");
       match(state, ":");
-      const returnType = parseType(state);
+      const returnType = matchType(state);
       const block = parseBlock(state);
       return { tag: "func", name, parameters, returnType, block };
     }
@@ -112,19 +110,22 @@ const parsePrefixExpr: Parser<Expr | null> = (state) => {
 };
 
 const parsePostfixExpr: Parser<Expr | null> = (state) => {
-  const expr = parseBaseExpr(state);
+  let expr = parseBaseExpr(state);
   if (!expr) return null;
 
-  const token = state.token();
-  switch (token.tag) {
-    case "(": {
-      state.advance();
-      const args = commaList(state, checkExpr);
-      match(state, ")");
-      return { tag: "call", expr, args };
+  while (true) {
+    const token = state.token();
+    switch (token.tag) {
+      case "(": {
+        state.advance();
+        const args = commaList(state, checkExpr);
+        match(state, ")");
+        expr = { tag: "call", expr, args };
+        break;
+      }
+      default:
+        return expr;
     }
-    default:
-      return expr;
   }
 };
 
@@ -194,14 +195,27 @@ const checkBinding: Parser<Binding | null> = (state) => {
   }
 };
 
-const parseType: Parser<TypeExpr> = (state) => {
+const matchType: Parser<TypeExpr> = (state) => {
+  return assert(state, "type", checkType(state));
+};
+
+const checkType: Parser<TypeExpr | null> = (state) => {
   const token = state.token();
   switch (token.tag) {
     case "typeIdentifier":
       state.advance();
       return { tag: "identifier", value: token.value };
+    case "func": {
+      state.advance();
+      match(state, "(");
+      const parameters = commaList(state, checkType);
+      match(state, ")");
+      match(state, ":");
+      const returnType = matchType(state);
+      return { tag: "func", parameters, returnType };
+    }
     default:
-      throw new ParseError("type", token);
+      return null;
   }
 };
 
@@ -211,7 +225,7 @@ const checkFuncParam: Parser<{ binding: Binding; type: TypeExpr } | null> = (
   const binding = checkBinding(state);
   if (!binding) return null;
   match(state, ":");
-  const type = parseType(state);
+  const type = matchType(state);
   return { binding, type };
 };
 

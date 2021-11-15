@@ -324,6 +324,18 @@ class Interpreter {
         this.stack.push((left % right) as StackValue);
         return;
       }
+      case Opcode.Gt: {
+        const right = this.stack.pop();
+        const left = this.stack.pop();
+        this.stack.push(Number(left > right) as StackValue);
+        return;
+      }
+      case Opcode.Eq: {
+        const right = this.stack.pop();
+        const left = this.stack.pop();
+        this.stack.push(Number(left === right) as StackValue);
+        return;
+      }
       case Opcode.PrintStr: {
         const value = this.stack.pop();
         this.write(this.heap.getString(value));

@@ -222,7 +222,8 @@ it("works with closures", () => {
     .func('getAdder')
       .newObject(1).initLocal('state')
       .local('state').number(0).setHeap(0)
-      .newClosure('adderClosure', 'state').return()
+      .newClosure('fn', 'adderClosure', ['state'])
+      .local('fn').return()
     .endfunc()
 
     .closure('adderClosure', ['add'], ['state'])
