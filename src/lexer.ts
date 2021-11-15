@@ -18,7 +18,6 @@ export function lex(string: string): Token[] {
       }
     } else if (result[2]) {
       switch (result[2]) {
-        case "print":
         case "let":
         case "do":
         case "if":

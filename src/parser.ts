@@ -46,13 +46,6 @@ const parseStatement: Parser<Stmt> = (state) => {
       const type = matchType(state);
       return { tag: "type", binding, type };
     }
-    case "print": {
-      state.advance();
-      match(state, "(");
-      const expr = matchExpr(state);
-      match(state, ")");
-      return { tag: "print", expr };
-    }
     case "let": {
       state.advance();
       const binding = matchBinding(state);

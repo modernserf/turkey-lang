@@ -1,7 +1,6 @@
 // lexer -> parser
 
 export type Token =
-  | { tag: "print" }
   | { tag: "let" }
   | { tag: "do" }
   | { tag: "if" }
@@ -47,7 +46,6 @@ export class ParseError extends Error {
 
 export type Stmt =
   | { tag: "type"; binding: TypeBinding; type: TypeExpr }
-  | { tag: "print"; expr: Expr }
   | { tag: "let"; binding: Binding; type: TypeExpr | null; expr: Expr }
   | { tag: "while"; expr: Expr; block: Stmt[] }
   | { tag: "return"; expr: Expr | null }

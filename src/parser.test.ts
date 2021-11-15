@@ -13,18 +13,27 @@ it("parses print, let, numbers", () => {
 Array [
   Object {
     "expr": Object {
-      "left": Object {
-        "tag": "integer",
-        "value": 0,
+      "args": Array [
+        Object {
+          "left": Object {
+            "tag": "integer",
+            "value": 0,
+          },
+          "operator": "+",
+          "right": Object {
+            "tag": "integer",
+            "value": 123,
+          },
+          "tag": "binaryOp",
+        },
+      ],
+      "expr": Object {
+        "tag": "identifier",
+        "value": "print",
       },
-      "operator": "+",
-      "right": Object {
-        "tag": "integer",
-        "value": 123,
-      },
-      "tag": "binaryOp",
+      "tag": "call",
     },
-    "tag": "print",
+    "tag": "expr",
   },
   Object {
     "binding": Object {
@@ -40,18 +49,27 @@ Array [
   },
   Object {
     "expr": Object {
-      "left": Object {
+      "args": Array [
+        Object {
+          "left": Object {
+            "tag": "identifier",
+            "value": "x",
+          },
+          "operator": "+",
+          "right": Object {
+            "tag": "float",
+            "value": 67.89,
+          },
+          "tag": "binaryOp",
+        },
+      ],
+      "expr": Object {
         "tag": "identifier",
-        "value": "x",
+        "value": "print",
       },
-      "operator": "+",
-      "right": Object {
-        "tag": "float",
-        "value": 67.89,
-      },
-      "tag": "binaryOp",
+      "tag": "call",
     },
-    "tag": "print",
+    "tag": "expr",
   },
 ]
 `);
@@ -159,15 +177,6 @@ Array [
 
 it("does not parse invalid programs", () => {
   expect(() => {
-    parse(lex(`print`));
-  }).toThrowError(ParseError);
-  expect(() => {
-    parse(lex(`print(print)`));
-  }).toThrowError(ParseError);
-  expect(() => {
-    parse(lex(`print(123.45 print)`));
-  }).toThrowError(ParseError);
-  expect(() => {
     parse(lex(`let 123 = 123`));
   }).toThrowError(ParseError);
   expect(() => {
@@ -180,10 +189,19 @@ it("parses simple type constructors", () => {
 Array [
   Object {
     "expr": Object {
-      "tag": "typeConstructor",
-      "value": "True",
+      "args": Array [
+        Object {
+          "tag": "typeConstructor",
+          "value": "True",
+        },
+      ],
+      "expr": Object {
+        "tag": "identifier",
+        "value": "print",
+      },
+      "tag": "call",
     },
-    "tag": "print",
+    "tag": "expr",
   },
 ]
 `);
@@ -202,10 +220,19 @@ Array [
           "block": Array [
             Object {
               "expr": Object {
-                "tag": "identifier",
-                "value": "y",
+                "args": Array [
+                  Object {
+                    "tag": "identifier",
+                    "value": "y",
+                  },
+                ],
+                "expr": Object {
+                  "tag": "identifier",
+                  "value": "print",
+                },
+                "tag": "call",
               },
-              "tag": "print",
+              "tag": "expr",
             },
           ],
           "predicate": Object {
@@ -291,10 +318,19 @@ Array [
     "block": Array [
       Object {
         "expr": Object {
-          "tag": "identifier",
-          "value": "x",
+          "args": Array [
+            Object {
+              "tag": "identifier",
+              "value": "x",
+            },
+          ],
+          "expr": Object {
+            "tag": "identifier",
+            "value": "print",
+          },
+          "tag": "call",
         },
-        "tag": "print",
+        "tag": "expr",
       },
     ],
     "expr": Object {

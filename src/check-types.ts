@@ -69,23 +69,6 @@ class TypeChecker {
       case "type":
         this.types.init(stmt.binding.value, this.checkTypeExpr(stmt.type));
         return null;
-      case "print": {
-        const expr = this.checkExpr(stmt.expr, null);
-        const op =
-          expr.type.tag === "string" ? Opcode.PrintStr : Opcode.PrintNum;
-
-        // TODO: handle printing other values (enums, structs, funcs etc)
-
-        return {
-          tag: "expr",
-          expr: {
-            tag: "callBuiltIn",
-            opcode: op,
-            args: [expr],
-            type: voidType,
-          },
-        };
-      }
       case "let": {
         const forwardType = stmt.type ? this.checkTypeExpr(stmt.type) : null;
         const expr = this.checkExpr(stmt.expr, forwardType);
@@ -318,6 +301,21 @@ class TypeChecker {
         }
       }
       case "call": {
+        if (expr.expr.tag === "identifier" && expr.expr.value === "print") {
+          if (expr.args.length !== 1) throw new Error("arity mismatch");
+
+          const arg = this.checkExpr(expr.args[0], null);
+          const op =
+            arg.type.tag === "string" ? Opcode.PrintStr : Opcode.PrintNum;
+
+          return {
+            tag: "callBuiltIn",
+            opcode: op,
+            args: [arg],
+            type: voidType,
+          };
+        }
+
         const callee = this.checkExpr(expr.expr, null);
         if (callee.type.tag !== "func") {
           throw new Error("not callable");
