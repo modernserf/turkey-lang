@@ -9,6 +9,7 @@ export type Token =
   | { tag: "func" }
   | { tag: "return" }
   | { tag: "type" }
+  | { tag: "enum" }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "string"; value: string }
@@ -46,6 +47,7 @@ export class ParseError extends Error {
 
 export type Stmt =
   | { tag: "type"; binding: TypeBinding; type: TypeExpr }
+  | { tag: "enum"; binding: TypeBinding; cases: EnumCase[] }
   | { tag: "let"; binding: Binding; type: TypeExpr | null; expr: Expr }
   | { tag: "while"; expr: Expr; block: Stmt[] }
   | { tag: "return"; expr: Expr | null }
@@ -57,6 +59,8 @@ export type Stmt =
       block: Stmt[];
     }
   | { tag: "expr"; expr: Expr };
+
+export type EnumCase = { tagName: string; typeBody: null };
 
 export type Expr =
   | { tag: "identifier"; value: string }
@@ -88,7 +92,7 @@ export type Type =
   | { tag: "integer" }
   | { tag: "float" }
   | { tag: "string" }
-  | { tag: "struct"; value: string }
+  | { tag: "struct"; value: symbol }
   | { tag: "func"; parameters: Type[]; returnType: Type };
 
 export type CheckedExpr =

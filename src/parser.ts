@@ -7,6 +7,7 @@ import {
   IfCase,
   TypeExpr,
   TypeBinding,
+  EnumCase,
 } from "./types";
 
 interface IParseState {
@@ -45,6 +46,14 @@ const parseStatement: Parser<Stmt> = (state) => {
       match(state, "=");
       const type = matchType(state);
       return { tag: "type", binding, type };
+    }
+    case "enum": {
+      state.advance();
+      const binding = matchTypeBinding(state);
+      match(state, "{");
+      const cases = commaList(state, checkEnumCase);
+      match(state, "}");
+      return { tag: "enum", binding, cases };
     }
     case "let": {
       state.advance();
@@ -241,6 +250,12 @@ const checkType: Parser<TypeExpr | null> = (state) => {
   }
 };
 
+const checkEnumCase: Parser<EnumCase | null> = (state) => {
+  const tagName = check(state, "typeIdentifier");
+  if (!tagName) return null;
+  return { tagName: tagName.value, typeBody: null };
+};
+
 const checkFuncParam: Parser<{ binding: Binding; type: TypeExpr } | null> = (
   state
 ) => {
@@ -257,11 +272,14 @@ const parseEndOfInput: Parser<boolean> = (state) => {
 
 // utilities
 
-function check(state: IParseState, tag: Token["tag"]): Token | null {
+function check<Tag extends Token["tag"]>(
+  state: IParseState,
+  tag: Tag
+): (Token & { tag: Tag }) | null {
   const token = state.token();
   if (token.tag === tag) {
     state.advance();
-    return token;
+    return token as Token & { tag: Tag };
   } else {
     return null;
   }

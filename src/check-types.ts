@@ -14,13 +14,18 @@ const voidType: Type = { tag: "void" };
 const integerType: Type = { tag: "integer" };
 const floatType: Type = { tag: "float" };
 const stringType: Type = { tag: "string" };
-const boolType: Type = { tag: "struct", value: "Boolean" };
+const boolType: Type = { tag: "struct", value: Symbol("Boolean") };
 const builtInTypes = new Scope<string, Type>()
   .set("Int", integerType)
   .set("Float", floatType)
   .set("Boolean", boolType)
   .set("String", stringType)
   .set("Void", voidType);
+
+type TypeConstructor = { value: number; type: Type };
+const builtInTypeConstructors = new Scope<string, TypeConstructor>()
+  .set("False", { value: 0, type: boolType })
+  .set("True", { value: 1, type: boolType });
 
 type CurrentFunc = {
   returnType: Type;
@@ -34,6 +39,7 @@ export function check(program: Stmt[]): CheckedStmt[] {
 
 class TypeChecker {
   private types: Scope<string, Type>;
+  private typeConstructors: Scope<string, TypeConstructor>;
   private scope: Scope<string, Type> = new Scope();
   private currentFunc: CurrentFunc | null = null;
   static check(program: Stmt[]): CheckedStmt[] {
@@ -41,6 +47,7 @@ class TypeChecker {
   }
   constructor() {
     this.types = builtInTypes.push();
+    this.typeConstructors = builtInTypeConstructors.push();
   }
   private checkBlock(block: Stmt[]): { block: CheckedStmt[]; type: Type } {
     const checkedBlock: CheckedStmt[] = [];
@@ -69,6 +76,14 @@ class TypeChecker {
       case "type":
         this.types.init(stmt.binding.value, this.checkTypeExpr(stmt.type));
         return null;
+      case "enum": {
+        const type: Type = { tag: "struct", value: Symbol(stmt.binding.value) };
+        this.types.init(stmt.binding.value, type);
+        for (const [i, enumCase] of stmt.cases.entries()) {
+          this.typeConstructors.init(enumCase.tagName, { type, value: i });
+        }
+        return null;
+      }
       case "let": {
         const forwardType = stmt.type ? this.checkTypeExpr(stmt.type) : null;
         const expr = this.checkExpr(stmt.expr, forwardType);
@@ -231,15 +246,10 @@ class TypeChecker {
 
         return { tag: "identifier", value: expr.value, type };
       }
-      case "typeConstructor":
-        switch (expr.value) {
-          case "True":
-            return { tag: "primitive", value: 1, type: boolType };
-          case "False":
-            return { tag: "primitive", value: 0, type: boolType };
-          default:
-            throw new Error("Unknown primitive");
-        }
+      case "typeConstructor": {
+        const { value, type } = this.typeConstructors.get(expr.value);
+        return { tag: "primitive", value, type };
+      }
       case "unaryOp": {
         const checked = this.checkExpr(expr.expr, null);
         switch (expr.operator) {
@@ -287,12 +297,17 @@ class TypeChecker {
               boolType
             );
           case "==": {
-            return this.arithmeticOp(
-              Opcode.Eq,
-              expr.left,
-              expr.right,
-              boolType
-            );
+            // TODO: equality of complex objects
+            const left = this.checkExpr(expr.left, null);
+            const right = this.checkExpr(expr.right, null);
+            this.unify(left.type, right.type);
+
+            return {
+              tag: "callBuiltIn",
+              opcode: Opcode.Eq,
+              args: [left, right],
+              type: boolType,
+            };
           }
 
           // istanbul ignore next

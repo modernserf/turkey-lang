@@ -26,6 +26,7 @@ export function lex(string: string): Token[] {
         case "func":
         case "return":
         case "type":
+        case "enum":
           tokens.push({ tag: result[2] });
           break;
         default:

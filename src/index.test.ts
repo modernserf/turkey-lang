@@ -366,6 +366,7 @@ it("rejects anonymous functions without inferred types", () => {
 it("rejects anonymous functions type mismatches", () => {
   const code = `
     func map (value: Int, fn: func (Int): Int): Int {
+
       fn(value)
     }
     print(map(10, |x, y| { x + y }))
@@ -381,4 +382,19 @@ it("has type aliases", () => {
   `;
 
   expect(run(code)).toEqual(["2"]);
+});
+
+it("has simple enums", () => {
+  const code = `
+    enum Version { V1, V2 }
+    func print_version(v: Version): Void {
+      if (v == V1) {
+        print("V1")
+      } else {
+        print("V2")
+      }
+    }
+    print_version(V2)
+  `;
+  expect(run(code)).toEqual(["V2"]);
 });

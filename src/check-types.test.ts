@@ -133,7 +133,7 @@ Array [
                 "tag": "primitive",
                 "type": Object {
                   "tag": "struct",
-                  "value": "Boolean",
+                  "value": Symbol(Boolean),
                 },
                 "value": 0,
               },
@@ -173,7 +173,7 @@ Array [
                 "tag": "primitive",
                 "type": Object {
                   "tag": "struct",
-                  "value": "Boolean",
+                  "value": Symbol(Boolean),
                 },
                 "value": 0,
               },
@@ -192,7 +192,7 @@ Array [
                               "tag": "primitive",
                               "type": Object {
                                 "tag": "struct",
-                                "value": "Boolean",
+                                "value": Symbol(Boolean),
                               },
                               "value": 1,
                             },
@@ -201,7 +201,7 @@ Array [
                           "tag": "callBuiltIn",
                           "type": Object {
                             "tag": "struct",
-                            "value": "Boolean",
+                            "value": Symbol(Boolean),
                           },
                         },
                         "tag": "expr",
@@ -210,7 +210,7 @@ Array [
                     "tag": "do",
                     "type": Object {
                       "tag": "struct",
-                      "value": "Boolean",
+                      "value": Symbol(Boolean),
                     },
                   },
                 ],
@@ -235,7 +235,7 @@ Array [
       "tag": "primitive",
       "type": Object {
         "tag": "struct",
-        "value": "Boolean",
+        "value": Symbol(Boolean),
       },
       "value": 1,
     },
@@ -514,7 +514,7 @@ Array [
           "tag": "primitive",
           "type": Object {
             "tag": "struct",
-            "value": "Boolean",
+            "value": Symbol(Boolean),
           },
           "value": 1,
         },
@@ -753,7 +753,7 @@ Array [
           "tag": "primitive",
           "type": Object {
             "tag": "struct",
-            "value": "Boolean",
+            "value": Symbol(Boolean),
           },
           "value": 1,
         },
@@ -916,7 +916,7 @@ Array [
             "tag": "primitive",
             "type": Object {
               "tag": "struct",
-              "value": "Boolean",
+              "value": Symbol(Boolean),
             },
             "value": 1,
           },
