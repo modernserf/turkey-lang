@@ -10,15 +10,15 @@ it("checks types", () => {
   const code = `
     let a = 1
     let b = 1.5
-    print a + 2
-    print b + 2.5
+    print(a + 2)
+    print(b + 2.5)
     while (True) {
       if (False) {} else if (False) {
-        print -a
+        print(-a)
       } else {
-        print do {
+        print(do {
           !True
-        }
+        })
       }
     }
   `;
@@ -329,23 +329,23 @@ Array [
 
 it("rejects unknown variables", () => {
   expect(() => {
-    check(`print x`);
+    check(`print(x)`);
   }).toThrow();
 });
 
 it("rejects unknown type constructors", () => {
   expect(() => {
-    check(`print What`);
+    check(`print(What)`);
   }).toThrow();
 });
 
 it("typechecks math", () => {
   expect(() => {
-    check(`print 1.5 + 2`);
+    check(`print(1.5 + 2)`);
   }).toThrow();
 
   expect(() => {
-    check(`print True + False`);
+    check(`print(True + False)`);
   }).toThrow();
 });
 
@@ -356,7 +356,7 @@ it("enforces type matching between conditional branches", () => {
     } else {
       1.0
     }
-    print x
+    print(x)
   `;
 
   expect(() => check(code)).toThrow();
@@ -381,7 +381,7 @@ it("forbids unknown types", () => {
 it("checks functions", () => {
   const code = `
     func foo (): Void {
-      print 1
+      print(1)
     }
   `;
 
@@ -428,7 +428,7 @@ Array [
 it("checks functions that explicitly return void", () => {
   const code = `
   func foo (): Void {
-    print 1
+    print(1)
     return
   }
   `;
@@ -480,7 +480,7 @@ it("checks functions that implicitly return void", () => {
   const code = `
   func foo (): Void {
     while (True) {
-      print 0
+      print(0)
     }
   }
   `;
@@ -719,7 +719,7 @@ it("checks funcs with implicit void returns", () => {
   const code = `
   func loop (): Void {
     while (True) {
-      print 1
+      print(1)
     }
   }
   `;

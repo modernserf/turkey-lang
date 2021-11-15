@@ -4,9 +4,9 @@ import { ParseError } from "./types";
 
 it("parses print, let, numbers", () => {
   const code = `
-    print 0 + 123   // add ints
-    let x = 123.45  // a float
-    print x + 67.89 // add floats
+    print(0 + 123)   // add ints
+    let x = 123.45   // a float
+    print(x + 67.89) // add floats
   `;
   const ast = parse(lex(code));
   expect(ast).toMatchInlineSnapshot(`
@@ -162,10 +162,10 @@ it("does not parse invalid programs", () => {
     parse(lex(`print`));
   }).toThrowError(ParseError);
   expect(() => {
-    parse(lex(`print print`));
+    parse(lex(`print(print)`));
   }).toThrowError(ParseError);
   expect(() => {
-    parse(lex(`print 123.45 print`));
+    parse(lex(`print(123.45 print)`));
   }).toThrowError(ParseError);
   expect(() => {
     parse(lex(`let 123 = 123`));
@@ -176,7 +176,7 @@ it("does not parse invalid programs", () => {
 });
 
 it("parses simple type constructors", () => {
-  expect(parse(lex(`print True`))).toMatchInlineSnapshot(`
+  expect(parse(lex(`print(True)`))).toMatchInlineSnapshot(`
 Array [
   Object {
     "expr": Object {
@@ -191,7 +191,7 @@ Array [
 
 it("parses if statements", () => {
   const code = `
-    if (x) { print y }
+    if (x) { print(y) }
   `;
   expect(parse(lex(code))).toMatchInlineSnapshot(`
 Array [
@@ -284,7 +284,7 @@ Array [
 });
 
 it("parses while statements", () => {
-  const code = `while (x) { print x }`;
+  const code = `while (x) { print(x) }`;
   expect(parse(lex(code))).toMatchInlineSnapshot(`
 Array [
   Object {

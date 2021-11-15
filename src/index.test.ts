@@ -6,21 +6,21 @@ it("evaluates an empty program", () => {
 
 it("prints", () => {
   const code = `
-    print 123.45 // a number
-    print 0      // another one
-    print 6789   // the last number
+    print(123.45) // a number
+    print(0)      // another one
+    print(6789)   // the last number
   `;
   expect(run(code)).toEqual(["123.45", "0", "6789"]);
 });
 
 it("adds", () => {
-  expect(run(`print 123456 + 1`)).toEqual(["123457"]);
-  expect(run(`print 1.5 + -2.0`)).toEqual(["-0.5"]);
+  expect(run(`print(123456 + 1)`)).toEqual(["123457"]);
+  expect(run(`print(1.5 + -2.0)`)).toEqual(["-0.5"]);
 });
 
 it("typechecks math", () => {
   expect(() => {
-    run(`print 1.5 + 2`);
+    run(`print(1.5 + 2)`);
   }).toThrow();
 });
 
@@ -29,7 +29,7 @@ it("references variables", () => {
     let x = 1
     let y : Int = 2 + 3
     x - y
-    print x + y + 4
+    print(x + y + 4)
   `;
   expect(run(code)).toEqual(["10"]);
 });
@@ -43,7 +43,7 @@ it("uses conditionals", () => {
     } else {
       2
     }
-    print x
+    print(x)
   `;
   expect(run(code)).toEqual(["1"]);
 });
@@ -55,7 +55,7 @@ it("enforces type matching between conditional branches", () => {
     } else {
       1.0
     }
-    print x
+    print(x)
   `;
 
   expect(() => run(code)).toThrow();
@@ -64,9 +64,9 @@ it("enforces type matching between conditional branches", () => {
 it("uses conditional statements", () => {
   const code = `
     if (True) {
-      print 1
+      print(1)
     }
-    print 2
+    print(2)
   `;
   expect(run(code)).toEqual(["1", "2"]);
 });
@@ -74,12 +74,12 @@ it("uses conditional statements", () => {
 it("theoretically uses loops", () => {
   const code = `
     while (!True) {
-      print 1
+      print(1)
     }
     while (!!False) {
       3
     }
-    print 2
+    print(2)
   `;
   expect(run(code)).toEqual(["2"]);
 });
@@ -88,7 +88,7 @@ it("drops expressions called for their side effects", () => {
   const code = `
     let x = 1
     x + 2
-    print x + 3
+    print(x + 3)
   `;
   expect(run(code)).toEqual(["4"]);
 });
@@ -96,8 +96,8 @@ it("drops expressions called for their side effects", () => {
 it("calls functions", () => {
   const code = `
     func print_twice (x: Int): Void {
-      print x
-      print x
+      print(x)
+      print(x)
       return
     }
 
@@ -113,7 +113,7 @@ it("calls closures", () => {
       return x
     }
 
-    print get_x()
+    print(get_x())
   `;
 
   expect(run(code)).toEqual(["1.5"]);
@@ -145,8 +145,8 @@ it("treats void as a value", () => {
 it("uses strings", () => {
   const code = `
     func print_twice (val: String): Void {
-      print val
-      print val
+      print(val)
+      print(val)
     }
 
     print_twice("hello")
@@ -158,7 +158,7 @@ it("uses strings", () => {
 it("supports recursion", () => {
   const code = `
     func count (from: Int): Void {
-      print from
+      print(from)
       if (from > 0) {
         count(from - 1)
       }
@@ -188,13 +188,13 @@ it("runs fizzbuzz", () => {
       if (from > to) { return }
 
       if (from % 15 == 0) {
-        print "FizzBuzz"
+        print("FizzBuzz")
       } else if (from % 3 == 0) {
-        print "Fizz"
+        print("Fizz")
       } else if (from % 5 == 0) {
-        print "Buzz"
+        print("Buzz")
       } else {
-        print from
+        print(from)
       }
 
       fizzbuzz(from + 1, to)
@@ -315,7 +315,7 @@ it("accepts functions as parameters", () => {
     func double (value: Int): Int {
       return value + value
     }
-    print map(10, double)
+    print(map(10, double))
   `;
 
   expect(run(code)).toEqual(["20"]);
@@ -330,7 +330,7 @@ it("accepts functions as return values", () => {
       return add_right
     }
 
-    print add_curried(1)(2)
+    print(add_curried(1)(2))
   `;
 
   expect(run(code)).toEqual(["3"]);
@@ -349,7 +349,7 @@ it("has anonymous function literals", () => {
     func map (value: Int, fn: func (Int): Int): Int {
       fn(value)
     }
-    print map(10, |x| { x + x })
+    print(map(10, |x| { x + x }))
   `;
 
   expect(run(code)).toEqual(["20"]);
@@ -358,7 +358,7 @@ it("has anonymous function literals", () => {
 it("rejects anonymous functions without inferred types", () => {
   const code = `
     let fn = |x| { x + x }
-    print fn(1)
+    print(fn(1))
   `;
   expect(() => run(code)).toThrow();
 });
@@ -368,7 +368,7 @@ it("rejects anonymous functions type mismatches", () => {
     func map (value: Int, fn: func (Int): Int): Int {
       fn(value)
     }
-    print map(10, |x, y| { x + y })
+    print(map(10, |x, y| { x + y }))
   `;
   expect(() => run(code)).toThrow();
 });
@@ -377,7 +377,7 @@ it("has type aliases", () => {
   const code = `
     type Mapper = func (Int): Int
     let fn: Mapper = |x| { x + x }
-    print fn(1)
+    print(fn(1))
   `;
 
   expect(run(code)).toEqual(["2"]);
