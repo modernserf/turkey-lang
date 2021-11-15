@@ -33,6 +33,7 @@ export type Token =
   | { tag: "}" }
   | { tag: ":" }
   | { tag: "," }
+  | { tag: "|" }
   | { tag: "endOfInput" };
 
 // parser -> typechecker
@@ -63,6 +64,7 @@ export type Expr =
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "string"; value: string }
+  | { tag: "closure"; parameters: Binding[]; block: Stmt[] }
   | { tag: "binaryOp"; left: Expr; right: Expr; operator: string }
   | { tag: "unaryOp"; expr: Expr; operator: string }
   | { tag: "do"; block: Stmt[] }
@@ -91,6 +93,13 @@ export type CheckedExpr =
   | { tag: "primitive"; value: number; type: Type }
   | { tag: "string"; value: string; type: Type }
   | { tag: "identifier"; value: string; type: Type }
+  | {
+      tag: "closure";
+      parameters: CheckedParam[];
+      upvalues: CheckedUpvalue[];
+      block: CheckedStmt[];
+      type: Type;
+    }
   | { tag: "callBuiltIn"; opcode: Opcode; args: CheckedExpr[]; type: Type }
   | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: Type }
   | { tag: "do"; block: CheckedStmt[]; type: Type }
@@ -107,13 +116,16 @@ export type CheckedStmt =
   | {
       tag: "func";
       name: string;
-      parameters: Array<{ binding: Binding; type: Type }>;
-      upvalues: Array<{ name: string; type: Type }>;
-      type: Type;
+      parameters: CheckedParam[];
+      upvalues: CheckedUpvalue[];
       block: CheckedStmt[];
+      type: Type;
     }
   | { tag: "while"; expr: CheckedExpr; block: CheckedStmt[] }
   | { tag: "expr"; expr: CheckedExpr };
+
+type CheckedParam = { binding: Binding; type: Type };
+type CheckedUpvalue = { name: string; type: Type };
 
 // compiler -> interpreter
 

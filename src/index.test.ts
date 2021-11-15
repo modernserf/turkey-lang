@@ -343,3 +343,14 @@ it("rejects invalid function types", () => {
   `;
   expect(() => run(code)).toThrow();
 });
+
+it("has anonymous function literals", () => {
+  const code = `
+    func map (value: Int, fn: func (Int): Int): Int {
+      fn(value)
+    }
+    print map(10, |x| { x + x })
+  `;
+
+  expect(run(code)).toEqual(["20"]);
+});

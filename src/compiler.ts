@@ -116,6 +116,21 @@ class Compiler {
       case "string":
         this.asm.string(expr.value);
         return;
+      case "closure": {
+        const label = Symbol();
+        const parameters = expr.parameters.map((param) => param.binding.value);
+        const upvalues = expr.upvalues.map((val) => val.name);
+        this.funcs.push({
+          label,
+          block: expr.block,
+          parameters,
+          upvalues,
+        });
+
+        this.asm.newClosure(null, label, upvalues);
+        return;
+      }
+
       case "do":
         this.compileBlock(expr.block);
         return;

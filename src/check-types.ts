@@ -6,6 +6,7 @@ import {
   CheckedStmt,
   CheckedExpr,
   Opcode,
+  Binding,
 } from "./types";
 import { Scope } from "./scope";
 
@@ -60,13 +61,14 @@ class TypeChecker {
   private checkStmt(stmt: Stmt): CheckedStmt {
     switch (stmt.tag) {
       case "expr":
-        return { tag: "expr", expr: this.checkExpr(stmt.expr) };
+        return { tag: "expr", expr: this.checkExpr(stmt.expr, null) };
       case "print": {
-        const expr = this.checkExpr(stmt.expr);
+        const expr = this.checkExpr(stmt.expr, null);
         const op =
           expr.type.tag === "string" ? Opcode.PrintStr : Opcode.PrintNum;
 
-        // TODO: support printing strings, forbid printing other values?
+        // TODO: handle printing other values (enums, structs, funcs etc)
+
         return {
           tag: "expr",
           expr: {
@@ -78,15 +80,16 @@ class TypeChecker {
         };
       }
       case "let": {
-        const expr = this.checkExpr(stmt.expr);
-        if (stmt.type) {
-          this.unify(expr.type, this.checkTypeExpr(stmt.type));
+        const forwardType = stmt.type ? this.checkTypeExpr(stmt.type) : null;
+        const expr = this.checkExpr(stmt.expr, forwardType);
+        if (forwardType) {
+          this.unify(expr.type, forwardType);
         }
         this.scope.init(stmt.binding.value, expr.type);
         return { tag: "let", binding: stmt.binding, expr };
       }
       case "while": {
-        const checkedPredicate = this.checkExpr(stmt.expr);
+        const checkedPredicate = this.checkExpr(stmt.expr, null);
         this.unify(boolType, checkedPredicate.type);
         const { block } = this.checkBlock(stmt.block);
         return { tag: "while", expr: checkedPredicate, block };
@@ -99,7 +102,7 @@ class TypeChecker {
           this.unify(voidType, this.currentFunc.returnType);
           return { tag: "return", expr: null };
         }
-        const expr = this.checkExpr(stmt.expr);
+        const expr = this.checkExpr(stmt.expr, this.currentFunc.returnType);
         this.unify(this.currentFunc.returnType, expr.type);
         return { tag: "return", expr };
       }
@@ -116,56 +119,11 @@ class TypeChecker {
         };
         this.scope.init(stmt.name, type);
 
-        // save current context
-        const outerScope = this.scope;
-        this.scope = this.scope.push();
-        const prevCurrentFunc = this.currentFunc;
-        this.currentFunc = { returnType, upvalues: new Map(), outerScope };
-
-        // add parameters to scope
-        for (const param of parameters) {
-          this.scope.init(param.binding.value, param.type);
-        }
-
-        // check function body
-        const { block } = this.checkBlock(stmt.block);
-
-        // handle implicit returns
-        const lastStmt = block.pop() ?? { tag: "noop" };
-        switch (lastStmt.tag) {
-          case "return":
-            block.push(lastStmt);
-            break;
-          case "expr":
-            this.unify(returnType, lastStmt.expr.type);
-            block.push({ tag: "return", expr: lastStmt.expr });
-            break;
-          case "noop":
-            this.unify(returnType, voidType);
-            block.push({ tag: "return", expr: null });
-            break;
-          // istanbul ignore next
-          default:
-            this.unify(returnType, voidType);
-            block.push(lastStmt);
-            block.push({ tag: "return", expr: null });
-            break;
-        }
-
-        const upvalues = Array.from(this.currentFunc.upvalues.entries()).map(
-          ([name, type]) => ({ name, type })
+        const { upvalues, block } = this.checkFunc(
+          parameters,
+          returnType,
+          stmt.block
         );
-
-        this.currentFunc = prevCurrentFunc;
-        this.scope = this.scope.pop();
-        // propagate upvalues
-        if (prevCurrentFunc) {
-          for (const upval of upvalues) {
-            if (this.scope.isUpvalue(upval.name, prevCurrentFunc.outerScope)) {
-              prevCurrentFunc.upvalues.set(upval.name, upval.type);
-            }
-          }
-        }
 
         return {
           tag: "func",
@@ -178,7 +136,68 @@ class TypeChecker {
       }
     }
   }
-  private checkExpr(expr: Expr): CheckedExpr {
+  private checkFunc(
+    parameters: Array<{ binding: Binding; type: Type }>,
+    returnType: Type,
+    rawBlock: Stmt[]
+  ): {
+    upvalues: Array<{ name: string; type: Type }>;
+    block: CheckedStmt[];
+  } {
+    // save current context
+    const outerScope = this.scope;
+    this.scope = this.scope.push();
+    const prevCurrentFunc = this.currentFunc;
+    this.currentFunc = { returnType, upvalues: new Map(), outerScope };
+
+    // add parameters to scope
+    for (const param of parameters) {
+      this.scope.init(param.binding.value, param.type);
+    }
+
+    // check function body
+    const { block } = this.checkBlock(rawBlock);
+
+    // handle implicit returns
+    const lastStmt = block.pop() ?? { tag: "noop" };
+    switch (lastStmt.tag) {
+      case "return":
+        block.push(lastStmt);
+        break;
+      case "expr":
+        this.unify(returnType, lastStmt.expr.type);
+        block.push({ tag: "return", expr: lastStmt.expr });
+        break;
+      case "noop":
+        this.unify(returnType, voidType);
+        block.push({ tag: "return", expr: null });
+        break;
+      // istanbul ignore next
+      default:
+        this.unify(returnType, voidType);
+        block.push(lastStmt);
+        block.push({ tag: "return", expr: null });
+        break;
+    }
+
+    const upvalues = Array.from(this.currentFunc.upvalues.entries()).map(
+      ([name, type]) => ({ name, type })
+    );
+
+    this.currentFunc = prevCurrentFunc;
+    this.scope = this.scope.pop();
+    // propagate upvalues
+    if (prevCurrentFunc) {
+      for (const upval of upvalues) {
+        if (this.scope.isUpvalue(upval.name, prevCurrentFunc.outerScope)) {
+          prevCurrentFunc.upvalues.set(upval.name, upval.type);
+        }
+      }
+    }
+
+    return { upvalues, block };
+  }
+  private checkExpr(expr: Expr, forwardType: Type | null): CheckedExpr {
     switch (expr.tag) {
       case "integer":
         return { tag: "primitive", value: expr.value, type: integerType };
@@ -186,6 +205,31 @@ class TypeChecker {
         return { tag: "primitive", value: expr.value, type: floatType };
       case "string":
         return { tag: "string", value: expr.value, type: stringType };
+      case "closure": {
+        if (!forwardType) throw new Error("missing type for closure");
+        if (forwardType.tag !== "func") throw new Error("non-function type");
+        if (forwardType.parameters.length !== expr.parameters.length) {
+          throw new Error("arity mismatch");
+        }
+        const parameters = forwardType.parameters.map((type, i) => ({
+          type,
+          binding: expr.parameters[i],
+        }));
+
+        const { upvalues, block } = this.checkFunc(
+          parameters,
+          forwardType.returnType,
+          expr.block
+        );
+        return {
+          tag: "closure",
+          type: forwardType,
+          parameters,
+          upvalues,
+          block,
+        };
+      }
+
       case "identifier": {
         const type = this.scope.get(expr.value);
 
@@ -207,7 +251,7 @@ class TypeChecker {
             throw new Error("Unknown primitive");
         }
       case "unaryOp": {
-        const checked = this.checkExpr(expr.expr);
+        const checked = this.checkExpr(expr.expr, null);
         switch (expr.operator) {
           case "!":
             return {
@@ -267,7 +311,7 @@ class TypeChecker {
         }
       }
       case "call": {
-        const callee = this.checkExpr(expr.expr);
+        const callee = this.checkExpr(expr.expr, null);
         if (callee.type.tag !== "func") {
           throw new Error("not callable");
         }
@@ -276,8 +320,9 @@ class TypeChecker {
         }
         const args: CheckedExpr[] = [];
         for (const [i, arg] of expr.args.entries()) {
-          const checkedArg = this.checkExpr(arg);
-          this.unify(checkedArg.type, callee.type.parameters[i]);
+          const argType = callee.type.parameters[i];
+          const checkedArg = this.checkExpr(arg, argType);
+          this.unify(checkedArg.type, argType);
           args.push(checkedArg);
         }
         return { tag: "call", callee, args, type: callee.type.returnType };
@@ -297,7 +342,7 @@ class TypeChecker {
         };
 
         for (const { predicate, block } of expr.cases) {
-          const checkedPredicate = this.checkExpr(predicate);
+          const checkedPredicate = this.checkExpr(predicate, null);
           this.unify(boolType, checkedPredicate.type);
           const checkedBlock = this.checkBlock(block);
           resultType = this.unify(resultType, checkedBlock.type);
@@ -363,8 +408,8 @@ class TypeChecker {
     right: Expr,
     outType?: Type
   ): CheckedExpr {
-    const checkedLeft = this.checkExpr(left);
-    const checkedRight = this.checkExpr(right);
+    const checkedLeft = this.checkExpr(left, null);
+    const checkedRight = this.checkExpr(right, null);
     const type = this.checkNumber(
       this.unify(checkedLeft.type, checkedRight.type)
     );

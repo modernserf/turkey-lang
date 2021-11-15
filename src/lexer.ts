@@ -2,7 +2,7 @@ import { Token } from "./types";
 
 // _: whitespace _: comment  1: number 2: identifier 3: typeIdentifier 4: operator 5: string
 const pattern =
-  /[ \t\n]+|\/\/[^\n]*|(0|[1-9][0-9]*(?:\.[0-9]+)?)|([_a-z][_a-zA-Z0-9]*)|([A-Z][_a-zA-Z0-9]*)|(==|!=|<=|>=|[,:!+\-*/%=<>(){}])|"((?:[^"]|\\")*)"/y;
+  /[ \t\n]+|\/\/[^\n]*|(0|[1-9][0-9]*(?:\.[0-9]+)?)|([_a-z][_a-zA-Z0-9]*)|([A-Z][_a-zA-Z0-9]*)|(==|!=|<=|>=|[|,:!+\-*/%=<>(){}])|"((?:[^"]|\\")*)"/y;
 
 export function lex(string: string): Token[] {
   const tokens: Token[] = [];
@@ -39,6 +39,7 @@ export function lex(string: string): Token[] {
         case "!=":
         case "<=":
         case ">=":
+        case "|":
         case ":":
         case ",":
         case "!":

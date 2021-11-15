@@ -498,3 +498,42 @@ Array [
 ]
 `);
 });
+
+it("parses anonymous function literals", () => {
+  const code = `
+    |x| { x + x }
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "block": Array [
+        Object {
+          "expr": Object {
+            "left": Object {
+              "tag": "identifier",
+              "value": "x",
+            },
+            "operator": "+",
+            "right": Object {
+              "tag": "identifier",
+              "value": "x",
+            },
+            "tag": "binaryOp",
+          },
+          "tag": "expr",
+        },
+      ],
+      "parameters": Array [
+        Object {
+          "tag": "identifier",
+          "value": "x",
+        },
+      ],
+      "tag": "closure",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});

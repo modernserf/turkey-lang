@@ -176,11 +176,17 @@ export class Assembler {
     this.program.push(Opcode.New, size);
     return this;
   }
-  newClosure(name: string, funcLabel: Label, capturedVars: string[]): this {
+  newClosure(
+    name: string | null,
+    funcLabel: Label,
+    capturedVars: string[]
+  ): this {
     this.labels.ref(funcLabel, this.program.length);
 
     this.program.push(Opcode.NewClosure, capturedVars.length, 0);
-    this.initLocal(name);
+    if (name !== null) {
+      this.initLocal(name);
+    }
 
     for (const [i, name] of capturedVars.entries()) {
       this.program.push(Opcode.Dup);

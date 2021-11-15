@@ -153,6 +153,13 @@ const parseBaseExpr: Parser<Expr | null> = (state) => {
     case "string":
       state.advance();
       return { tag: "string", value: token.value };
+    case "|": {
+      state.advance();
+      const parameters = commaList(state, checkBinding);
+      match(state, "|");
+      const block = parseBlock(state);
+      return { tag: "closure", parameters, block };
+    }
     case "do":
       state.advance();
       return { tag: "do", block: parseBlock(state) };
@@ -174,7 +181,6 @@ const parseBaseExpr: Parser<Expr | null> = (state) => {
         }
       }
     }
-
     default:
       return null;
   }
