@@ -115,6 +115,9 @@ class Compiler {
       case "primitive":
         this.asm.number(expr.value);
         return;
+      case "string":
+        this.asm.string(expr.value);
+        return;
       case "do":
         this.compileBlock(expr.block);
         return;

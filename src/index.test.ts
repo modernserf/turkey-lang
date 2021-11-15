@@ -141,3 +141,16 @@ it("treats void as a value", () => {
   `;
   expect(run(code)).toEqual([]);
 });
+
+it("uses strings", () => {
+  const code = `
+    func print_twice (val: String): Void {
+      print val
+      print val
+    }
+
+    print_twice("hello")
+  `;
+
+  expect(run(code)).toEqual(["hello", "hello"]);
+});

@@ -149,6 +149,9 @@ const parseBaseExpr: Parser<Expr | null> = (state) => {
     case "integer":
       state.advance();
       return { tag: "integer", value: token.value };
+    case "string":
+      state.advance();
+      return { tag: "string", value: token.value };
     case "do":
       state.advance();
       return { tag: "do", block: parseBlock(state) };

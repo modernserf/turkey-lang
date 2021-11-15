@@ -1,8 +1,8 @@
 import { Token } from "./types";
 
-// _: whitespace _: comment  1: number 2: identifier 3: typeIdentifier 4: operator
+// _: whitespace _: comment  1: number 2: identifier 3: typeIdentifier 4: operator 5: string
 const pattern =
-  /[ \t\n]+|\/\/[^\n]*|(0|[1-9][0-9]*(?:\.[0-9]+)?)|([_a-z][_a-zA-Z0-9]*)|([A-Z][_a-zA-Z0-9]*)|(==|!=|<=|>=|[,:!+\-*/%=<>(){}])/y;
+  /[ \t\n]+|\/\/[^\n]*|(0|[1-9][0-9]*(?:\.[0-9]+)?)|([_a-z][_a-zA-Z0-9]*)|([A-Z][_a-zA-Z0-9]*)|(==|!=|<=|>=|[,:!+\-*/%=<>(){}])|"((?:[^"]|\\")*)"/y;
 
 export function lex(string: string): Token[] {
   const tokens: Token[] = [];
@@ -57,6 +57,8 @@ export function lex(string: string): Token[] {
           tokens.push({ tag: result[4] });
           break;
       }
+    } else if (result[5] !== undefined) {
+      tokens.push({ tag: "string", value: result[5] });
     }
   }
 

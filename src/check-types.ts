@@ -12,6 +12,7 @@ import { Scope } from "./scope";
 const voidType: Type = { tag: "void" };
 const integerType: Type = { tag: "integer" };
 const floatType: Type = { tag: "float" };
+const stringType: Type = { tag: "string" };
 const boolType: Type = { tag: "struct", value: "Boolean" };
 
 type CurrentFunc = {
@@ -58,12 +59,15 @@ class TypeChecker {
         return { tag: "expr", expr: this.checkExpr(stmt.expr) };
       case "print": {
         const expr = this.checkExpr(stmt.expr);
+        const op =
+          expr.type.tag === "string" ? Opcode.PrintStr : Opcode.PrintNum;
+
         // TODO: support printing strings, forbid printing other values?
         return {
           tag: "expr",
           expr: {
             tag: "callBuiltIn",
-            opcode: Opcode.PrintNum,
+            opcode: op,
             args: [expr],
             type: voidType,
           },
@@ -176,6 +180,8 @@ class TypeChecker {
         return { tag: "primitive", value: expr.value, type: integerType };
       case "float":
         return { tag: "primitive", value: expr.value, type: floatType };
+      case "string":
+        return { tag: "string", value: expr.value, type: stringType };
       case "identifier": {
         const type = this.scope.get(expr.value);
 
@@ -321,6 +327,8 @@ class TypeChecker {
         return floatType;
       case "Boolean":
         return boolType;
+      case "String":
+        return stringType;
       case "Void":
         return voidType;
       default:

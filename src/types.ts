@@ -11,6 +11,7 @@ export type Token =
   | { tag: "return" }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
+  | { tag: "string"; value: string }
   | { tag: "identifier"; value: string }
   | { tag: "typeIdentifier"; value: string }
   | { tag: "==" }
@@ -61,6 +62,7 @@ export type Expr =
   | { tag: "typeConstructor"; value: string }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
+  | { tag: "string"; value: string }
   | { tag: "binaryOp"; left: Expr; right: Expr; operator: string }
   | { tag: "unaryOp"; expr: Expr; operator: string }
   | { tag: "do"; block: Stmt[] }
@@ -79,11 +81,13 @@ export type Type =
   | { tag: "void" }
   | { tag: "integer" }
   | { tag: "float" }
+  | { tag: "string" }
   | { tag: "struct"; value: string }
   | { tag: "func"; parameters: Type[]; returnType: Type };
 
 export type CheckedExpr =
   | { tag: "primitive"; value: number; type: Type }
+  | { tag: "string"; value: string; type: Type }
   | { tag: "identifier"; value: string; type: Type }
   | { tag: "callBuiltIn"; opcode: Opcode; args: CheckedExpr[]; type: Type }
   | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: Type }
@@ -130,6 +134,7 @@ export enum Opcode {
   CallClosure, // arity
   ReturnValue,
   ReturnVoid,
+
   //
   Add,
   Sub,
