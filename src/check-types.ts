@@ -48,6 +48,10 @@ class TypeChecker {
     this.scope = this.scope.push();
     for (const stmt of block) {
       const checkedStmt = this.checkStmt(stmt);
+      if (!checkedStmt) {
+        type = voidType;
+        continue;
+      }
       checkedBlock.push(checkedStmt);
       if (checkedStmt.tag === "expr") {
         type = checkedStmt.expr.type;
@@ -58,10 +62,13 @@ class TypeChecker {
     this.scope = this.scope.pop();
     return { block: checkedBlock, type };
   }
-  private checkStmt(stmt: Stmt): CheckedStmt {
+  private checkStmt(stmt: Stmt): CheckedStmt | null {
     switch (stmt.tag) {
       case "expr":
         return { tag: "expr", expr: this.checkExpr(stmt.expr, null) };
+      case "type":
+        this.types.init(stmt.binding.value, this.checkTypeExpr(stmt.type));
+        return null;
       case "print": {
         const expr = this.checkExpr(stmt.expr, null);
         const op =

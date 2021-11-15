@@ -354,3 +354,31 @@ it("has anonymous function literals", () => {
 
   expect(run(code)).toEqual(["20"]);
 });
+
+it("rejects anonymous functions without inferred types", () => {
+  const code = `
+    let fn = |x| { x + x }
+    print fn(1)
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("rejects anonymous functions type mismatches", () => {
+  const code = `
+    func map (value: Int, fn: func (Int): Int): Int {
+      fn(value)
+    }
+    print map(10, |x, y| { x + y })
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("has type aliases", () => {
+  const code = `
+    type Mapper = func (Int): Int
+    let fn: Mapper = |x| { x + x }
+    print fn(1)
+  `;
+
+  expect(run(code)).toEqual(["2"]);
+});

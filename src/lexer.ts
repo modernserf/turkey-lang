@@ -26,6 +26,7 @@ export function lex(string: string): Token[] {
         case "while":
         case "func":
         case "return":
+        case "type":
           tokens.push({ tag: result[2] });
           break;
         default:

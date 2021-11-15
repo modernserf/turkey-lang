@@ -6,6 +6,7 @@ import {
   ParseError,
   IfCase,
   TypeExpr,
+  TypeBinding,
 } from "./types";
 
 interface IParseState {
@@ -38,6 +39,13 @@ const parseProgram: Parser<Stmt[]> = (state) => {
 const parseStatement: Parser<Stmt> = (state) => {
   const token = state.token();
   switch (token.tag) {
+    case "type": {
+      state.advance();
+      const binding = matchTypeBinding(state);
+      match(state, "=");
+      const type = matchType(state);
+      return { tag: "type", binding, type };
+    }
     case "print":
       state.advance();
       return { tag: "print", expr: matchExpr(state) };
@@ -198,6 +206,17 @@ const checkBinding: Parser<Binding | null> = (state) => {
       return { tag: "identifier", value: token.value };
     default:
       return null;
+  }
+};
+
+const matchTypeBinding: Parser<TypeBinding> = (state) => {
+  const token = state.token();
+  switch (token.tag) {
+    case "typeIdentifier":
+      state.advance();
+      return { tag: "identifier", value: token.value };
+    default:
+      throw new ParseError("type binding", token);
   }
 };
 

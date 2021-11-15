@@ -9,6 +9,7 @@ export type Token =
   | { tag: "while" }
   | { tag: "func" }
   | { tag: "return" }
+  | { tag: "type" }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "string"; value: string }
@@ -45,6 +46,7 @@ export class ParseError extends Error {
 }
 
 export type Stmt =
+  | { tag: "type"; binding: TypeBinding; type: TypeExpr }
   | { tag: "print"; expr: Expr }
   | { tag: "let"; binding: Binding; type: TypeExpr | null; expr: Expr }
   | { tag: "while"; expr: Expr; block: Stmt[] }
@@ -78,6 +80,8 @@ export type Binding = { tag: "identifier"; value: string };
 export type TypeExpr =
   | { tag: "identifier"; value: string }
   | { tag: "func"; parameters: TypeExpr[]; returnType: TypeExpr };
+
+export type TypeBinding = { tag: "identifier"; value: string };
 
 // typechecker -> compiler
 
