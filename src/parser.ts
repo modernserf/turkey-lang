@@ -46,9 +46,14 @@ const parseStatement: Parser<Stmt> = (state) => {
     case "let": {
       state.advance();
       const binding = matchBinding(state);
+      let type = null;
+      if (check(state, ":")) {
+        type = parseType(state);
+      }
+
       match(state, "=");
       const expr = matchExpr(state);
-      return { tag: "let", binding, type: null, expr };
+      return { tag: "let", binding, type, expr };
     }
     case "while": {
       state.advance();

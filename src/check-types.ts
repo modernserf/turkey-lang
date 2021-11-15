@@ -20,6 +20,11 @@ type CurrentFunc = {
   outerScope: Scope<string, Type>;
 };
 
+// istanbul ignore next
+function noMatch(value: never) {
+  throw new Error("no match");
+}
+
 export function check(program: Stmt[]): CheckedStmt[] {
   return TypeChecker.check(program);
 }
@@ -119,7 +124,7 @@ class TypeChecker {
 
         // handle implicit returns
         const lastStmt = block.pop() ?? { tag: "noop" };
-        switch (lastStmt?.tag) {
+        switch (lastStmt.tag) {
           case "return":
             block.push(lastStmt);
             break;
@@ -127,14 +132,14 @@ class TypeChecker {
             this.unify(returnType, lastStmt.expr.type);
             block.push({ tag: "return", expr: lastStmt.expr });
             break;
-          case "func":
-          case "let":
-          case "while":
+          case "noop":
             this.unify(returnType, voidType);
-            block.push(lastStmt);
             block.push({ tag: "return", expr: null });
             break;
-          case "noop":
+          // istanbul ignore next
+          default:
+            this.unify(returnType, voidType);
+            block.push(lastStmt);
             block.push({ tag: "return", expr: null });
             break;
         }

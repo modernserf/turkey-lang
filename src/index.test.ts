@@ -27,7 +27,8 @@ it("typechecks math", () => {
 it("references variables", () => {
   const code = `
     let x = 1
-    let y = 2 + 3
+    let y : Int = 2 + 3
+    x - y
     print x + y + 4
   `;
   expect(run(code)).toEqual(["10"]);
@@ -132,4 +133,11 @@ it("forbids unknown types", () => {
     }
   `;
   expect(() => run(code)).toThrow();
+});
+
+it("treats void as a value", () => {
+  const code = `
+    let x: Void = do {}
+  `;
+  expect(run(code)).toEqual([]);
 });

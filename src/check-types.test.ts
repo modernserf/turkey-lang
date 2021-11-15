@@ -476,7 +476,72 @@ Array [
 `);
 });
 
-it("checks functions that implicitly return", () => {
+it("checks functions that implicitly return void", () => {
+  const code = `
+  func foo (): Void {
+    while (True) {
+      print 0
+    }
+  }
+  `;
+  expect(check(code)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [
+      Object {
+        "block": Array [
+          Object {
+            "expr": Object {
+              "args": Array [
+                Object {
+                  "tag": "primitive",
+                  "type": Object {
+                    "tag": "integer",
+                  },
+                  "value": 0,
+                },
+              ],
+              "opcode": 33,
+              "tag": "callBuiltIn",
+              "type": Object {
+                "tag": "void",
+              },
+            },
+            "tag": "expr",
+          },
+        ],
+        "expr": Object {
+          "tag": "primitive",
+          "type": Object {
+            "tag": "struct",
+            "value": "Boolean",
+          },
+          "value": 1,
+        },
+        "tag": "while",
+      },
+      Object {
+        "expr": null,
+        "tag": "return",
+      },
+    ],
+    "name": "foo",
+    "parameters": Array [],
+    "tag": "func",
+    "type": Object {
+      "parameters": Array [],
+      "returnType": Object {
+        "tag": "void",
+      },
+      "tag": "func",
+    },
+    "upvalues": Array [],
+  },
+]
+`);
+});
+
+it("checks functions that implicitly return values", () => {
   const code = `
   func add_one (x: Int): Int {
     x + 1

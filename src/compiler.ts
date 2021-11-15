@@ -1,6 +1,7 @@
 import { Assembler } from "./assembler";
 import { CheckedExpr, CheckedStmt } from "./types";
 
+// istanbul ignore next
 function noMatch(value: never) {
   throw new Error("no match");
 }
@@ -27,15 +28,21 @@ class Compiler {
     this.asm.halt();
     for (const func of this.funcs) {
       this.asm.closure(func.label, func.parameters, func.upvalues);
-      for (const stmt of func.block) {
-        this.compileStmt(stmt);
-      }
+      this.compileBlockInner(func.block);
       this.asm.endfunc();
     }
     return this.asm.assemble();
   }
-  compileBlock(block: CheckedStmt[]) {
+  private compileBlock(block: CheckedStmt[]) {
     this.asm.scope();
+    this.compileBlockInner(block);
+    if (hasValue(block)) {
+      this.asm.endScopeValue();
+    } else {
+      this.asm.endScopeVoid();
+    }
+  }
+  private compileBlockInner(block: CheckedStmt[]) {
     let valueOnStack = false;
     for (const stmt of block) {
       if (valueOnStack) {
@@ -44,13 +51,8 @@ class Compiler {
       this.compileStmt(stmt);
       valueOnStack = stmt.tag === "expr";
     }
-    if (hasValue(block)) {
-      this.asm.endScopeValue();
-    } else {
-      this.asm.endScopeVoid();
-    }
   }
-  compileStmt(stmt: CheckedStmt) {
+  private compileStmt(stmt: CheckedStmt) {
     switch (stmt.tag) {
       case "expr":
         this.compileExpr(stmt.expr);
@@ -105,7 +107,7 @@ class Compiler {
         noMatch(stmt);
     }
   }
-  compileExpr(expr: CheckedExpr) {
+  private compileExpr(expr: CheckedExpr) {
     switch (expr.tag) {
       case "identifier":
         this.asm.local(expr.value);
