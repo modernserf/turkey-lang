@@ -14,7 +14,7 @@ const voidType: Type = { tag: "void" };
 const integerType: Type = { tag: "integer" };
 const floatType: Type = { tag: "float" };
 const stringType: Type = { tag: "string" };
-const boolType: Type = { tag: "struct", value: Symbol("Boolean") };
+const boolType: Type = { tag: "enum", value: Symbol("Boolean") };
 const builtInTypes = new Scope<string, Type>()
   .set("Int", integerType)
   .set("Float", floatType)
@@ -77,11 +77,32 @@ class TypeChecker {
         this.types.init(stmt.binding.value, this.checkTypeExpr(stmt.type));
         return null;
       case "enum": {
-        const type: Type = { tag: "struct", value: Symbol(stmt.binding.value) };
+        const type: Type = { tag: "enum", value: Symbol(stmt.binding.value) };
         this.types.init(stmt.binding.value, type);
         for (const [i, enumCase] of stmt.cases.entries()) {
           this.typeConstructors.init(enumCase.tagName, { type, value: i });
         }
+        return null;
+      }
+      case "struct": {
+        const type: Type = {
+          tag: "struct",
+          value: Symbol(stmt.binding.value),
+          fields: [],
+        };
+        const fieldNames = new Set();
+        this.types.init(stmt.binding.value, type);
+        for (const field of stmt.fields) {
+          if (fieldNames.has(field.fieldName)) {
+            throw new Error("duplicate field");
+          }
+          fieldNames.add(field.fieldName);
+          type.fields.push({
+            fieldName: field.fieldName,
+            type: this.checkTypeExpr(field.type),
+          });
+        }
+        this.typeConstructors.init(stmt.binding.value, { type, value: 0 });
         return null;
       }
       case "let": {
@@ -248,7 +269,36 @@ class TypeChecker {
       }
       case "typeConstructor": {
         const { value, type } = this.typeConstructors.get(expr.value);
-        return { tag: "primitive", value, type };
+        switch (type.tag) {
+          case "enum":
+            if (expr.fields.length > 0) throw new Error("not yet implemented");
+            return { tag: "primitive", value, type };
+          case "struct": {
+            if (expr.fields.length !== type.fields.length) {
+              throw new Error("arity mismatch");
+            }
+            const exprFieldsMap = new Map<string, Expr>();
+            for (const field of expr.fields) {
+              if (exprFieldsMap.has(field.fieldName)) {
+                throw new Error("duplicate field");
+              }
+              exprFieldsMap.set(field.fieldName, field.expr);
+            }
+
+            const value: CheckedExpr[] = [];
+            for (const field of type.fields) {
+              const res = exprFieldsMap.get(field.fieldName);
+              if (!res) throw new Error("missing field");
+              const checked = this.checkExpr(res, field.type);
+              this.unify(field.type, checked.type);
+              value.push(checked);
+            }
+
+            return { tag: "struct", value, type };
+          }
+          default:
+            throw new Error("invalid type");
+        }
       }
       case "unaryOp": {
         const checked = this.checkExpr(expr.expr, null);
@@ -347,6 +397,24 @@ class TypeChecker {
         }
         return { tag: "call", callee, args, type: callee.type.returnType };
       }
+      case "field": {
+        const checkedExpr = this.checkExpr(expr.expr, null);
+        if (checkedExpr.type.tag !== "struct") {
+          throw new Error("not a struct");
+        }
+        const fieldIndex = checkedExpr.type.fields.findIndex(
+          (f) => f.fieldName === expr.fieldName
+        );
+        const field = checkedExpr.type.fields[fieldIndex];
+        if (!field) throw new Error("does not have this field");
+
+        return {
+          tag: "field",
+          index: fieldIndex,
+          expr: checkedExpr,
+          type: field.type,
+        };
+      }
       case "do": {
         const { block, type } = this.checkBlock(expr.block);
         return { tag: "do", block, type };
@@ -390,36 +458,35 @@ class TypeChecker {
 
   private unify(left: Type | null, right: Type): Type {
     if (!left) return right;
-    if (left.tag === right.tag) {
-      switch (left.tag) {
-        case "void":
-        case "integer":
-        case "float":
-        case "string":
-          return left;
-        case "struct":
-          if (left.value === (right as typeof left).value) return left;
-          break;
-        case "func": {
-          const returnType = this.unify(
-            left.returnType,
-            (right as typeof left).returnType
-          );
-          if (
-            left.parameters.length !== (right as typeof left).parameters.length
-          ) {
-            throw new Error("arity mismatch");
-          }
-          const parameters = left.parameters.map((param, i) => {
-            return this.unify(param, (right as typeof left).parameters[i]);
-          });
+    if (left.tag !== right.tag) throw new Error("type mismatch");
 
-          return { tag: "func", parameters, returnType };
+    switch (left.tag) {
+      case "void":
+      case "integer":
+      case "float":
+      case "string":
+        return left;
+      case "struct":
+      case "enum":
+        if (left.value === (right as typeof left).value) return left;
+        throw new Error("type mismatch");
+      case "func": {
+        const returnType = this.unify(
+          left.returnType,
+          (right as typeof left).returnType
+        );
+        if (
+          left.parameters.length !== (right as typeof left).parameters.length
+        ) {
+          throw new Error("arity mismatch");
         }
+        const parameters = left.parameters.map((param, i) => {
+          return this.unify(param, (right as typeof left).parameters[i]);
+        });
+
+        return { tag: "func", parameters, returnType };
       }
     }
-
-    throw new Error("type mismatch");
   }
 
   private arithmeticOp(

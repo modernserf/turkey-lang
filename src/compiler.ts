@@ -1,5 +1,5 @@
 import { Assembler } from "./assembler";
-import { CheckedExpr, CheckedStmt } from "./types";
+import { CheckedExpr, CheckedStmt, Opcode } from "./types";
 
 // istanbul ignore next
 function noMatch(value: never) {
@@ -116,6 +116,14 @@ class Compiler {
       case "string":
         this.asm.string(expr.value);
         return;
+      case "struct":
+        this.asm.newObject(expr.value.length);
+        for (const [i, value] of expr.value.entries()) {
+          this.asm.write(Opcode.Dup);
+          this.compileExpr(value);
+          this.asm.setHeap(i);
+        }
+        return;
       case "closure": {
         const label = Symbol();
         const parameters = expr.parameters.map((param) => param.binding.value);
@@ -166,6 +174,11 @@ class Compiler {
         this.compileExpr(expr.callee);
         this.asm.callClosure(expr.args.length);
         return;
+      case "field": {
+        this.compileExpr(expr.expr);
+        this.asm.getHeap(expr.index);
+        return;
+      }
       // istanbul ignore next
       default:
         noMatch(expr);

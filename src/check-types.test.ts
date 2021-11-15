@@ -132,7 +132,7 @@ Array [
               "predicate": Object {
                 "tag": "primitive",
                 "type": Object {
-                  "tag": "struct",
+                  "tag": "enum",
                   "value": Symbol(Boolean),
                 },
                 "value": 0,
@@ -172,7 +172,7 @@ Array [
               "predicate": Object {
                 "tag": "primitive",
                 "type": Object {
-                  "tag": "struct",
+                  "tag": "enum",
                   "value": Symbol(Boolean),
                 },
                 "value": 0,
@@ -191,7 +191,7 @@ Array [
                             Object {
                               "tag": "primitive",
                               "type": Object {
-                                "tag": "struct",
+                                "tag": "enum",
                                 "value": Symbol(Boolean),
                               },
                               "value": 1,
@@ -200,7 +200,7 @@ Array [
                           "opcode": 32,
                           "tag": "callBuiltIn",
                           "type": Object {
-                            "tag": "struct",
+                            "tag": "enum",
                             "value": Symbol(Boolean),
                           },
                         },
@@ -209,7 +209,7 @@ Array [
                     ],
                     "tag": "do",
                     "type": Object {
-                      "tag": "struct",
+                      "tag": "enum",
                       "value": Symbol(Boolean),
                     },
                   },
@@ -234,7 +234,7 @@ Array [
     "expr": Object {
       "tag": "primitive",
       "type": Object {
-        "tag": "struct",
+        "tag": "enum",
         "value": Symbol(Boolean),
       },
       "value": 1,
@@ -513,7 +513,7 @@ Array [
         "expr": Object {
           "tag": "primitive",
           "type": Object {
-            "tag": "struct",
+            "tag": "enum",
             "value": Symbol(Boolean),
           },
           "value": 1,
@@ -752,7 +752,7 @@ Array [
         "expr": Object {
           "tag": "primitive",
           "type": Object {
-            "tag": "struct",
+            "tag": "enum",
             "value": Symbol(Boolean),
           },
           "value": 1,
@@ -915,7 +915,7 @@ Array [
           "predicate": Object {
             "tag": "primitive",
             "type": Object {
-              "tag": "struct",
+              "tag": "enum",
               "value": Symbol(Boolean),
             },
             "value": 1,

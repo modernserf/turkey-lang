@@ -398,3 +398,23 @@ it("has simple enums", () => {
   `;
   expect(run(code)).toEqual(["V2"]);
 });
+
+it("has structs", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,
+    }
+
+    func abs (x: Int): Int {
+      if (x > 0) { x } else { -x }
+    }
+
+    func manhattan_distance (from: Point, to: Point): Int {
+      abs(to:x - from:x) + abs(to:y - from:y)
+    }
+
+    print(manhattan_distance(Point { x: 1, y: 1 }, Point { x: 2, y: 0 }))
+  `;
+  expect(run(code)).toEqual(["2"]);
+});

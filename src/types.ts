@@ -10,6 +10,7 @@ export type Token =
   | { tag: "return" }
   | { tag: "type" }
   | { tag: "enum" }
+  | { tag: "struct" }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "string"; value: string }
@@ -48,6 +49,7 @@ export class ParseError extends Error {
 export type Stmt =
   | { tag: "type"; binding: TypeBinding; type: TypeExpr }
   | { tag: "enum"; binding: TypeBinding; cases: EnumCase[] }
+  | { tag: "struct"; binding: TypeBinding; fields: StructFieldType[] }
   | { tag: "let"; binding: Binding; type: TypeExpr | null; expr: Expr }
   | { tag: "while"; expr: Expr; block: Stmt[] }
   | { tag: "return"; expr: Expr | null }
@@ -62,9 +64,11 @@ export type Stmt =
 
 export type EnumCase = { tagName: string; typeBody: null };
 
+export type StructFieldType = { fieldName: string; type: TypeExpr };
+
 export type Expr =
   | { tag: "identifier"; value: string }
-  | { tag: "typeConstructor"; value: string }
+  | { tag: "typeConstructor"; value: string; fields: StructFieldValue[] }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "string"; value: string }
@@ -73,7 +77,10 @@ export type Expr =
   | { tag: "unaryOp"; expr: Expr; operator: string }
   | { tag: "do"; block: Stmt[] }
   | { tag: "if"; cases: IfCase[]; elseBlock: Stmt[] }
+  | { tag: "field"; expr: Expr; fieldName: string }
   | { tag: "call"; expr: Expr; args: Expr[] };
+
+export type StructFieldValue = { fieldName: string; expr: Expr };
 
 export type IfCase = { tag: "cond"; predicate: Expr; block: Stmt[] };
 
@@ -92,12 +99,18 @@ export type Type =
   | { tag: "integer" }
   | { tag: "float" }
   | { tag: "string" }
-  | { tag: "struct"; value: symbol }
+  | { tag: "enum"; value: symbol }
+  | {
+      tag: "struct";
+      value: symbol;
+      fields: Array<{ fieldName: string; type: Type }>;
+    }
   | { tag: "func"; parameters: Type[]; returnType: Type };
 
 export type CheckedExpr =
   | { tag: "primitive"; value: number; type: Type }
   | { tag: "string"; value: string; type: Type }
+  | { tag: "struct"; value: CheckedExpr[]; type: Type }
   | { tag: "identifier"; value: string; type: Type }
   | {
       tag: "closure";
@@ -106,6 +119,7 @@ export type CheckedExpr =
       block: CheckedStmt[];
       type: Type;
     }
+  | { tag: "field"; expr: CheckedExpr; index: number; type: Type }
   | { tag: "callBuiltIn"; opcode: Opcode; args: CheckedExpr[]; type: Type }
   | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: Type }
   | { tag: "do"; block: CheckedStmt[]; type: Type }

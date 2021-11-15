@@ -191,6 +191,7 @@ Array [
     "expr": Object {
       "args": Array [
         Object {
+          "fields": Array [],
           "tag": "typeConstructor",
           "value": "True",
         },
