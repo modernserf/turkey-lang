@@ -307,6 +307,21 @@ Array [
 `);
 });
 
+it("handles dropping scope values correctly", () => {
+  const code = `
+    func get_three(): Int { 3 }
+  
+    if (True) {
+      let x = get_three()
+      get_three()
+      print(x)
+    } else {
+      print(0)
+    }
+  `;
+  expect(run(code)).toEqual(["3"]);
+});
+
 it("accepts functions as parameters", () => {
   const code = `
     func map (value: Int, fn: func (Int): Int): Int {
