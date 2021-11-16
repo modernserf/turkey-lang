@@ -418,3 +418,20 @@ it("has structs", () => {
   `;
   expect(run(code)).toEqual(["2"]);
 });
+
+it("has tuple structs", () => {
+  const code = `
+    struct Point (Int, Int) 
+
+    func abs (x: Int): Int {
+      if (x > 0) { x } else { -x }
+    }
+
+    func manhattan_distance (from: Point, to: Point): Int {
+      abs(to:0 - from:0) + abs(to:1 - from:1)
+    }
+
+    print(manhattan_distance(Point(1,1), Point(2,0)))
+  `;
+  expect(run(code)).toEqual(["2"]);
+});
