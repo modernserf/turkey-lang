@@ -31,7 +31,9 @@ const builtInTypes = new Scope<string, Type>()
   .set("String", stringType)
   .set("Void", voidType);
 
-type TypeConstructor = { value: number; type: Type };
+type ConstructableType = Type & ({ tag: "struct" } | { tag: "enum" });
+
+type TypeConstructor = { value: number; type: ConstructableType };
 const builtInTypeConstructors = new Scope<string, TypeConstructor>()
   .set("False", { value: 0, type: boolType })
   .set("True", { value: 1, type: boolType });
@@ -303,30 +305,21 @@ class TypeChecker {
             if (expr.fields.length > 0) throw new Error("not yet implemented");
             return { tag: "primitive", value, type };
           case "struct": {
-            if (expr.fields.length !== type.fields.length) {
-              throw new Error("arity mismatch");
-            }
-            const exprFieldsMap = new Map<string, Expr>();
-            for (const field of expr.fields) {
-              if (exprFieldsMap.has(field.fieldName)) {
-                throw new Error("duplicate field");
+            const fields = this.zipFields(
+              type.fields,
+              expr.fields,
+              (typeField, exprField) => {
+                const checked = this.checkExpr(exprField.expr, typeField.type);
+                this.unify(typeField.type, checked.type);
+                return checked;
               }
-              exprFieldsMap.set(field.fieldName, field.expr);
-            }
+            );
 
-            const value: CheckedExpr[] = [];
-            for (const field of type.fields) {
-              const res = exprFieldsMap.get(field.fieldName);
-              if (!res) throw new Error("missing field");
-              const checked = this.checkExpr(res, field.type);
-              this.unify(field.type, checked.type);
-              value.push(checked);
-            }
-
-            return { tag: "struct", value, type };
+            return { tag: "struct", value: fields, type };
           }
+          // istanbul ignore next
           default:
-            throw new Error("invalid type");
+            throw new Error("non-constructible type");
         }
       }
       case "unaryOp": {
@@ -479,63 +472,64 @@ class TypeChecker {
         return res;
       }
       case "match": {
-        let resultType: Type | null = null;
-        const predicate = this.checkExpr(expr.expr, null);
-        if (predicate.type.tag !== "enum") {
-          throw new Error("can only pattern match with enums");
-        }
+        throw new Error("not yet implemented");
+        // let resultType: Type | null = null;
+        // const predicate = this.checkExpr(expr.expr, null);
+        // if (predicate.type.tag !== "enum") {
+        //   throw new Error("can only pattern match with enums");
+        // }
 
-        const res: CheckedExpr = {
-          tag: "match",
-          expr: predicate,
-          cases: [],
-          type: voidType,
-        };
+        // const res: CheckedExpr = {
+        //   tag: "match",
+        //   expr: predicate,
+        //   cases: [],
+        //   type: voidType,
+        // };
 
-        const validTags = new Set(predicate.type.cases.map((c) => c.tag));
+        // const validTags = new Set(predicate.type.cases.map((c) => c.tag));
 
-        const matchCaseMap = new Map<string, MatchCase>();
-        for (const matchCase of expr.cases) {
-          const tag = matchCase.binding.value;
-          if (matchCaseMap.has(tag)) {
-            throw new Error("duplicate match cases");
-          }
-          if (!validTags.has(tag)) {
-            throw new Error("invalid match case");
-          }
-          matchCaseMap.set(tag, matchCase);
-        }
+        // const matchCaseMap = new Map<string, MatchCase>();
+        // for (const matchCase of expr.cases) {
+        //   const tag = matchCase.binding.value;
+        //   if (matchCaseMap.has(tag)) {
+        //     throw new Error("duplicate match cases");
+        //   }
+        //   if (!validTags.has(tag)) {
+        //     throw new Error("invalid match case");
+        //   }
+        //   matchCaseMap.set(tag, matchCase);
+        // }
 
-        for (const enumCase of predicate.type.cases) {
-          const matchCase = matchCaseMap.get(enumCase.tag);
-          if (!matchCase) {
-            throw new Error("incomplete match cases");
-          }
+        // for (const enumCase of predicate.type.cases) {
+        //   const matchCase = matchCaseMap.get(enumCase.tag);
+        //   if (!matchCase) {
+        //     throw new Error("incomplete match cases");
+        //   }
 
-          const fieldMap = new Map(
-            enumCase.fields.map((field) => [field.fieldName, field.type])
-          );
+        //   const fieldMap = new Map(
+        //     enumCase.fields.map((field) => [field.fieldName, field.type])
+        //   );
 
-          this.scope = this.scope.push();
-          // TODO: i want to allow partial { } bindings, but only complete ( ) bindings
-          for (const field of matchCase.binding.fields) {
-            const type = fieldMap.get(field.fieldName);
-            if (!type) throw new Error("missing field");
-            this.initScopeBinding(field.binding, type);
-          }
+        //   this.scope = this.scope.push();
+        //   // TODO: i want to allow partial { } bindings, but only complete ( ) bindings
+        //   for (const field of matchCase.binding.fields) {
+        //     const type = fieldMap.get(field.fieldName);
+        //     if (!type) throw new Error("missing field");
+        //     this.initScopeBinding(field.binding, type);
+        //   }
 
-          const block = this.checkBlock(matchCase.block);
-          this.scope = this.scope.pop();
-          resultType = this.unify(resultType, block.type);
+        //   const block = this.checkBlock(matchCase.block);
+        //   this.scope = this.scope.pop();
+        //   resultType = this.unify(resultType, block.type);
 
-          res.cases.push({ binding: matchCase.binding, block: block.block });
-        }
+        //   res.cases.push({ binding: matchCase.binding, block: block.block });
+        // }
 
-        if (resultType) {
-          res.type = resultType;
-        }
+        // if (resultType) {
+        //   res.type = resultType;
+        // }
 
-        return res;
+        // return res;
       }
     }
   }
@@ -578,6 +572,35 @@ class TypeChecker {
         return { tag: "func", parameters, returnType };
       }
     }
+  }
+
+  private zipFields<
+    TypeField extends { fieldName: string },
+    ValueField extends { fieldName: string },
+    U
+  >(
+    typeFields: TypeField[],
+    valueFields: ValueField[],
+    join: (t: TypeField, u: ValueField) => U
+  ): U[] {
+    const typeFieldsSet = new Set(typeFields.map((field) => field.fieldName));
+
+    const valueFieldsMap = new Map<string, ValueField>();
+    for (const field of valueFields) {
+      if (!typeFieldsSet.has(field.fieldName)) {
+        throw new Error("unknown field");
+      }
+      if (valueFieldsMap.has(field.fieldName)) {
+        throw new Error("duplicate field");
+      }
+      valueFieldsMap.set(field.fieldName, field);
+    }
+
+    return typeFields.map((typeField) => {
+      const valueField = valueFieldsMap.get(typeField.fieldName);
+      if (!valueField) throw new Error("missing field");
+      return join(typeField, valueField);
+    });
   }
 
   private arithmeticOp(

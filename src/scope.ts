@@ -31,6 +31,7 @@ export class Scope<K, V> {
     return false;
   }
   get(key: K): V {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     if (this.map.has(key)) return this.map.get(key)!;
     if (this.parent) return this.parent.get(key);
     throw new KeyNotFoundError(key);

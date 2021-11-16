@@ -399,6 +399,17 @@ it("has simple enums", () => {
   expect(run(code)).toEqual(["V2"]);
 });
 
+it("rejects enun type mismatches", () => {
+  const code = `
+    enum Foo { Foo }
+    enum Bar { Bar }
+    func foo(value: Foo): Void {} 
+    
+    foo(Bar)
+  `;
+  expect(() => run(code)).toThrow();
+});
+
 it("has structs", () => {
   const code = `
     struct Point {
@@ -417,6 +428,50 @@ it("has structs", () => {
     print(manhattan_distance(Point { x: 1, y: 1 }, Point { x: 2, y: 0 }))
   `;
   expect(run(code)).toEqual(["2"]);
+});
+
+it("rejects duplicate fields in struct definitions", () => {
+  const code = `
+    struct Point { x: Int, x: Int } 
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("rejects duplicate fields in struct constructors", () => {
+  const code = `
+    struct Val { x: Int }
+    let val = Val { x: 1, x: 2 }
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("rejects missing fields in struct constructors", () => {
+  const code = `
+    struct Point { x: Int, y: Int }
+    let point = Point { x: 1 }
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("rejects unknown fields in struct constructors", () => {
+  const code = `
+    struct Point { x: Int, y: Int }
+    let point = Point { x: 1, y: 1, z: 2 }
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("rejects field access on non-structs", () => {
+  expect(() => run(`"foo":0`)).toThrow();
+});
+
+it("rejects invalid field access ", () => {
+  const code = `
+    struct Point { x: Int, y: Int }
+    let point = Point { x: 1, y: 1 }
+    print(point:z)
+  `;
+  expect(() => run(code)).toThrow();
 });
 
 it("has tuple structs", () => {
