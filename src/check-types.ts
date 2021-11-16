@@ -49,6 +49,12 @@ class TypeChecker {
     this.types = builtInTypes.push();
     this.typeConstructors = builtInTypeConstructors.push();
   }
+  private initScopeBinding(binding: Binding, type: Type) {
+    switch (binding.tag) {
+      case "identifier":
+        this.scope.init(binding.value, type);
+    }
+  }
   private checkBlock(block: Stmt[]): { block: CheckedStmt[]; type: Type } {
     const checkedBlock: CheckedStmt[] = [];
     let type = voidType;
@@ -111,7 +117,7 @@ class TypeChecker {
         if (forwardType) {
           this.unify(expr.type, forwardType);
         }
-        this.scope.init(stmt.binding.value, expr.type);
+        this.initScopeBinding(stmt.binding, expr.type);
         return { tag: "let", binding: stmt.binding, expr };
       }
       case "while": {
@@ -178,7 +184,7 @@ class TypeChecker {
 
     // add parameters to scope
     for (const param of parameters) {
-      this.scope.init(param.binding.value, param.type);
+      this.initScopeBinding(param.binding, param.type);
     }
 
     // check function body

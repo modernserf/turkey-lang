@@ -1,5 +1,5 @@
 import { Assembler } from "./assembler";
-import { CheckedExpr, CheckedStmt, Opcode } from "./types";
+import { Binding, CheckedExpr, CheckedStmt, Opcode } from "./types";
 
 // istanbul ignore next
 function noMatch(value: never) {
@@ -87,17 +87,7 @@ class Compiler {
         return;
       }
       case "func": {
-        const label = Symbol(stmt.name);
-        const parameters = stmt.parameters.map((param) => param.binding.value);
-        const upvalues = stmt.upvalues.map((val) => val.name);
-        this.funcs.push({
-          label,
-          block: stmt.block,
-          parameters,
-          upvalues,
-        });
-
-        this.asm.newClosure(stmt.name, label, upvalues);
+        this.compileFunc(stmt.name, Symbol(stmt.name), stmt);
         return;
       }
       // istanbul ignore next
@@ -125,17 +115,7 @@ class Compiler {
         }
         return;
       case "closure": {
-        const label = Symbol();
-        const parameters = expr.parameters.map((param) => param.binding.value);
-        const upvalues = expr.upvalues.map((val) => val.name);
-        this.funcs.push({
-          label,
-          block: expr.block,
-          parameters,
-          upvalues,
-        });
-
-        this.asm.newClosure(null, label, upvalues);
+        this.compileFunc(null, Symbol("closure"), expr);
         return;
       }
 
@@ -183,6 +163,28 @@ class Compiler {
       default:
         noMatch(expr);
     }
+  }
+  private compileFunc(
+    bindAs: string | null,
+    label: symbol,
+    stmt: {
+      parameters: { binding: Binding }[];
+      upvalues: { name: string }[];
+      block: CheckedStmt[];
+    }
+  ) {
+    //func
+    const parameters = stmt.parameters.map((param) => param.binding.value);
+    const upvalues = stmt.upvalues.map((val) => val.name);
+    this.funcs.push({
+      label,
+      block: stmt.block,
+      parameters,
+      upvalues,
+    });
+
+    this.asm.newClosure(bindAs, label, upvalues);
+    return;
   }
 }
 
