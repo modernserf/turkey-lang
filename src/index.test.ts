@@ -435,3 +435,27 @@ it("has tuple structs", () => {
   `;
   expect(run(code)).toEqual(["2"]);
 });
+
+it.skip("has tagged variants", () => {
+  const code = `
+    enum IntOption {
+      None,
+      Some(Int),
+    }
+
+    func print_int_option(val: IntOption): Void {
+      match (val) {
+        None => {
+          print("None")
+        },
+        Some(x) => {
+          print(x)
+        },
+      }
+    }
+
+    print_int_option(None)
+    print_int_option(Some(5))
+  `;
+  expect(run(code)).toEqual(["None", "5"]);
+});

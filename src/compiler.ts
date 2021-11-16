@@ -147,8 +147,9 @@ class Compiler {
       // value at top of the stack is result
       // copy to the eventual new top of the stack
       this.asm.setLocal(this.locals.size());
-    } else {
-      // TODO: why am i not dropping here?
+    } else if (count > 0) {
+      // value at top of stack is local; drop it
+      this.asm.drop();
     }
     // drop everything else
     for (let i = 0; i < count - 1; i++) {
@@ -251,6 +252,10 @@ class Compiler {
         this.labels.create(condElse);
         this.compileBlock(expr.elseBlock);
         this.labels.create(condEnd);
+        return;
+      }
+      case "match": {
+        throw new Error("not yet implemented");
         return;
       }
       case "callBuiltIn":

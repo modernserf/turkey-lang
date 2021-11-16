@@ -132,6 +132,16 @@ Array [
               "predicate": Object {
                 "tag": "primitive",
                 "type": Object {
+                  "cases": Array [
+                    Object {
+                      "fields": Array [],
+                      "tag": "False",
+                    },
+                    Object {
+                      "fields": Array [],
+                      "tag": "True",
+                    },
+                  ],
                   "tag": "enum",
                   "value": Symbol(Boolean),
                 },
@@ -172,6 +182,16 @@ Array [
               "predicate": Object {
                 "tag": "primitive",
                 "type": Object {
+                  "cases": Array [
+                    Object {
+                      "fields": Array [],
+                      "tag": "False",
+                    },
+                    Object {
+                      "fields": Array [],
+                      "tag": "True",
+                    },
+                  ],
                   "tag": "enum",
                   "value": Symbol(Boolean),
                 },
@@ -191,6 +211,16 @@ Array [
                             Object {
                               "tag": "primitive",
                               "type": Object {
+                                "cases": Array [
+                                  Object {
+                                    "fields": Array [],
+                                    "tag": "False",
+                                  },
+                                  Object {
+                                    "fields": Array [],
+                                    "tag": "True",
+                                  },
+                                ],
                                 "tag": "enum",
                                 "value": Symbol(Boolean),
                               },
@@ -200,6 +230,16 @@ Array [
                           "opcode": 32,
                           "tag": "callBuiltIn",
                           "type": Object {
+                            "cases": Array [
+                              Object {
+                                "fields": Array [],
+                                "tag": "False",
+                              },
+                              Object {
+                                "fields": Array [],
+                                "tag": "True",
+                              },
+                            ],
                             "tag": "enum",
                             "value": Symbol(Boolean),
                           },
@@ -209,6 +249,16 @@ Array [
                     ],
                     "tag": "do",
                     "type": Object {
+                      "cases": Array [
+                        Object {
+                          "fields": Array [],
+                          "tag": "False",
+                        },
+                        Object {
+                          "fields": Array [],
+                          "tag": "True",
+                        },
+                      ],
                       "tag": "enum",
                       "value": Symbol(Boolean),
                     },
@@ -234,6 +284,16 @@ Array [
     "expr": Object {
       "tag": "primitive",
       "type": Object {
+        "cases": Array [
+          Object {
+            "fields": Array [],
+            "tag": "False",
+          },
+          Object {
+            "fields": Array [],
+            "tag": "True",
+          },
+        ],
         "tag": "enum",
         "value": Symbol(Boolean),
       },
@@ -513,6 +573,16 @@ Array [
         "expr": Object {
           "tag": "primitive",
           "type": Object {
+            "cases": Array [
+              Object {
+                "fields": Array [],
+                "tag": "False",
+              },
+              Object {
+                "fields": Array [],
+                "tag": "True",
+              },
+            ],
             "tag": "enum",
             "value": Symbol(Boolean),
           },
@@ -752,6 +822,16 @@ Array [
         "expr": Object {
           "tag": "primitive",
           "type": Object {
+            "cases": Array [
+              Object {
+                "fields": Array [],
+                "tag": "False",
+              },
+              Object {
+                "fields": Array [],
+                "tag": "True",
+              },
+            ],
             "tag": "enum",
             "value": Symbol(Boolean),
           },
@@ -915,6 +995,16 @@ Array [
           "predicate": Object {
             "tag": "primitive",
             "type": Object {
+              "cases": Array [
+                Object {
+                  "fields": Array [],
+                  "tag": "False",
+                },
+                Object {
+                  "fields": Array [],
+                  "tag": "True",
+                },
+              ],
               "tag": "enum",
               "value": Symbol(Boolean),
             },

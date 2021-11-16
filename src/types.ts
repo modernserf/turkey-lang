@@ -11,6 +11,7 @@ export type Token =
   | { tag: "type" }
   | { tag: "enum" }
   | { tag: "struct" }
+  | { tag: "match" }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "string"; value: string }
@@ -20,6 +21,7 @@ export type Token =
   | { tag: "!=" }
   | { tag: "<=" }
   | { tag: ">=" }
+  | { tag: "=>" }
   | { tag: "!" }
   | { tag: "+" }
   | { tag: "-" }
@@ -62,9 +64,11 @@ export type Stmt =
     }
   | { tag: "expr"; expr: Expr };
 
-export type EnumCase = { tagName: string; typeBody: null };
+export type EnumCase = { tagName: string; fields: StructFieldType[] };
 
 export type StructFieldType = { fieldName: string; type: TypeExpr };
+export type StructFieldValue = { fieldName: string; expr: Expr };
+export type StructFieldBinding = { fieldName: string; binding: Binding };
 
 export type Expr =
   | { tag: "identifier"; value: string }
@@ -77,12 +81,18 @@ export type Expr =
   | { tag: "unaryOp"; expr: Expr; operator: string }
   | { tag: "do"; block: Stmt[] }
   | { tag: "if"; cases: IfCase[]; elseBlock: Stmt[] }
+  | { tag: "match"; expr: Expr; cases: MatchCase[] }
   | { tag: "field"; expr: Expr; fieldName: string }
   | { tag: "call"; expr: Expr; args: Expr[] };
 
-export type StructFieldValue = { fieldName: string; expr: Expr };
-
 export type IfCase = { tag: "cond"; predicate: Expr; block: Stmt[] };
+
+export type MatchCase = { binding: MatchBinding; block: Stmt[] };
+export type MatchBinding = {
+  tag: "typeIdentifier";
+  value: string;
+  fields: StructFieldBinding[];
+};
 
 export type Binding = { tag: "identifier"; value: string };
 
@@ -99,13 +109,19 @@ export type Type =
   | { tag: "integer" }
   | { tag: "float" }
   | { tag: "string" }
-  | { tag: "enum"; value: symbol }
+  | {
+      tag: "enum";
+      value: symbol;
+      cases: Array<{ tag: string; fields: CheckedStructFieldType[] }>;
+    }
   | {
       tag: "struct";
       value: symbol;
-      fields: Array<{ fieldName: string; type: Type }>;
+      fields: CheckedStructFieldType[];
     }
   | { tag: "func"; parameters: Type[]; returnType: Type };
+
+type CheckedStructFieldType = { fieldName: string; type: Type };
 
 export type CheckedExpr =
   | { tag: "primitive"; value: number; type: Type }
@@ -127,6 +143,12 @@ export type CheckedExpr =
       tag: "if";
       cases: Array<{ predicate: CheckedExpr; block: CheckedStmt[] }>;
       elseBlock: CheckedStmt[];
+      type: Type;
+    }
+  | {
+      tag: "match";
+      expr: CheckedExpr;
+      cases: Array<{ binding: MatchBinding; block: CheckedStmt[] }>;
       type: Type;
     };
 

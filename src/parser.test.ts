@@ -574,3 +574,325 @@ Array [
 ]
 `);
 });
+
+it("has tagged variants", () => {
+  const code = `
+    enum IntOption {
+      None,
+      Some(Int),
+    }
+
+    match (val) {
+      None => print("None"),
+      Some(x) => {
+        print(x)
+      },
+    }
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "value": "IntOption",
+    },
+    "cases": Array [
+      Object {
+        "fields": Array [],
+        "tagName": "None",
+      },
+      Object {
+        "fields": Array [
+          Object {
+            "fieldName": "0",
+            "type": Object {
+              "tag": "identifier",
+              "value": "Int",
+            },
+          },
+        ],
+        "tagName": "Some",
+      },
+    ],
+    "tag": "enum",
+  },
+  Object {
+    "expr": Object {
+      "cases": Array [
+        Object {
+          "binding": Object {
+            "fields": Array [],
+            "tag": "typeIdentifier",
+            "value": "None",
+          },
+          "block": Array [
+            Object {
+              "expr": Object {
+                "args": Array [
+                  Object {
+                    "tag": "string",
+                    "value": "None",
+                  },
+                ],
+                "expr": Object {
+                  "tag": "identifier",
+                  "value": "print",
+                },
+                "tag": "call",
+              },
+              "tag": "expr",
+            },
+          ],
+        },
+        Object {
+          "binding": Object {
+            "fields": Array [
+              Object {
+                "binding": Object {
+                  "tag": "identifier",
+                  "value": "x",
+                },
+                "fieldName": "0",
+              },
+            ],
+            "tag": "typeIdentifier",
+            "value": "Some",
+          },
+          "block": Array [
+            Object {
+              "expr": Object {
+                "args": Array [
+                  Object {
+                    "tag": "identifier",
+                    "value": "x",
+                  },
+                ],
+                "expr": Object {
+                  "tag": "identifier",
+                  "value": "print",
+                },
+                "tag": "call",
+              },
+              "tag": "expr",
+            },
+          ],
+        },
+      ],
+      "expr": Object {
+        "tag": "identifier",
+        "value": "val",
+      },
+      "tag": "match",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("has tagged variants with named fields", () => {
+  const code = `
+    enum Expr {
+      AddExpr { left: Expr, right: Expr },
+      IntExpr { value: Int },
+    }
+
+    match (val) {
+      AddExpr { left: left, right: right } => left + right,
+      IntExpr { value: value } => value,
+    }
+  `;
+
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "value": "Expr",
+    },
+    "cases": Array [
+      Object {
+        "fields": Array [
+          Object {
+            "fieldName": "left",
+            "type": Object {
+              "tag": "identifier",
+              "value": "Expr",
+            },
+          },
+          Object {
+            "fieldName": "right",
+            "type": Object {
+              "tag": "identifier",
+              "value": "Expr",
+            },
+          },
+        ],
+        "tagName": "AddExpr",
+      },
+      Object {
+        "fields": Array [
+          Object {
+            "fieldName": "value",
+            "type": Object {
+              "tag": "identifier",
+              "value": "Int",
+            },
+          },
+        ],
+        "tagName": "IntExpr",
+      },
+    ],
+    "tag": "enum",
+  },
+  Object {
+    "expr": Object {
+      "cases": Array [
+        Object {
+          "binding": Object {
+            "fields": Array [
+              Object {
+                "binding": Object {
+                  "tag": "identifier",
+                  "value": "left",
+                },
+                "fieldName": "left",
+              },
+              Object {
+                "binding": Object {
+                  "tag": "identifier",
+                  "value": "right",
+                },
+                "fieldName": "right",
+              },
+            ],
+            "tag": "typeIdentifier",
+            "value": "AddExpr",
+          },
+          "block": Array [
+            Object {
+              "expr": Object {
+                "left": Object {
+                  "tag": "identifier",
+                  "value": "left",
+                },
+                "operator": "+",
+                "right": Object {
+                  "tag": "identifier",
+                  "value": "right",
+                },
+                "tag": "binaryOp",
+              },
+              "tag": "expr",
+            },
+          ],
+        },
+        Object {
+          "binding": Object {
+            "fields": Array [
+              Object {
+                "binding": Object {
+                  "tag": "identifier",
+                  "value": "value",
+                },
+                "fieldName": "value",
+              },
+            ],
+            "tag": "typeIdentifier",
+            "value": "IntExpr",
+          },
+          "block": Array [
+            Object {
+              "expr": Object {
+                "tag": "identifier",
+                "value": "value",
+              },
+              "tag": "expr",
+            },
+          ],
+        },
+      ],
+      "expr": Object {
+        "tag": "identifier",
+        "value": "val",
+      },
+      "tag": "match",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("rejects invalid pattern matches", () => {
+  const code = `
+    match (foo) {
+      1 => 1
+    }
+  `;
+
+  expect(() => parse(lex(code))).toThrow();
+});
+
+it("rejects invalid enum/struct bindings", () => {
+  expect(() => parse(lex(`enum 1 {}`))).toThrow();
+});
+
+it("allows empty type constructions", () => {
+  const code = `
+    Foo {}  
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "fields": Array [],
+      "tag": "typeConstructor",
+      "value": "Foo",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("allows empty pattern matches", () => {
+  const code = `
+    match (foo) {
+      Tag {} => 1,
+    } 
+  `;
+
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "cases": Array [
+        Object {
+          "binding": Object {
+            "fields": Array [],
+            "tag": "typeIdentifier",
+            "value": "Tag",
+          },
+          "block": Array [
+            Object {
+              "expr": Object {
+                "tag": "integer",
+                "value": 1,
+              },
+              "tag": "expr",
+            },
+          ],
+        },
+      ],
+      "expr": Object {
+        "tag": "identifier",
+        "value": "foo",
+      },
+      "tag": "match",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});

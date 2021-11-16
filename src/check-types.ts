@@ -7,6 +7,8 @@ import {
   CheckedExpr,
   Opcode,
   Binding,
+  StructFieldType,
+  MatchCase,
 } from "./types";
 import { Scope } from "./scope";
 
@@ -14,7 +16,14 @@ const voidType: Type = { tag: "void" };
 const integerType: Type = { tag: "integer" };
 const floatType: Type = { tag: "float" };
 const stringType: Type = { tag: "string" };
-const boolType: Type = { tag: "enum", value: Symbol("Boolean") };
+const boolType: Type = {
+  tag: "enum",
+  value: Symbol("Boolean"),
+  cases: [
+    { tag: "False", fields: [] },
+    { tag: "True", fields: [] },
+  ],
+};
 const builtInTypes = new Scope<string, Type>()
   .set("Int", integerType)
   .set("Float", floatType)
@@ -75,6 +84,22 @@ class TypeChecker {
     this.scope = this.scope.pop();
     return { block: checkedBlock, type };
   }
+  private buildFields(fields: StructFieldType[]) {
+    const fieldsResult: { fieldName: string; type: Type }[] = [];
+    const fieldNames = new Set();
+    for (const field of fields) {
+      if (fieldNames.has(field.fieldName)) {
+        throw new Error("duplicate field");
+      }
+      fieldNames.add(field.fieldName);
+      fieldsResult.push({
+        fieldName: field.fieldName,
+        type: this.checkTypeExpr(field.type),
+      });
+    }
+
+    return fieldsResult;
+  }
   private checkStmt(stmt: Stmt): CheckedStmt | null {
     switch (stmt.tag) {
       case "expr":
@@ -83,10 +108,18 @@ class TypeChecker {
         this.types.init(stmt.binding.value, this.checkTypeExpr(stmt.type));
         return null;
       case "enum": {
-        const type: Type = { tag: "enum", value: Symbol(stmt.binding.value) };
+        const type: Type = {
+          tag: "enum",
+          value: Symbol(stmt.binding.value),
+          cases: [],
+        };
         this.types.init(stmt.binding.value, type);
         for (const [i, enumCase] of stmt.cases.entries()) {
           this.typeConstructors.init(enumCase.tagName, { type, value: i });
+          type.cases.push({
+            tag: enumCase.tagName,
+            fields: this.buildFields(enumCase.fields),
+          });
         }
         return null;
       }
@@ -96,18 +129,8 @@ class TypeChecker {
           value: Symbol(stmt.binding.value),
           fields: [],
         };
-        const fieldNames = new Set();
         this.types.init(stmt.binding.value, type);
-        for (const field of stmt.fields) {
-          if (fieldNames.has(field.fieldName)) {
-            throw new Error("duplicate field");
-          }
-          fieldNames.add(field.fieldName);
-          type.fields.push({
-            fieldName: field.fieldName,
-            type: this.checkTypeExpr(field.type),
-          });
-        }
+        type.fields = this.buildFields(stmt.fields);
         this.typeConstructors.init(stmt.binding.value, { type, value: 0 });
         return null;
       }
@@ -405,21 +428,24 @@ class TypeChecker {
       }
       case "field": {
         const checkedExpr = this.checkExpr(expr.expr, null);
-        if (checkedExpr.type.tag !== "struct") {
-          throw new Error("not a struct");
-        }
-        const fieldIndex = checkedExpr.type.fields.findIndex(
-          (f) => f.fieldName === expr.fieldName
-        );
-        const field = checkedExpr.type.fields[fieldIndex];
-        if (!field) throw new Error("does not have this field");
+        switch (checkedExpr.type.tag) {
+          case "struct": {
+            const fieldIndex = checkedExpr.type.fields.findIndex(
+              (f) => f.fieldName === expr.fieldName
+            );
+            const field = checkedExpr.type.fields[fieldIndex];
+            if (!field) throw new Error("does not have this field");
 
-        return {
-          tag: "field",
-          index: fieldIndex,
-          expr: checkedExpr,
-          type: field.type,
-        };
+            return {
+              tag: "field",
+              index: fieldIndex,
+              expr: checkedExpr,
+              type: field.type,
+            };
+          }
+          default:
+            throw new Error("value does not have irrefutable fields");
+        }
       }
       case "do": {
         const { block, type } = this.checkBlock(expr.block);
@@ -449,6 +475,65 @@ class TypeChecker {
         const checkedElse = this.checkBlock(expr.elseBlock);
         res.elseBlock = checkedElse.block;
         res.type = this.unify(resultType, checkedElse.type);
+
+        return res;
+      }
+      case "match": {
+        let resultType: Type | null = null;
+        const predicate = this.checkExpr(expr.expr, null);
+        if (predicate.type.tag !== "enum") {
+          throw new Error("can only pattern match with enums");
+        }
+
+        const res: CheckedExpr = {
+          tag: "match",
+          expr: predicate,
+          cases: [],
+          type: voidType,
+        };
+
+        const validTags = new Set(predicate.type.cases.map((c) => c.tag));
+
+        const matchCaseMap = new Map<string, MatchCase>();
+        for (const matchCase of expr.cases) {
+          const tag = matchCase.binding.value;
+          if (matchCaseMap.has(tag)) {
+            throw new Error("duplicate match cases");
+          }
+          if (!validTags.has(tag)) {
+            throw new Error("invalid match case");
+          }
+          matchCaseMap.set(tag, matchCase);
+        }
+
+        for (const enumCase of predicate.type.cases) {
+          const matchCase = matchCaseMap.get(enumCase.tag);
+          if (!matchCase) {
+            throw new Error("incomplete match cases");
+          }
+
+          const fieldMap = new Map(
+            enumCase.fields.map((field) => [field.fieldName, field.type])
+          );
+
+          this.scope = this.scope.push();
+          // TODO: i want to allow partial { } bindings, but only complete ( ) bindings
+          for (const field of matchCase.binding.fields) {
+            const type = fieldMap.get(field.fieldName);
+            if (!type) throw new Error("missing field");
+            this.initScopeBinding(field.binding, type);
+          }
+
+          const block = this.checkBlock(matchCase.block);
+          this.scope = this.scope.pop();
+          resultType = this.unify(resultType, block.type);
+
+          res.cases.push({ binding: matchCase.binding, block: block.block });
+        }
+
+        if (resultType) {
+          res.type = resultType;
+        }
 
         return res;
       }

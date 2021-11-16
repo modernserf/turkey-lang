@@ -10,6 +10,9 @@ import {
   EnumCase,
   StructFieldType,
   StructFieldValue,
+  MatchCase,
+  StructFieldBinding,
+  MatchBinding,
 } from "./types";
 
 interface IParseState {
@@ -211,9 +214,61 @@ const parseBaseExpr: Parser<Expr | null> = (state) => {
         }
       }
     }
+    case "match": {
+      state.advance();
+      match(state, "(");
+      const expr = matchExpr(state);
+      match(state, ")");
+
+      match(state, "{");
+      const cases = commaList(state, checkMatchCase);
+      match(state, "}");
+      return { tag: "match", expr, cases };
+    }
     default:
       return null;
   }
+};
+
+const checkMatchCase: Parser<MatchCase | null> = (state) => {
+  const enumTag = check(state, "typeIdentifier");
+  if (!enumTag) return null;
+  const fields = matchStructFieldBindingList(state);
+  match(state, "=>");
+  const binding: MatchBinding = {
+    tag: "typeIdentifier",
+    value: enumTag.value,
+    fields,
+  };
+  if (state.token().tag === "{") {
+    const block = parseBlock(state);
+    return { binding, block };
+  } else {
+    const expr = matchExpr(state);
+    return { binding, block: [{ tag: "expr", expr }] };
+  }
+};
+
+const matchStructFieldBindingList: Parser<StructFieldBinding[]> = (state) => {
+  if (check(state, "{")) {
+    const fields = commaList(state, checkStructFieldBinding);
+    match(state, "}");
+    return fields;
+  } else if (check(state, "(")) {
+    const fields = commaList(state, checkBinding);
+    match(state, ")");
+    return fields.map((binding, i) => ({ fieldName: String(i), binding }));
+  } else {
+    return [];
+  }
+};
+
+const checkStructFieldBinding: Parser<StructFieldBinding | null> = (state) => {
+  const fieldName = checkField(state);
+  if (!fieldName) return null;
+  match(state, ":");
+  const binding = matchBinding(state);
+  return { fieldName, binding };
 };
 
 const matchBinding: Parser<Binding> = (state) => {
@@ -269,7 +324,8 @@ const checkType: Parser<TypeExpr | null> = (state) => {
 const checkEnumCase: Parser<EnumCase | null> = (state) => {
   const tagName = check(state, "typeIdentifier");
   if (!tagName) return null;
-  return { tagName: tagName.value, typeBody: null };
+  const fields = matchStructFieldTypeList(state);
+  return { tagName: tagName.value, fields };
 };
 
 const matchStructFieldTypeList: Parser<StructFieldType[]> = (state) => {
