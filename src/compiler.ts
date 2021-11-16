@@ -1,18 +1,24 @@
-import { Binding, CheckedExpr, CheckedStmt } from "./types";
+import {
+  CheckedBinding,
+  CheckedExpr,
+  CheckedStmt,
+  CheckedStructFieldBinding,
+} from "./types";
 import { Scope } from "./scope";
 import { Writer } from "./writer";
-
-// istanbul ignore next
-function noMatch(value: never) {
-  throw new Error("no match");
-}
+import { noMatch } from "./utils";
 
 type QueuedFunc = {
   label: symbol;
   block: CheckedStmt[];
 
-  parameters: string[];
+  parameters: CheckedBinding[];
   upvalues: string[];
+};
+
+type QueuedBinding = {
+  label: symbol;
+  fields: CheckedStructFieldBinding[];
 };
 
 export function compile(program: CheckedStmt[]) {
@@ -53,15 +59,15 @@ class LabelState {
 }
 
 class LocalsState {
-  private locals: Scope<string, number> = new Scope();
+  private locals: Scope<Label, number> = new Scope();
   size() {
     return this.locals.size;
   }
-  init(name: string): void {
+  init(name: Label): void {
     const index = this.locals.size;
     this.locals.set(name, index);
   }
-  get(name: string): number {
+  get(name: Label): number {
     return this.locals.get(name);
   }
   pushScope(): void {
@@ -100,6 +106,7 @@ class Compiler {
   private labels: LabelState;
   private locals = new LocalsState();
   private strings = new InternedStringsState();
+  private bindingQueue: QueuedBinding[] = [];
   constructor() {
     this.labels = new LabelState(this.asm);
   }
@@ -114,21 +121,7 @@ class Compiler {
     this.locals.popScope();
     this.asm.halt();
     for (const func of this.funcs) {
-      this.labels.create(func.label);
-      this.locals.pushScope();
-
-      for (const param of func.parameters) {
-        this.locals.init(param);
-      }
-      this.locals.init("$");
-      for (const [i, upval] of func.upvalues.entries()) {
-        this.asm.loadLocal(this.locals.get("$")).getHeap(i);
-        this.locals.init(upval);
-      }
-
-      this.compileBlockInner(func.block);
-
-      this.locals.popScope();
+      this.compileFuncBody(func);
     }
 
     this.labels.patch();
@@ -166,6 +159,34 @@ class Compiler {
       valueOnStack = stmt.tag === "expr" && stmt.expr.type.tag !== "void";
     }
   }
+  private flushBindingQueue() {
+    let queuedBinding;
+    // eslint-disable-next-line no-cond-assign
+    while ((queuedBinding = this.bindingQueue.shift())) {
+      for (const field of queuedBinding.fields) {
+        this.asm
+          .loadLocal(this.locals.get(queuedBinding.label))
+          .getHeap(field.fieldIndex);
+        this.compileBinding(field.binding);
+      }
+    }
+  }
+  private compileBinding(binding: CheckedBinding) {
+    switch (binding.tag) {
+      case "identifier":
+        this.locals.init(binding.value);
+        return;
+      case "struct": {
+        const label = Symbol("<destructured>");
+        this.locals.init(label);
+        this.bindingQueue.push({ label, fields: binding.fields });
+        return;
+      }
+      // istanbul ignore next
+      default:
+        return noMatch(binding);
+    }
+  }
   private compileStmt(stmt: CheckedStmt) {
     switch (stmt.tag) {
       case "expr":
@@ -173,7 +194,8 @@ class Compiler {
         return;
       case "let":
         this.compileExpr(stmt.expr);
-        this.locals.init(stmt.binding.value);
+        this.compileBinding(stmt.binding);
+        this.flushBindingQueue();
         return;
       case "return":
         if (stmt.expr) {
@@ -200,7 +222,7 @@ class Compiler {
         return;
       }
       case "func": {
-        this.compileFunc(stmt.name, Symbol(stmt.name), stmt);
+        this.compileFuncHeader(stmt.name, Symbol(stmt.name), stmt);
         return;
       }
       // istanbul ignore next
@@ -228,7 +250,7 @@ class Compiler {
         }
         return;
       case "closure": {
-        this.compileFunc(null, Symbol("closure"), expr);
+        this.compileFuncHeader(null, Symbol("closure"), expr);
         return;
       }
 
@@ -281,21 +303,20 @@ class Compiler {
         noMatch(expr);
     }
   }
-  private compileFunc(
+  private compileFuncHeader(
     bindAs: string | null,
     funcLabel: symbol,
     stmt: {
-      parameters: { binding: Binding }[];
+      parameters: { binding: CheckedBinding }[];
       upvalues: { name: string }[];
       block: CheckedStmt[];
     }
   ) {
-    const parameters = stmt.parameters.map((param) => param.binding.value);
     const upvalues = stmt.upvalues.map((val) => val.name);
     this.funcs.push({
       label: funcLabel,
       block: stmt.block,
-      parameters,
+      parameters: stmt.parameters.map((p) => p.binding),
       upvalues,
     });
 
@@ -312,6 +333,26 @@ class Compiler {
         .setHeap(i);
     }
     return;
+  }
+  private compileFuncBody(func: QueuedFunc) {
+    this.labels.create(func.label);
+    this.locals.pushScope();
+
+    for (const param of func.parameters) {
+      this.compileBinding(param);
+    }
+
+    const upvaluesLabel = Symbol("upvalues");
+    this.locals.init(upvaluesLabel);
+    for (const [i, upval] of func.upvalues.entries()) {
+      this.asm.loadLocal(this.locals.get(upvaluesLabel)).getHeap(i);
+      this.locals.init(upval);
+    }
+
+    this.flushBindingQueue();
+    this.compileBlockInner(func.block);
+
+    this.locals.popScope();
   }
 }
 

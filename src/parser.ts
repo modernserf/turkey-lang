@@ -266,9 +266,12 @@ const matchStructFieldBindingList: Parser<StructFieldBinding[]> = (state) => {
 const checkStructFieldBinding: Parser<StructFieldBinding | null> = (state) => {
   const fieldName = checkField(state);
   if (!fieldName) return null;
-  match(state, ":");
-  const binding = matchBinding(state);
-  return { fieldName, binding };
+  if (check(state, ":")) {
+    const binding = matchBinding(state);
+    return { fieldName, binding };
+  } else {
+    return { fieldName, binding: { tag: "identifier", value: fieldName } };
+  }
 };
 
 const matchBinding: Parser<Binding> = (state) => {
@@ -281,6 +284,11 @@ const checkBinding: Parser<Binding | null> = (state) => {
     case "identifier":
       state.advance();
       return { tag: "identifier", value: token.value };
+    case "{":
+    case "(": {
+      const fields = matchStructFieldBindingList(state);
+      return { tag: "struct", fields };
+    }
     default:
       return null;
   }
@@ -375,9 +383,12 @@ const checkField: Parser<string | null> = (state) => {
 const checkStructFieldValue: Parser<StructFieldValue | null> = (state) => {
   const fieldName = checkField(state);
   if (!fieldName) return null;
-  match(state, ":");
-  const expr = matchExpr(state);
-  return { fieldName: fieldName, expr };
+  if (check(state, ":")) {
+    const expr = matchExpr(state);
+    return { fieldName, expr };
+  } else {
+    return { fieldName, expr: { tag: "identifier", value: fieldName } };
+  }
 };
 
 const checkFuncParam: Parser<{ binding: Binding; type: TypeExpr } | null> = (

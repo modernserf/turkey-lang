@@ -8,9 +8,12 @@ import {
   Opcode,
   Binding,
   StructFieldType,
-  MatchCase,
+  CheckedBinding,
+  CheckedStructFieldBinding,
+  CheckedParam,
 } from "./types";
 import { Scope } from "./scope";
+import { noMatch } from "./utils";
 
 const voidType: Type = { tag: "void" };
 const integerType: Type = { tag: "integer" };
@@ -60,10 +63,35 @@ class TypeChecker {
     this.types = builtInTypes.push();
     this.typeConstructors = builtInTypeConstructors.push();
   }
-  private initScopeBinding(binding: Binding, type: Type) {
+
+  private initScopeBinding(binding: Binding, type: Type): CheckedBinding {
     switch (binding.tag) {
       case "identifier":
         this.scope.init(binding.value, type);
+        return binding;
+      case "struct": {
+        if (type.tag !== "struct") {
+          throw new Error("can only destructure structs");
+        }
+        const fields: CheckedStructFieldBinding[] = [];
+        for (const bindingField of binding.fields) {
+          const fieldIndex = type.fields.findIndex(
+            (f) => f.fieldName === bindingField.fieldName
+          );
+          const typeField = type.fields[fieldIndex];
+          if (!typeField) throw new Error("invalid field");
+          const checkedField = this.initScopeBinding(
+            bindingField.binding,
+            typeField.type
+          );
+          fields.push({ fieldIndex, binding: checkedField });
+        }
+
+        return { tag: "struct", fields };
+      }
+      // istanbul ignore next
+      default:
+        noMatch(binding);
     }
   }
   private checkBlock(block: Stmt[]): { block: CheckedStmt[]; type: Type } {
@@ -142,8 +170,8 @@ class TypeChecker {
         if (forwardType) {
           this.unify(expr.type, forwardType);
         }
-        this.initScopeBinding(stmt.binding, expr.type);
-        return { tag: "let", binding: stmt.binding, expr };
+        const binding = this.initScopeBinding(stmt.binding, expr.type);
+        return { tag: "let", binding, expr };
       }
       case "while": {
         const checkedPredicate = this.checkExpr(stmt.expr, null);
@@ -164,20 +192,20 @@ class TypeChecker {
         return { tag: "return", expr };
       }
       case "func": {
-        const parameters = stmt.parameters.map(({ binding, type }) => ({
+        const rawParams = stmt.parameters.map(({ binding, type }) => ({
           binding,
           type: this.checkTypeExpr(type),
         }));
         const returnType = this.checkTypeExpr(stmt.returnType);
         const type: Type = {
           tag: "func",
-          parameters: parameters.map((p) => p.type),
+          parameters: rawParams.map((p) => p.type),
           returnType,
         };
         this.scope.init(stmt.name, type);
 
-        const { upvalues, block } = this.checkFunc(
-          parameters,
+        const { upvalues, block, parameters } = this.checkFunc(
+          rawParams,
           returnType,
           stmt.block
         );
@@ -200,6 +228,7 @@ class TypeChecker {
   ): {
     upvalues: Array<{ name: string; type: Type }>;
     block: CheckedStmt[];
+    parameters: CheckedParam[];
   } {
     // save current context
     const outerScope = this.scope;
@@ -208,9 +237,10 @@ class TypeChecker {
     this.currentFunc = { returnType, upvalues: new Map(), outerScope };
 
     // add parameters to scope
-    for (const param of parameters) {
-      this.initScopeBinding(param.binding, param.type);
-    }
+    const checkedParams = parameters.map((param) => ({
+      type: param.type,
+      binding: this.initScopeBinding(param.binding, param.type),
+    }));
 
     // check function body
     const { block } = this.checkBlock(rawBlock);
@@ -229,7 +259,6 @@ class TypeChecker {
         this.unify(returnType, voidType);
         block.push({ tag: "return", expr: null });
         break;
-      // istanbul ignore next
       default:
         this.unify(returnType, voidType);
         block.push(lastStmt);
@@ -252,7 +281,7 @@ class TypeChecker {
       }
     }
 
-    return { upvalues, block };
+    return { upvalues, block, parameters: checkedParams };
   }
   private checkExpr(expr: Expr, forwardType: Type | null): CheckedExpr {
     switch (expr.tag) {
@@ -268,13 +297,13 @@ class TypeChecker {
         if (forwardType.parameters.length !== expr.parameters.length) {
           throw new Error("arity mismatch");
         }
-        const parameters = forwardType.parameters.map((type, i) => ({
+        const rawParams = forwardType.parameters.map((type, i) => ({
           type,
           binding: expr.parameters[i],
         }));
 
-        const { upvalues, block } = this.checkFunc(
-          parameters,
+        const { upvalues, block, parameters } = this.checkFunc(
+          rawParams,
           forwardType.returnType,
           expr.block
         );
@@ -319,7 +348,7 @@ class TypeChecker {
           }
           // istanbul ignore next
           default:
-            throw new Error("non-constructible type");
+            return noMatch(type);
         }
       }
       case "unaryOp": {

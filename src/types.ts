@@ -94,7 +94,9 @@ export type MatchBinding = {
   fields: StructFieldBinding[];
 };
 
-export type Binding = { tag: "identifier"; value: string };
+export type Binding =
+  | { tag: "identifier"; value: string }
+  | { tag: "struct"; fields: StructFieldBinding[] };
 
 export type TypeExpr =
   | { tag: "identifier"; value: string }
@@ -153,7 +155,7 @@ export type CheckedExpr =
     };
 
 export type CheckedStmt =
-  | { tag: "let"; binding: Binding; expr: CheckedExpr }
+  | { tag: "let"; binding: CheckedBinding; expr: CheckedExpr }
   | { tag: "return"; expr: CheckedExpr | null }
   | {
       tag: "func";
@@ -166,8 +168,17 @@ export type CheckedStmt =
   | { tag: "while"; expr: CheckedExpr; block: CheckedStmt[] }
   | { tag: "expr"; expr: CheckedExpr };
 
-type CheckedParam = { binding: Binding; type: Type };
-type CheckedUpvalue = { name: string; type: Type };
+export type CheckedBinding =
+  | { tag: "identifier"; value: string }
+  | { tag: "struct"; fields: CheckedStructFieldBinding[] };
+
+export type CheckedStructFieldBinding = {
+  fieldIndex: number;
+  binding: CheckedBinding;
+};
+
+export type CheckedParam = { binding: CheckedBinding; type: Type };
+export type CheckedUpvalue = { name: string; type: Type };
 
 // compiler -> interpreter
 

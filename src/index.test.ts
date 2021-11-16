@@ -445,6 +445,21 @@ it("has structs", () => {
   expect(run(code)).toEqual(["2"]);
 });
 
+it("puns struct fields in construction", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,
+    }
+
+    let x = 1
+    let y = 2
+    let point = Point { x, y }
+    print(point:x)
+  `;
+  expect(run(code)).toEqual(["1"]);
+});
+
 it("rejects duplicate fields in struct definitions", () => {
   const code = `
     struct Point { x: Int, x: Int } 
@@ -504,6 +519,57 @@ it("has tuple structs", () => {
     print(manhattan_distance(Point(1,1), Point(2,0)))
   `;
   expect(run(code)).toEqual(["2"]);
+});
+
+it("has destructuring", () => {
+  const code = `
+  struct Point {
+    x: Int,
+    y: Int,
+  }
+
+  let point = Point { x: 1, y: 2 }
+  let { x: x } = point
+  print(x)
+  `;
+  expect(run(code)).toEqual(["1"]);
+});
+
+it("rejects destructuring of non-structs", () => {
+  const code = `
+    let { x, y } = 1
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("puns struct fields in destructuring", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,
+    }
+
+    let point = Point { x: 1, y: 2 }
+    let { x } = point
+    print(x)
+  `;
+  expect(run(code)).toEqual(["1"]);
+});
+
+it("destructures function parameters", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,
+    }
+
+    func get_x ({ x }: Point): Int {
+      x
+    }
+
+    print(get_x(Point { x: 1, y: 2 }))
+  `;
+  expect(run(code)).toEqual(["1"]);
 });
 
 it.skip("has tagged variants", () => {
