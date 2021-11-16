@@ -16,6 +16,12 @@ export class NoParentScopeError extends Error {
   }
 }
 
+export class InvalidParentScopeError extends Error {
+  constructor() {
+    super("parent scope not in scope chain");
+  }
+}
+
 export class Scope<K, V> {
   private map: Map<K, V> = new Map();
   constructor(private parent: Scope<K, V> | null = null) {}
@@ -48,14 +54,19 @@ export class Scope<K, V> {
   get size(): number {
     return this.map.size + (this.parent ? this.parent.size : 0);
   }
-
   isUpvalue(key: K, parentScope: Scope<K, V>): boolean {
-    if (this === parentScope) {
-      if (this.has(key)) return true;
-      throw new KeyNotFoundError(key);
+    let found = false;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    let current: Scope<K, V> = this;
+    while (current !== parentScope) {
+      if (!found && current.map.has(key)) {
+        found = true;
+      }
+      if (!current.parent) throw new InvalidParentScopeError();
+      current = current.parent;
     }
-    if (!this.parent) throw new Error("parent scope not in scope chain");
-    if (this.map.has(key)) return false;
-    return this.parent.isUpvalue(key, parentScope);
+    if (found) return false;
+    current.get(key);
+    return true;
   }
 }
