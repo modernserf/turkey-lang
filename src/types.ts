@@ -206,7 +206,7 @@ export enum Opcode {
   //
   Jump, // target
   JumpIfZero, // target
-  Call, // arity, target
+  JumpTable, // ...offsets
   CallClosure, // arity
   ReturnValue,
   ReturnVoid,

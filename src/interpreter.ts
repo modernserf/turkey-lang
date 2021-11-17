@@ -184,6 +184,10 @@ class Program {
   jump(address: number) {
     this.ip = address;
   }
+  jumpTable(offset: number) {
+    const tableValue = this.program[this.ip + offset];
+    this.ip += tableValue;
+  }
 }
 
 export function interpret(data: { program: number[]; constants: string[] }) {
@@ -275,11 +279,9 @@ class Interpreter {
         if (predicate === 0) this.program.jump(target);
         return;
       }
-      case Opcode.Call: {
-        const arity = this.program.nextOp();
-        const target = this.program.nextOp();
-        this.stack.pushFrame(arity, this.program.here());
-        this.program.jump(target);
+      case Opcode.JumpTable: {
+        const offset = this.stack.pop();
+        this.program.jumpTable(offset);
         return;
       }
       case Opcode.CallClosure: {

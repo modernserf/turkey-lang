@@ -27,10 +27,11 @@ export function compile(program: CheckedStmt[]) {
 }
 
 type Label = string | symbol;
+type JumpTableRef = { labels: Label[]; index: number };
 class LabelState {
   private labels: Scope<Label, number> = new Scope();
-  private labelRefs: Array<{ label: Label; index: number; arity?: number }> =
-    [];
+  private labelRefs: Array<{ label: Label; index: number }> = [];
+  private jumpTableRefs: JumpTableRef[] = [];
   constructor(private writer: Writer) {}
   create(name: Label): void {
     const index = this.writer.nextIndex();
@@ -44,6 +45,16 @@ class LabelState {
     this.ref(label, this.writer.nextIndex());
     this.writer.jumpIfZero();
   }
+  jumpTable(size: number): Label[] {
+    const ref: JumpTableRef = { labels: [], index: this.writer.nextIndex() };
+    this.writer.jumpTable(size);
+    for (let i = 0; i < size; i++) {
+      const label = Symbol(i);
+      ref.labels.push(label);
+    }
+    this.jumpTableRefs.push(ref);
+    return ref.labels;
+  }
   newClosure(label: Label, size: number) {
     this.ref(label, this.writer.nextIndex());
     this.writer.newClosure(size);
@@ -55,6 +66,10 @@ class LabelState {
     for (const { label, index } of this.labelRefs) {
       const addr = this.labels.get(label);
       this.writer.patchAddress(index, addr);
+    }
+    for (const { labels, index } of this.jumpTableRefs) {
+      const offsets = labels.map((label) => this.labels.get(label) - index - 1);
+      this.writer.patchJumpTable(index, offsets);
     }
   }
 }
@@ -280,18 +295,11 @@ class Compiler {
       case "match": {
         const condEnd = Symbol("cond_end");
         this.compileExpr(expr.expr);
-
-        // TODO: replace with jump tables & handle pointers
-        for (const [, { index, block }] of expr.cases.entries()) {
-          const next = Symbol("next");
-          this.asm.dup();
-          this.asm.loadPrimitive(index);
-          this.asm.writeOpcode(Opcode.Eq);
-          this.labels.jumpIfZero(next);
-          this.asm.drop();
+        const labels = this.labels.jumpTable(expr.cases.size);
+        for (const { index, block } of expr.cases.values()) {
+          this.labels.create(labels[index]);
           this.compileBlock(block);
           this.labels.jump(condEnd);
-          this.labels.create(next);
         }
         // istanbul ignore next
         {

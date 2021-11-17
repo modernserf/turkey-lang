@@ -92,6 +92,27 @@ export class Writer {
     this.program[index + 1] = addr;
     return this;
   }
+  jumpTable(size: number): this {
+    this.program.push(Opcode.JumpTable);
+    this.program.push(size - 1);
+    for (let i = 1; i < size; i++) {
+      this.program.push(0);
+    }
+    return this;
+  }
+  patchJumpTable(index: number, addrs: number[]): this {
+    if (this.program[index] !== Opcode.JumpTable) {
+      throw new Error("invalid jump table");
+    }
+    const expectedSize = this.program[index + 1] + 1;
+    if (expectedSize !== addrs.length) {
+      throw new Error("size mismatch");
+    }
+    for (const [i, addr] of addrs.entries()) {
+      this.program[index + 1 + i] = addr;
+    }
+    return this;
+  }
   callClosure(arity: number): this {
     this.program.push(Opcode.CallClosure, arity);
     return this;
