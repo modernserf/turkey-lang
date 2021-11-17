@@ -58,6 +58,7 @@ export type Stmt =
   | {
       tag: "func";
       name: string;
+      typeParameters: TypeParam[];
       parameters: Array<{ binding: Binding; type: TypeExpr }>;
       returnType: TypeExpr;
       block: Stmt[];
@@ -99,10 +100,21 @@ export type Binding =
   | { tag: "struct"; fields: StructFieldBinding[] };
 
 export type TypeExpr =
-  | { tag: "identifier"; value: string }
-  | { tag: "func"; parameters: TypeExpr[]; returnType: TypeExpr };
+  | { tag: "identifier"; value: string; typeArgs: TypeExpr[] }
+  | {
+      tag: "func";
+      typeParameters: TypeParam[];
+      parameters: TypeExpr[];
+      returnType: TypeExpr;
+    };
 
-export type TypeBinding = { tag: "identifier"; value: string };
+export type TypeBinding = {
+  tag: "identifier";
+  value: string;
+  typeParameters: TypeParam[];
+};
+
+export type TypeParam = { tag: "identifier"; value: string };
 
 // typechecker -> compiler
 

@@ -426,9 +426,11 @@ Array [
     "parameters": Array [],
     "returnType": Object {
       "tag": "identifier",
+      "typeArgs": Array [],
       "value": "Void",
     },
     "tag": "func",
+    "typeParameters": Array [],
   },
 ]
 `);
@@ -461,15 +463,18 @@ Array [
         },
         "type": Object {
           "tag": "identifier",
+          "typeArgs": Array [],
           "value": "Int",
         },
       },
     ],
     "returnType": Object {
       "tag": "identifier",
+      "typeArgs": Array [],
       "value": "Int",
     },
     "tag": "func",
+    "typeParameters": Array [],
   },
 ]
 `);
@@ -594,6 +599,7 @@ Array [
   Object {
     "binding": Object {
       "tag": "identifier",
+      "typeParameters": Array [],
       "value": "IntOption",
     },
     "cases": Array [
@@ -607,6 +613,7 @@ Array [
             "fieldName": "0",
             "type": Object {
               "tag": "identifier",
+              "typeArgs": Array [],
               "value": "Int",
             },
           },
@@ -708,6 +715,7 @@ Array [
   Object {
     "binding": Object {
       "tag": "identifier",
+      "typeParameters": Array [],
       "value": "Expr",
     },
     "cases": Array [
@@ -717,6 +725,7 @@ Array [
             "fieldName": "left",
             "type": Object {
               "tag": "identifier",
+              "typeArgs": Array [],
               "value": "Expr",
             },
           },
@@ -724,6 +733,7 @@ Array [
             "fieldName": "right",
             "type": Object {
               "tag": "identifier",
+              "typeArgs": Array [],
               "value": "Expr",
             },
           },
@@ -736,6 +746,7 @@ Array [
             "fieldName": "value",
             "type": Object {
               "tag": "identifier",
+              "typeArgs": Array [],
               "value": "Int",
             },
           },
@@ -892,6 +903,155 @@ Array [
       "tag": "match",
     },
     "tag": "expr",
+  },
+]
+`);
+});
+
+it("parses type parameters", () => {
+  const code = `
+    enum List<T> {
+      Cons(T, List<T>),
+      Nil,
+    }
+    func foo<T> (
+      list: List<T>, 
+      fn: func <U>(T, U): T
+    ): T {}
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [
+        Object {
+          "tag": "identifier",
+          "value": "T",
+        },
+      ],
+      "value": "List",
+    },
+    "cases": Array [
+      Object {
+        "fields": Array [
+          Object {
+            "fieldName": "0",
+            "type": Object {
+              "tag": "identifier",
+              "typeArgs": Array [],
+              "value": "T",
+            },
+          },
+          Object {
+            "fieldName": "1",
+            "type": Object {
+              "tag": "identifier",
+              "typeArgs": Array [
+                Object {
+                  "tag": "identifier",
+                  "typeArgs": Array [],
+                  "value": "T",
+                },
+              ],
+              "value": "List",
+            },
+          },
+        ],
+        "tagName": "Cons",
+      },
+      Object {
+        "fields": Array [],
+        "tagName": "Nil",
+      },
+    ],
+    "tag": "enum",
+  },
+  Object {
+    "block": Array [],
+    "name": "foo",
+    "parameters": Array [
+      Object {
+        "binding": Object {
+          "tag": "identifier",
+          "value": "list",
+        },
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [
+            Object {
+              "tag": "identifier",
+              "typeArgs": Array [],
+              "value": "T",
+            },
+          ],
+          "value": "List",
+        },
+      },
+      Object {
+        "binding": Object {
+          "tag": "identifier",
+          "value": "fn",
+        },
+        "type": Object {
+          "parameters": Array [
+            Object {
+              "tag": "identifier",
+              "typeArgs": Array [],
+              "value": "T",
+            },
+            Object {
+              "tag": "identifier",
+              "typeArgs": Array [],
+              "value": "U",
+            },
+          ],
+          "returnType": Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "T",
+          },
+          "tag": "func",
+          "typeParameters": Array [
+            Object {
+              "tag": "identifier",
+              "value": "U",
+            },
+          ],
+        },
+      },
+    ],
+    "returnType": Object {
+      "tag": "identifier",
+      "typeArgs": Array [],
+      "value": "T",
+    },
+    "tag": "func",
+    "typeParameters": Array [
+      Object {
+        "tag": "identifier",
+        "value": "T",
+      },
+    ],
+  },
+]
+`);
+});
+
+it("parses empty parameter lists? sure, why not", () => {
+  const code = `
+    struct Foo<> {}
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [],
+      "value": "Foo",
+    },
+    "fields": Array [],
+    "tag": "struct",
   },
 ]
 `);
