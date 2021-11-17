@@ -3,7 +3,6 @@ import {
   CheckedExpr,
   CheckedStmt,
   CheckedStructFieldBinding,
-  Opcode,
 } from "./types";
 import { Scope } from "./scope";
 import { Writer } from "./writer";
@@ -256,6 +255,22 @@ class Compiler {
         return;
       case "string":
         this.asm.loadPointer(this.strings.use(expr.value));
+        return;
+      case "enum":
+        if (expr.fields.length === 0) {
+          this.asm.loadPrimitive(expr.index);
+          return;
+        }
+        this.asm
+          .newObject(expr.fields.length + 1)
+          .dup()
+          .loadPrimitive(expr.index)
+          .setHeap(0);
+        for (const [i, value] of expr.fields.entries()) {
+          this.asm.dup();
+          this.compileExpr(value);
+          this.asm.setHeap(i + 1);
+        }
         return;
       case "struct":
         this.asm.newObject(expr.value.length);

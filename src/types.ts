@@ -134,6 +134,7 @@ type CheckedStructFieldType = { type: Type; index: number };
 export type CheckedExpr =
   | { tag: "primitive"; value: number; type: Type }
   | { tag: "string"; value: string; type: Type }
+  | { tag: "enum"; index: number; fields: CheckedExpr[]; type: Type }
   | { tag: "struct"; value: CheckedExpr[]; type: Type }
   | { tag: "identifier"; value: string; type: Type }
   | {

@@ -280,7 +280,10 @@ class Interpreter {
         return;
       }
       case Opcode.JumpTable: {
-        const offset = this.stack.pop();
+        let offset = this.stack.pop();
+        if (offset > 255 || offset < 0) {
+          offset = this.heap.get(offset, 0);
+        }
         this.program.jumpTable(offset);
         return;
       }

@@ -310,7 +310,7 @@ Array [
 it("handles dropping scope values correctly", () => {
   const code = `
     func get_three(): Int { 3 }
-  
+
     if (True) {
       let x = get_three()
       get_three()
@@ -425,8 +425,8 @@ it("rejects enun type mismatches", () => {
   const code = `
     enum Foo { Foo }
     enum Bar { Bar }
-    func foo(value: Foo): Void {} 
-    
+    func foo(value: Foo): Void {}
+
     foo(Bar)
   `;
   expect(() => run(code)).toThrow();
@@ -469,7 +469,7 @@ it("puns struct fields in construction", () => {
 
 it("rejects duplicate fields in struct definitions", () => {
   const code = `
-    struct Point { x: Int, x: Int } 
+    struct Point { x: Int, x: Int }
   `;
   expect(() => run(code)).toThrow();
 });
@@ -513,7 +513,7 @@ it("rejects invalid field access ", () => {
 
 it("has tuple structs", () => {
   const code = `
-    struct Point (Int, Int) 
+    struct Point (Int, Int)
 
     func abs (x: Int): Int {
       if (x > 0) { x } else { -x }
@@ -654,7 +654,31 @@ it("rejects invalid branches", () => {
   expect(() => run(code)).toThrow();
 });
 
-it.skip("has tagged variants", () => {
+it("has tagged variants", () => {
+  const code = `
+    enum IntOption {
+      None,
+      Some(Int),
+    }
+
+    func print_int_option(val: IntOption): Void {
+      match (val) {
+        None => {
+          print("None")
+        },
+        Some(x) => {
+          print("Some")
+        },
+      }
+    }
+
+    print_int_option(None)
+    print_int_option(Some(5))
+  `;
+  expect(run(code)).toEqual(["None", "Some"]);
+});
+
+it.skip("destructures tagged variant values", () => {
   const code = `
     enum IntOption {
       None,

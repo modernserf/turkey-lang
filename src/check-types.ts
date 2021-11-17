@@ -246,9 +246,19 @@ class TypeChecker {
       case "typeConstructor": {
         const { value, type } = this.typeConstructors.get(expr.value);
         switch (type.tag) {
-          case "enum":
-            if (expr.fields.length > 0) throw new Error("not yet implemented");
-            return { tag: "primitive", value, type };
+          case "enum": {
+            const fields = this.zipFields(
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+              type.cases.get(expr.value)!.fields,
+              expr.fields,
+              (typeField, exprField) => {
+                const checked = this.checkExpr(exprField.expr, typeField.type);
+                this.unify(typeField.type, checked.type);
+                return checked;
+              }
+            );
+            return { tag: "enum", index: value, fields, type };
+          }
           case "struct": {
             const fields = this.zipFields(
               type.fields,
