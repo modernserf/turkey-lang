@@ -23,8 +23,8 @@ const boolType: Type = {
   tag: "enum",
   value: Symbol("Boolean"),
   cases: [
-    { tag: "False", fields: [] },
-    { tag: "True", fields: [] },
+    { tag: "False", fields: new Map() },
+    { tag: "True", fields: new Map() },
   ],
 };
 const builtInTypes = new Scope<string, Type>()
@@ -63,28 +63,20 @@ class TypeChecker {
     this.types = builtInTypes.push();
     this.typeConstructors = builtInTypeConstructors.push();
   }
-
   private initScopeBinding(binding: Binding, type: Type): CheckedBinding {
     switch (binding.tag) {
       case "identifier":
         this.scope.init(binding.value, type);
         return binding;
       case "struct": {
-        if (type.tag !== "struct") {
-          throw new Error("can only destructure structs");
-        }
         const fields: CheckedStructFieldBinding[] = [];
         for (const bindingField of binding.fields) {
-          const fieldIndex = type.fields.findIndex(
-            (f) => f.fieldName === bindingField.fieldName
-          );
-          const typeField = type.fields[fieldIndex];
-          if (!typeField) throw new Error("invalid field");
+          const typeField = this.getField(type, bindingField.fieldName);
           const checkedField = this.initScopeBinding(
             bindingField.binding,
             typeField.type
           );
-          fields.push({ fieldIndex, binding: checkedField });
+          fields.push({ fieldIndex: typeField.index, binding: checkedField });
         }
 
         return { tag: "struct", fields };
@@ -114,22 +106,6 @@ class TypeChecker {
     this.scope = this.scope.pop();
     return { block: checkedBlock, type };
   }
-  private buildFields(fields: StructFieldType[]) {
-    const fieldsResult: { fieldName: string; type: Type }[] = [];
-    const fieldNames = new Set();
-    for (const field of fields) {
-      if (fieldNames.has(field.fieldName)) {
-        throw new Error("duplicate field");
-      }
-      fieldNames.add(field.fieldName);
-      fieldsResult.push({
-        fieldName: field.fieldName,
-        type: this.checkTypeExpr(field.type),
-      });
-    }
-
-    return fieldsResult;
-  }
   private checkStmt(stmt: Stmt): CheckedStmt | null {
     switch (stmt.tag) {
       case "expr":
@@ -157,7 +133,7 @@ class TypeChecker {
         const type: Type = {
           tag: "struct",
           value: Symbol(stmt.binding.value),
-          fields: [],
+          fields: new Map(),
         };
         this.types.init(stmt.binding.value, type);
         type.fields = this.buildFields(stmt.fields);
@@ -452,17 +428,13 @@ class TypeChecker {
         const checkedExpr = this.checkExpr(expr.expr, null);
         switch (checkedExpr.type.tag) {
           case "struct": {
-            const fieldIndex = checkedExpr.type.fields.findIndex(
-              (f) => f.fieldName === expr.fieldName
-            );
-            const field = checkedExpr.type.fields[fieldIndex];
-            if (!field) throw new Error("does not have this field");
+            const typeField = this.getField(checkedExpr.type, expr.fieldName);
 
             return {
               tag: "field",
-              index: fieldIndex,
+              index: typeField.index,
               expr: checkedExpr,
-              type: field.type,
+              type: typeField.type,
             };
           }
           default:
@@ -602,21 +574,36 @@ class TypeChecker {
       }
     }
   }
+  private getField(type: Type, fieldName: string) {
+    if (type.tag !== "struct") {
+      throw new Error("can only destructure structs");
+    }
+    const typeField = type.fields.get(fieldName);
+    if (!typeField) throw new Error("invalid field");
+    return typeField;
+  }
+  private buildFields(fields: StructFieldType[]) {
+    const fieldsResult = new Map<string, { type: Type; index: number }>();
+    for (const field of fields) {
+      if (fieldsResult.has(field.fieldName)) {
+        throw new Error("duplicate field");
+      }
+      fieldsResult.set(field.fieldName, {
+        type: this.checkTypeExpr(field.type),
+        index: fieldsResult.size,
+      });
+    }
 
-  private zipFields<
-    TypeField extends { fieldName: string },
-    ValueField extends { fieldName: string },
-    U
-  >(
-    typeFields: TypeField[],
+    return fieldsResult;
+  }
+  private zipFields<TypeField, ValueField extends { fieldName: string }, U>(
+    typeFields: Map<string, TypeField>,
     valueFields: ValueField[],
     join: (t: TypeField, u: ValueField) => U
   ): U[] {
-    const typeFieldsSet = new Set(typeFields.map((field) => field.fieldName));
-
     const valueFieldsMap = new Map<string, ValueField>();
     for (const field of valueFields) {
-      if (!typeFieldsSet.has(field.fieldName)) {
+      if (!typeFields.has(field.fieldName)) {
         throw new Error("unknown field");
       }
       if (valueFieldsMap.has(field.fieldName)) {
@@ -625,13 +612,12 @@ class TypeChecker {
       valueFieldsMap.set(field.fieldName, field);
     }
 
-    return typeFields.map((typeField) => {
-      const valueField = valueFieldsMap.get(typeField.fieldName);
+    return Array.from(typeFields.entries()).map(([fieldName, typeField]) => {
+      const valueField = valueFieldsMap.get(fieldName);
       if (!valueField) throw new Error("missing field");
       return join(typeField, valueField);
     });
   }
-
   private arithmeticOp(
     opcode: Opcode,
     left: Expr,

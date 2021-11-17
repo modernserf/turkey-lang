@@ -114,16 +114,19 @@ export type Type =
   | {
       tag: "enum";
       value: symbol;
-      cases: Array<{ tag: string; fields: CheckedStructFieldType[] }>;
+      cases: Array<{
+        tag: string;
+        fields: Map<string, CheckedStructFieldType>;
+      }>;
     }
   | {
       tag: "struct";
       value: symbol;
-      fields: CheckedStructFieldType[];
+      fields: Map<string, CheckedStructFieldType>;
     }
   | { tag: "func"; parameters: Type[]; returnType: Type };
 
-type CheckedStructFieldType = { fieldName: string; type: Type };
+type CheckedStructFieldType = { type: Type; index: number };
 
 export type CheckedExpr =
   | { tag: "primitive"; value: number; type: Type }

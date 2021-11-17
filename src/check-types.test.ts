@@ -134,11 +134,11 @@ Array [
                 "type": Object {
                   "cases": Array [
                     Object {
-                      "fields": Array [],
+                      "fields": Map {},
                       "tag": "False",
                     },
                     Object {
-                      "fields": Array [],
+                      "fields": Map {},
                       "tag": "True",
                     },
                   ],
@@ -184,11 +184,11 @@ Array [
                 "type": Object {
                   "cases": Array [
                     Object {
-                      "fields": Array [],
+                      "fields": Map {},
                       "tag": "False",
                     },
                     Object {
-                      "fields": Array [],
+                      "fields": Map {},
                       "tag": "True",
                     },
                   ],
@@ -213,11 +213,11 @@ Array [
                               "type": Object {
                                 "cases": Array [
                                   Object {
-                                    "fields": Array [],
+                                    "fields": Map {},
                                     "tag": "False",
                                   },
                                   Object {
-                                    "fields": Array [],
+                                    "fields": Map {},
                                     "tag": "True",
                                   },
                                 ],
@@ -232,11 +232,11 @@ Array [
                           "type": Object {
                             "cases": Array [
                               Object {
-                                "fields": Array [],
+                                "fields": Map {},
                                 "tag": "False",
                               },
                               Object {
-                                "fields": Array [],
+                                "fields": Map {},
                                 "tag": "True",
                               },
                             ],
@@ -251,11 +251,11 @@ Array [
                     "type": Object {
                       "cases": Array [
                         Object {
-                          "fields": Array [],
+                          "fields": Map {},
                           "tag": "False",
                         },
                         Object {
-                          "fields": Array [],
+                          "fields": Map {},
                           "tag": "True",
                         },
                       ],
@@ -286,11 +286,11 @@ Array [
       "type": Object {
         "cases": Array [
           Object {
-            "fields": Array [],
+            "fields": Map {},
             "tag": "False",
           },
           Object {
-            "fields": Array [],
+            "fields": Map {},
             "tag": "True",
           },
         ],
@@ -575,11 +575,11 @@ Array [
           "type": Object {
             "cases": Array [
               Object {
-                "fields": Array [],
+                "fields": Map {},
                 "tag": "False",
               },
               Object {
-                "fields": Array [],
+                "fields": Map {},
                 "tag": "True",
               },
             ],
@@ -824,11 +824,11 @@ Array [
           "type": Object {
             "cases": Array [
               Object {
-                "fields": Array [],
+                "fields": Map {},
                 "tag": "False",
               },
               Object {
-                "fields": Array [],
+                "fields": Map {},
                 "tag": "True",
               },
             ],
@@ -997,11 +997,11 @@ Array [
             "type": Object {
               "cases": Array [
                 Object {
-                  "fields": Array [],
+                  "fields": Map {},
                   "tag": "False",
                 },
                 Object {
-                  "fields": Array [],
+                  "fields": Map {},
                   "tag": "True",
                 },
               ],
