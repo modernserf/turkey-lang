@@ -413,30 +413,48 @@ class TypeChecker {
         return res;
       }
       case "match": {
-        throw new Error("not yet implemented");
-        // let resultType: Type | null = null;
-        // const predicate = this.checkExpr(expr.expr, null);
-        // if (predicate.type.tag !== "enum") {
-        //   throw new Error("can only pattern match with enums");
-        // }
+        // throw new Error("not yet implemented");
+        let resultType: Type | null = null;
+        const predicate = this.checkExpr(expr.expr, null);
+        if (predicate.type.tag !== "enum") {
+          throw new Error("can only pattern match with enums");
+        }
 
-        // const res: CheckedExpr = {
-        //   tag: "match",
-        //   expr: predicate,
-        //   cases: new Map(),
-        //   type: voidType,
-        // };
+        const res: CheckedExpr = {
+          tag: "match",
+          expr: predicate,
+          cases: new Map(),
+          type: voidType,
+        };
 
-        // for (const matchCase of expr.cases) {
-        //   const tag = matchCase.binding.tag
-        //   if (predicate.type.)
+        for (const matchCase of expr.cases) {
+          // TODO: actually use bindings and not just tag
+          const tag = matchCase.binding.value;
+          if (!predicate.type.cases.has(tag)) {
+            throw new Error("unknown tag");
+          }
+          if (res.cases.has(tag)) {
+            throw new Error("duplicate tag");
+          }
+          const blockRes = this.checkBlock(matchCase.block);
+          resultType = this.unify(resultType, blockRes.type);
+          res.cases.set(tag, {
+            index: res.cases.size,
+            binding: matchCase.binding,
+            block: blockRes.block,
+          });
+        }
+        // istanbul ignore next
+        if (!resultType) {
+          throw new Error("invalid match");
+        }
 
-        //   if (res.cases.has(tag)) {
-        //     throw new Error('duplicate tag')
-        //   }
-        //   const blockRes = matchCase
-        // }
-        // return res;
+        if (res.cases.size !== predicate.type.cases.size) {
+          throw new Error("incomplete match");
+        }
+
+        res.type = resultType;
+        return res;
       }
     }
   }

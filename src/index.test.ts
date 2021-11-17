@@ -579,18 +579,79 @@ it("destructures function parameters", () => {
   expect(run(code)).toEqual(["1"]);
 });
 
-it.skip("has pattern matching", () => {
+it("has pattern matching", () => {
   const code = `
-    match (True) {
-      True => {
+    enum V { V1, V2 }
+
+    match (V1) {
+      V1 => {
         print(1)
       },
-      False => {
-        print(0)
+      V2 => {
+        print(2)
       }
     }
   `;
   expect(run(code)).toEqual(["1"]);
+});
+
+it("rejects pattern matching on non-enums", () => {
+  const code = `
+    match ("hello") {
+      True => {
+        print("hello")
+      },
+      False => {
+        print("goodbye")
+      }
+    }
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("rejects incomplete cases", () => {
+  const code = `
+    match (True) {
+      True => {
+        print("hello")
+      },
+    }
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("rejects duplicate cases", () => {
+  const code = `
+    match (True) {
+      True => {
+        print("hello")
+      },
+      True => {
+        print("hello")
+      },
+      False => {
+        print("goodbye")
+      },
+    }
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("rejects invalid branches", () => {
+  const code = `
+    match (True) {
+      True => {
+        print("hello")
+      },
+      False => {
+        print("goodbye")
+      },
+      Other => {
+        print("hmmm")
+      },
+    }
+  `;
+  expect(() => run(code)).toThrow();
 });
 
 it.skip("has tagged variants", () => {

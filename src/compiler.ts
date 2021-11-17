@@ -3,6 +3,7 @@ import {
   CheckedExpr,
   CheckedStmt,
   CheckedStructFieldBinding,
+  Opcode,
 } from "./types";
 import { Scope } from "./scope";
 import { Writer } from "./writer";
@@ -277,7 +278,27 @@ class Compiler {
         return;
       }
       case "match": {
-        throw new Error("not yet implemented");
+        const condEnd = Symbol("cond_end");
+        this.compileExpr(expr.expr);
+
+        // TODO: replace with jump tables & handle pointers
+        for (const [, { index, block }] of expr.cases.entries()) {
+          const next = Symbol("next");
+          this.asm.dup();
+          this.asm.loadPrimitive(index);
+          this.asm.writeOpcode(Opcode.Eq);
+          this.labels.jumpIfZero(next);
+          this.asm.drop();
+          this.compileBlock(block);
+          this.labels.jump(condEnd);
+          this.labels.create(next);
+        }
+        // istanbul ignore next
+        {
+          this.strings.use("Panic: pattern match with no branch taken");
+          this.asm.halt();
+        }
+        this.labels.create(condEnd);
         return;
       }
       case "callBuiltIn":
