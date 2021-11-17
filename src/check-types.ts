@@ -51,40 +51,63 @@ export function check(program: Stmt[]): CheckedStmt[] {
   return TypeChecker.check(program);
 }
 
+type FuncFields = {
+  upvalues: Array<{ name: string; type: Type }>;
+  block: CheckedStmt[];
+  parameters: CheckedParam[];
+};
+
+class CurrentFuncState {
+  private currentFunc: CurrentFunc | null = null;
+  funcReturnType() {
+    if (!this.currentFunc) {
+      throw new Error("cannot return from top level");
+    }
+    return this.currentFunc.returnType;
+  }
+  checkUpvalue(scope: Scope<string, Type>, name: string, type: Type) {
+    if (!this.currentFunc) return;
+    if (scope.isUpvalue(name, this.currentFunc.outerScope)) {
+      this.currentFunc.upvalues.set(name, type);
+    }
+  }
+  withFunc(
+    returnType: Type,
+    outerScope: Scope<string, Type>,
+    fn: () => Pick<FuncFields, "parameters" | "block">
+  ) {
+    const prevCurrentFunc = this.currentFunc;
+    this.currentFunc = { returnType, upvalues: new Map(), outerScope };
+    const { parameters, block } = fn();
+
+    const upvalues = Array.from(this.currentFunc.upvalues.entries()).map(
+      ([name, type]) => ({ name, type })
+    );
+
+    this.currentFunc = prevCurrentFunc;
+    // propagate upvalues
+    if (prevCurrentFunc) {
+      for (const upval of upvalues) {
+        if (outerScope.isUpvalue(upval.name, prevCurrentFunc.outerScope)) {
+          prevCurrentFunc.upvalues.set(upval.name, upval.type);
+        }
+      }
+    }
+    return { upvalues, parameters, block };
+  }
+}
+
 class TypeChecker {
   private types: Scope<string, Type>;
   private typeConstructors: Scope<string, TypeConstructor>;
   private scope: Scope<string, Type> = new Scope();
-  private currentFunc: CurrentFunc | null = null;
+  private currentFunc = new CurrentFuncState();
   static check(program: Stmt[]): CheckedStmt[] {
     return new TypeChecker().checkBlock(program).block;
   }
   constructor() {
     this.types = builtInTypes.push();
     this.typeConstructors = builtInTypeConstructors.push();
-  }
-  private initScopeBinding(binding: Binding, type: Type): CheckedBinding {
-    switch (binding.tag) {
-      case "identifier":
-        this.scope.init(binding.value, type);
-        return binding;
-      case "struct": {
-        const fields: CheckedStructFieldBinding[] = [];
-        for (const bindingField of binding.fields) {
-          const typeField = this.getField(type, bindingField.fieldName);
-          const checkedField = this.initScopeBinding(
-            bindingField.binding,
-            typeField.type
-          );
-          fields.push({ fieldIndex: typeField.index, binding: checkedField });
-        }
-
-        return { tag: "struct", fields };
-      }
-      // istanbul ignore next
-      default:
-        noMatch(binding);
-    }
   }
   private checkBlock(block: Stmt[]): { block: CheckedStmt[]; type: Type } {
     const checkedBlock: CheckedStmt[] = [];
@@ -156,15 +179,13 @@ class TypeChecker {
         return { tag: "while", expr: checkedPredicate, block };
       }
       case "return": {
-        if (!this.currentFunc) {
-          throw new Error("cannot return from top level");
-        }
+        const returnType = this.currentFunc.funcReturnType();
         if (!stmt.expr) {
-          this.unify(voidType, this.currentFunc.returnType);
+          this.unify(voidType, returnType);
           return { tag: "return", expr: null };
         }
-        const expr = this.checkExpr(stmt.expr, this.currentFunc.returnType);
-        this.unify(this.currentFunc.returnType, expr.type);
+        const expr = this.checkExpr(stmt.expr, returnType);
+        this.unify(returnType, expr.type);
         return { tag: "return", expr };
       }
       case "func": {
@@ -180,85 +201,16 @@ class TypeChecker {
         };
         this.scope.init(stmt.name, type);
 
-        const { upvalues, block, parameters } = this.checkFunc(
-          rawParams,
-          returnType,
-          stmt.block
-        );
-
         return {
           tag: "func",
           name: stmt.name,
-          parameters,
-          upvalues,
           type,
-          block,
+          ...this.checkFunc(rawParams, returnType, stmt.block),
         };
       }
     }
   }
-  private checkFunc(
-    parameters: Array<{ binding: Binding; type: Type }>,
-    returnType: Type,
-    rawBlock: Stmt[]
-  ): {
-    upvalues: Array<{ name: string; type: Type }>;
-    block: CheckedStmt[];
-    parameters: CheckedParam[];
-  } {
-    // save current context
-    const outerScope = this.scope;
-    this.scope = this.scope.push();
-    const prevCurrentFunc = this.currentFunc;
-    this.currentFunc = { returnType, upvalues: new Map(), outerScope };
 
-    // add parameters to scope
-    const checkedParams = parameters.map((param) => ({
-      type: param.type,
-      binding: this.initScopeBinding(param.binding, param.type),
-    }));
-
-    // check function body
-    const { block } = this.checkBlock(rawBlock);
-
-    // handle implicit returns
-    const lastStmt = block.pop() ?? { tag: "noop" };
-    switch (lastStmt.tag) {
-      case "return":
-        block.push(lastStmt);
-        break;
-      case "expr":
-        this.unify(returnType, lastStmt.expr.type);
-        block.push({ tag: "return", expr: lastStmt.expr });
-        break;
-      case "noop":
-        this.unify(returnType, voidType);
-        block.push({ tag: "return", expr: null });
-        break;
-      default:
-        this.unify(returnType, voidType);
-        block.push(lastStmt);
-        block.push({ tag: "return", expr: null });
-        break;
-    }
-
-    const upvalues = Array.from(this.currentFunc.upvalues.entries()).map(
-      ([name, type]) => ({ name, type })
-    );
-
-    this.currentFunc = prevCurrentFunc;
-    this.scope = this.scope.pop();
-    // propagate upvalues
-    if (prevCurrentFunc) {
-      for (const upval of upvalues) {
-        if (this.scope.isUpvalue(upval.name, prevCurrentFunc.outerScope)) {
-          prevCurrentFunc.upvalues.set(upval.name, upval.type);
-        }
-      }
-    }
-
-    return { upvalues, block, parameters: checkedParams };
-  }
   private checkExpr(expr: Expr, forwardType: Type | null): CheckedExpr {
     switch (expr.tag) {
       case "integer":
@@ -278,28 +230,16 @@ class TypeChecker {
           binding: expr.parameters[i],
         }));
 
-        const { upvalues, block, parameters } = this.checkFunc(
-          rawParams,
-          forwardType.returnType,
-          expr.block
-        );
         return {
           tag: "closure",
           type: forwardType,
-          parameters,
-          upvalues,
-          block,
+          ...this.checkFunc(rawParams, forwardType.returnType, expr.block),
         };
       }
 
       case "identifier": {
         const type = this.scope.get(expr.value);
-
-        if (this.currentFunc) {
-          if (this.scope.isUpvalue(expr.value, this.currentFunc.outerScope)) {
-            this.currentFunc.upvalues.set(expr.value, type);
-          }
-        }
+        this.currentFunc.checkUpvalue(this.scope, expr.value, type);
 
         return { tag: "identifier", value: expr.value, type };
       }
@@ -533,6 +473,77 @@ class TypeChecker {
         // return res;
       }
     }
+  }
+
+  private initScopeBinding(binding: Binding, type: Type): CheckedBinding {
+    switch (binding.tag) {
+      case "identifier":
+        this.scope.init(binding.value, type);
+        return binding;
+      case "struct": {
+        const fields: CheckedStructFieldBinding[] = [];
+        for (const bindingField of binding.fields) {
+          const typeField = this.getField(type, bindingField.fieldName);
+          const checkedField = this.initScopeBinding(
+            bindingField.binding,
+            typeField.type
+          );
+          fields.push({ fieldIndex: typeField.index, binding: checkedField });
+        }
+
+        return { tag: "struct", fields };
+      }
+      // istanbul ignore next
+      default:
+        noMatch(binding);
+    }
+  }
+
+  private checkFunc(
+    parameters: Array<{ binding: Binding; type: Type }>,
+    returnType: Type,
+    rawBlock: Stmt[]
+  ): FuncFields {
+    // save current context
+    const outerScope = this.scope;
+    this.scope = this.scope.push();
+
+    const res = this.currentFunc.withFunc(returnType, outerScope, () => {
+      // add parameters to scope
+      const checkedParams = parameters.map((param) => ({
+        type: param.type,
+        binding: this.initScopeBinding(param.binding, param.type),
+      }));
+
+      // check function body
+      const { block } = this.checkBlock(rawBlock);
+
+      // handle implicit returns
+      const lastStmt = block.pop() ?? { tag: "noop" };
+      switch (lastStmt.tag) {
+        case "return":
+          block.push(lastStmt);
+          break;
+        case "expr":
+          this.unify(returnType, lastStmt.expr.type);
+          block.push({ tag: "return", expr: lastStmt.expr });
+          break;
+        case "noop":
+          this.unify(returnType, voidType);
+          block.push({ tag: "return", expr: null });
+          break;
+        default:
+          this.unify(returnType, voidType);
+          block.push(lastStmt);
+          block.push({ tag: "return", expr: null });
+          break;
+      }
+
+      return { parameters: checkedParams, block };
+    });
+
+    this.scope = this.scope.pop();
+    return res;
   }
 
   private checkNumber(type: Type) {
