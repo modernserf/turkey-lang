@@ -141,7 +141,7 @@ export type Type =
     }
   | { tag: "func"; parameters: Type[]; returnType: Type };
 
-type CheckedStructFieldType = { type: Type; index: number };
+export type CheckedStructFieldType = { type: Type; index: number };
 
 export type CheckedExpr =
   | { tag: "primitive"; value: number; type: Type }

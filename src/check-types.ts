@@ -1,19 +1,18 @@
 import {
   Stmt,
   Expr,
-  TypeExpr,
   Type,
   CheckedStmt,
   CheckedExpr,
   Opcode,
   Binding,
-  StructFieldType,
   CheckedBinding,
   CheckedStructFieldBinding,
-  CheckedParam,
 } from "./types";
 import { Scope } from "./scope";
 import { noMatch } from "./utils";
+import { CurrentFuncState, FuncFields } from "./current-func";
+import { TypeScope, TypeConstructor } from "./type-scope-2";
 
 const voidType: Type = { tag: "void" };
 const integerType: Type = { tag: "integer" };
@@ -34,80 +33,20 @@ const builtInTypes = new Scope<string, Type>()
   .set("String", stringType)
   .set("Void", voidType);
 
-type ConstructableType = Type & ({ tag: "struct" } | { tag: "enum" });
-
-type TypeConstructor = { value: number; type: ConstructableType };
 const builtInTypeConstructors = new Scope<string, TypeConstructor>()
   .set("False", { value: 0, type: boolType })
   .set("True", { value: 1, type: boolType });
-
-type CurrentFunc = {
-  returnType: Type;
-  upvalues: Map<string, Type>;
-  outerScope: Scope<string, Type>;
-};
 
 export function check(program: Stmt[]): CheckedStmt[] {
   return TypeChecker.check(program);
 }
 
-type FuncFields = {
-  upvalues: Array<{ name: string; type: Type }>;
-  block: CheckedStmt[];
-  parameters: CheckedParam[];
-};
-
-class CurrentFuncState {
-  private currentFunc: CurrentFunc | null = null;
-  funcReturnType() {
-    if (!this.currentFunc) {
-      throw new Error("cannot return from top level");
-    }
-    return this.currentFunc.returnType;
-  }
-  checkUpvalue(scope: Scope<string, Type>, name: string, type: Type) {
-    if (!this.currentFunc) return;
-    if (scope.isUpvalue(name, this.currentFunc.outerScope)) {
-      this.currentFunc.upvalues.set(name, type);
-    }
-  }
-  withFunc(
-    returnType: Type,
-    outerScope: Scope<string, Type>,
-    fn: () => Pick<FuncFields, "parameters" | "block">
-  ) {
-    const prevCurrentFunc = this.currentFunc;
-    this.currentFunc = { returnType, upvalues: new Map(), outerScope };
-    const { parameters, block } = fn();
-
-    const upvalues = Array.from(this.currentFunc.upvalues.entries()).map(
-      ([name, type]) => ({ name, type })
-    );
-
-    this.currentFunc = prevCurrentFunc;
-    // propagate upvalues
-    if (prevCurrentFunc) {
-      for (const upval of upvalues) {
-        if (outerScope.isUpvalue(upval.name, prevCurrentFunc.outerScope)) {
-          prevCurrentFunc.upvalues.set(upval.name, upval.type);
-        }
-      }
-    }
-    return { upvalues, parameters, block };
-  }
-}
-
 class TypeChecker {
-  private types: Scope<string, Type>;
-  private typeConstructors: Scope<string, TypeConstructor>;
   private scope: Scope<string, Type> = new Scope();
   private currentFunc = new CurrentFuncState();
+  private types = new TypeScope(builtInTypes, builtInTypeConstructors);
   static check(program: Stmt[]): CheckedStmt[] {
     return new TypeChecker().checkBlock(program).block;
-  }
-  constructor() {
-    this.types = builtInTypes.push();
-    this.typeConstructors = builtInTypeConstructors.push();
   }
   private checkBlock(block: Stmt[]): { block: CheckedStmt[]; type: Type } {
     const checkedBlock: CheckedStmt[] = [];
@@ -134,78 +73,55 @@ class TypeChecker {
       case "expr":
         return { tag: "expr", expr: this.checkExpr(stmt.expr, null) };
       case "type":
-        this.types.init(stmt.binding.value, this.checkTypeExpr(stmt.type));
+        this.types.alias(stmt.binding, stmt.type);
         return null;
-      case "enum": {
-        const type: Type = {
-          tag: "enum",
-          value: Symbol(stmt.binding.value),
-          cases: new Map(),
-        };
-        this.types.init(stmt.binding.value, type);
-        for (const [i, enumCase] of stmt.cases.entries()) {
-          this.typeConstructors.init(enumCase.tagName, { type, value: i });
-          type.cases.set(enumCase.tagName, {
-            index: i,
-            fields: this.buildFields(enumCase.fields),
-          });
-        }
+      case "enum":
+        this.types.enum(stmt.binding, stmt.cases);
         return null;
-      }
-      case "struct": {
-        const type: Type = {
-          tag: "struct",
-          value: Symbol(stmt.binding.value),
-          fields: new Map(),
-        };
-        this.types.init(stmt.binding.value, type);
-        type.fields = this.buildFields(stmt.fields);
-        this.typeConstructors.init(stmt.binding.value, { type, value: 0 });
+      case "struct":
+        this.types.struct(stmt.binding, stmt.fields);
         return null;
-      }
       case "let": {
-        const forwardType = stmt.type ? this.checkTypeExpr(stmt.type) : null;
+        const forwardType = stmt.type
+          ? this.types.checkTypeExpr(stmt.type)
+          : null;
         const expr = this.checkExpr(stmt.expr, forwardType);
         if (forwardType) {
-          this.unify(expr.type, forwardType);
+          this.types.unify(expr.type, forwardType);
         }
         const binding = this.initScopeBinding(stmt.binding, expr.type);
         return { tag: "let", binding, expr };
       }
       case "while": {
         const checkedPredicate = this.checkExpr(stmt.expr, null);
-        this.unify(boolType, checkedPredicate.type);
+        this.types.unify(boolType, checkedPredicate.type);
         const { block } = this.checkBlock(stmt.block);
         return { tag: "while", expr: checkedPredicate, block };
       }
       case "return": {
         const returnType = this.currentFunc.funcReturnType();
         if (!stmt.expr) {
-          this.unify(voidType, returnType);
+          this.types.unify(voidType, returnType);
           return { tag: "return", expr: null };
         }
         const expr = this.checkExpr(stmt.expr, returnType);
-        this.unify(returnType, expr.type);
+        this.types.unify(returnType, expr.type);
         return { tag: "return", expr };
       }
       case "func": {
-        const rawParams = stmt.parameters.map(({ binding, type }) => ({
+        const type = this.types.func(stmt.parameters, stmt.returnType);
+        const rawParams = stmt.parameters.map(({ binding }, i) => ({
           binding,
-          type: this.checkTypeExpr(type),
+          type: type.parameters[i],
         }));
-        const returnType = this.checkTypeExpr(stmt.returnType);
-        const type: Type = {
-          tag: "func",
-          parameters: rawParams.map((p) => p.type),
-          returnType,
-        };
+
         this.scope.init(stmt.name, type);
 
         return {
           tag: "func",
           name: stmt.name,
           type,
-          ...this.checkFunc(rawParams, returnType, stmt.block),
+          ...this.checkFunc(rawParams, type.returnType, stmt.block),
         };
       }
     }
@@ -244,28 +160,28 @@ class TypeChecker {
         return { tag: "identifier", value: expr.value, type };
       }
       case "typeConstructor": {
-        const { value, type } = this.typeConstructors.get(expr.value);
+        const { value, type } = this.types.getConstructor(expr.value);
         switch (type.tag) {
           case "enum": {
-            const fields = this.zipFields(
+            const fields = zipFields(
               // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
               type.cases.get(expr.value)!.fields,
               expr.fields,
               (typeField, exprField) => {
                 const checked = this.checkExpr(exprField.expr, typeField.type);
-                this.unify(typeField.type, checked.type);
+                this.types.unify(typeField.type, checked.type);
                 return checked;
               }
             );
             return { tag: "enum", index: value, fields, type };
           }
           case "struct": {
-            const fields = this.zipFields(
+            const fields = zipFields(
               type.fields,
               expr.fields,
               (typeField, exprField) => {
                 const checked = this.checkExpr(exprField.expr, typeField.type);
-                this.unify(typeField.type, checked.type);
+                this.types.unify(typeField.type, checked.type);
                 return checked;
               }
             );
@@ -285,7 +201,7 @@ class TypeChecker {
               tag: "callBuiltIn",
               opcode: Opcode.Not,
               args: [checked],
-              type: this.unify(boolType, checked.type),
+              type: this.types.unify(boolType, checked.type),
             };
           case "-":
             return {
@@ -327,7 +243,7 @@ class TypeChecker {
             // TODO: equality of complex objects
             const left = this.checkExpr(expr.left, null);
             const right = this.checkExpr(expr.right, null);
-            this.unify(left.type, right.type);
+            this.types.unify(left.type, right.type);
 
             return {
               tag: "callBuiltIn",
@@ -369,7 +285,7 @@ class TypeChecker {
         for (const [i, arg] of expr.args.entries()) {
           const argType = callee.type.parameters[i];
           const checkedArg = this.checkExpr(arg, argType);
-          this.unify(checkedArg.type, argType);
+          this.types.unify(checkedArg.type, argType);
           args.push(checkedArg);
         }
         return { tag: "call", callee, args, type: callee.type.returnType };
@@ -378,7 +294,7 @@ class TypeChecker {
         const checkedExpr = this.checkExpr(expr.expr, null);
         switch (checkedExpr.type.tag) {
           case "struct": {
-            const typeField = this.getField(checkedExpr.type, expr.fieldName);
+            const typeField = getField(checkedExpr.type, expr.fieldName);
 
             return {
               tag: "field",
@@ -407,9 +323,9 @@ class TypeChecker {
 
         for (const { predicate, block } of expr.cases) {
           const checkedPredicate = this.checkExpr(predicate, null);
-          this.unify(boolType, checkedPredicate.type);
+          this.types.unify(boolType, checkedPredicate.type);
           const checkedBlock = this.checkBlock(block);
-          resultType = this.unify(resultType, checkedBlock.type);
+          resultType = this.types.unify(resultType, checkedBlock.type);
           res.cases.push({
             predicate: checkedPredicate,
             block: checkedBlock.block,
@@ -418,7 +334,7 @@ class TypeChecker {
 
         const checkedElse = this.checkBlock(expr.elseBlock);
         res.elseBlock = checkedElse.block;
-        res.type = this.unify(resultType, checkedElse.type);
+        res.type = this.types.unify(resultType, checkedElse.type);
 
         return res;
       }
@@ -449,7 +365,7 @@ class TypeChecker {
           }
 
           this.scope = this.scope.push();
-          const bindings = this.zipFields(
+          const bindings = zipFields(
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             predicate.type.cases.get(tag)!.fields,
             matchCase.binding.fields,
@@ -465,7 +381,7 @@ class TypeChecker {
           const blockRes = this.checkBlock(matchCase.block);
           this.scope = this.scope.pop();
 
-          resultType = this.unify(resultType, blockRes.type);
+          resultType = this.types.unify(resultType, blockRes.type);
           res.cases.set(tag, {
             index: typeCase.index,
             bindings,
@@ -495,7 +411,7 @@ class TypeChecker {
       case "struct": {
         const fields: CheckedStructFieldBinding[] = [];
         for (const bindingField of binding.fields) {
-          const typeField = this.getField(type, bindingField.fieldName);
+          const typeField = getField(type, bindingField.fieldName);
           const checkedField = this.initScopeBinding(
             bindingField.binding,
             typeField.type
@@ -537,15 +453,15 @@ class TypeChecker {
           block.push(lastStmt);
           break;
         case "expr":
-          this.unify(returnType, lastStmt.expr.type);
+          this.types.unify(returnType, lastStmt.expr.type);
           block.push({ tag: "return", expr: lastStmt.expr });
           break;
         case "noop":
-          this.unify(returnType, voidType);
+          this.types.unify(returnType, voidType);
           block.push({ tag: "return", expr: null });
           break;
         default:
-          this.unify(returnType, voidType);
+          this.types.unify(returnType, voidType);
           block.push(lastStmt);
           block.push({ tag: "return", expr: null });
           break;
@@ -565,82 +481,6 @@ class TypeChecker {
     return type;
   }
 
-  private unify(left: Type | null, right: Type): Type {
-    if (!left) return right;
-    if (left.tag !== right.tag) throw new Error("type mismatch");
-
-    switch (left.tag) {
-      case "void":
-      case "integer":
-      case "float":
-      case "string":
-        return left;
-      case "struct":
-      case "enum":
-        if (left.value === (right as typeof left).value) return left;
-        throw new Error("type mismatch");
-      case "func": {
-        const returnType = this.unify(
-          left.returnType,
-          (right as typeof left).returnType
-        );
-        if (
-          left.parameters.length !== (right as typeof left).parameters.length
-        ) {
-          throw new Error("arity mismatch");
-        }
-        const parameters = left.parameters.map((param, i) => {
-          return this.unify(param, (right as typeof left).parameters[i]);
-        });
-
-        return { tag: "func", parameters, returnType };
-      }
-    }
-  }
-  private getField(type: Type, fieldName: string) {
-    if (type.tag !== "struct") {
-      throw new Error("can only destructure structs");
-    }
-    const typeField = type.fields.get(fieldName);
-    if (!typeField) throw new Error("invalid field");
-    return typeField;
-  }
-  private buildFields(fields: StructFieldType[]) {
-    const fieldsResult = new Map<string, { type: Type; index: number }>();
-    for (const field of fields) {
-      if (fieldsResult.has(field.fieldName)) {
-        throw new Error("duplicate field");
-      }
-      fieldsResult.set(field.fieldName, {
-        type: this.checkTypeExpr(field.type),
-        index: fieldsResult.size,
-      });
-    }
-
-    return fieldsResult;
-  }
-  private zipFields<TypeField, ValueField extends { fieldName: string }, U>(
-    typeFields: Map<string, TypeField>,
-    valueFields: ValueField[],
-    join: (t: TypeField, u: ValueField, i: number) => U
-  ): U[] {
-    const valueFieldsMap = new Map<string, ValueField>();
-    for (const field of valueFields) {
-      if (!typeFields.has(field.fieldName)) {
-        throw new Error("unknown field");
-      }
-      if (valueFieldsMap.has(field.fieldName)) {
-        throw new Error("duplicate field");
-      }
-      valueFieldsMap.set(field.fieldName, field);
-    }
-
-    return Array.from(typeFields.entries()).map(([fieldName, typeField], i) => {
-      const valueField = valueFieldsMap.get(fieldName);
-      if (!valueField) throw new Error("missing field");
-      return join(typeField, valueField, i);
-    });
-  }
   private arithmeticOp(
     opcode: Opcode,
     left: Expr,
@@ -650,7 +490,7 @@ class TypeChecker {
     const checkedLeft = this.checkExpr(left, null);
     const checkedRight = this.checkExpr(right, null);
     const type = this.checkNumber(
-      this.unify(checkedLeft.type, checkedRight.type)
+      this.types.unify(checkedLeft.type, checkedRight.type)
     );
     return {
       tag: "callBuiltIn",
@@ -659,17 +499,35 @@ class TypeChecker {
       type: outType ?? type,
     };
   }
+}
 
-  private checkTypeExpr(type: TypeExpr): Type {
-    switch (type.tag) {
-      case "identifier":
-        return this.types.get(type.value);
-      case "func":
-        return {
-          tag: "func",
-          parameters: type.parameters.map((param) => this.checkTypeExpr(param)),
-          returnType: this.checkTypeExpr(type.returnType),
-        };
-    }
+function getField(type: Type, fieldName: string) {
+  if (type.tag !== "struct") {
+    throw new Error("can only destructure structs");
   }
+  const typeField = type.fields.get(fieldName);
+  if (!typeField) throw new Error("invalid field");
+  return typeField;
+}
+function zipFields<TypeField, ValueField extends { fieldName: string }, U>(
+  typeFields: Map<string, TypeField>,
+  valueFields: ValueField[],
+  join: (t: TypeField, u: ValueField, i: number) => U
+): U[] {
+  const valueFieldsMap = new Map<string, ValueField>();
+  for (const field of valueFields) {
+    if (!typeFields.has(field.fieldName)) {
+      throw new Error("unknown field");
+    }
+    if (valueFieldsMap.has(field.fieldName)) {
+      throw new Error("duplicate field");
+    }
+    valueFieldsMap.set(field.fieldName, field);
+  }
+
+  return Array.from(typeFields.entries()).map(([fieldName, typeField], i) => {
+    const valueField = valueFieldsMap.get(fieldName);
+    if (!valueField) throw new Error("missing field");
+    return join(typeField, valueField, i);
+  });
 }
