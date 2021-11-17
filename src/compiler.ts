@@ -75,6 +75,7 @@ class LabelState {
 
 class LocalsState {
   private locals: Scope<Label, number> = new Scope();
+  constructor(private writer: Writer) {}
   size() {
     return this.locals.size;
   }
@@ -82,13 +83,12 @@ class LocalsState {
     const index = this.locals.size;
     this.locals.set(name, index);
   }
-  get(name: Label): number {
-    return this.locals.get(name);
+  get(name: Label): void {
+    this.writer.loadLocal(this.locals.get(name));
   }
-  pushScope(): void {
+  inScope(fn: () => void) {
     this.locals = this.locals.push();
-  }
-  popScope(): number {
+    fn();
     const before = this.locals.size;
     this.locals = this.locals.pop();
     const after = this.locals.size;
@@ -119,22 +119,24 @@ class Compiler {
   private asm = new Writer();
   private funcs: QueuedFunc[] = [];
   private labels: LabelState;
-  private locals = new LocalsState();
+  private locals: LocalsState;
   private strings = new InternedStringsState();
   private bindingQueue: QueuedBinding[] = [];
   constructor() {
     this.labels = new LabelState(this.asm);
+    this.locals = new LocalsState(this.asm);
   }
   compileProgram(program: CheckedStmt[]): {
     program: number[];
     constants: string[];
   } {
-    this.locals.pushScope();
-    for (const stmt of program) {
-      this.compileStmt(stmt);
-    }
-    this.locals.popScope();
+    this.locals.inScope(() => {
+      for (const stmt of program) {
+        this.compileStmt(stmt);
+      }
+    });
     this.asm.halt();
+
     for (const func of this.funcs) {
       this.compileFuncBody(func);
     }
@@ -146,11 +148,9 @@ class Compiler {
     };
   }
   private compileBlock(block: CheckedStmt[]) {
-    this.locals.pushScope();
-
-    this.compileBlockInner(block);
-
-    const count = this.locals.popScope();
+    const count = this.locals.inScope(() => {
+      this.compileBlockInner(block);
+    });
     if (hasValue(block)) {
       // value at top of the stack is result
       // copy to the eventual new top of the stack
@@ -179,9 +179,8 @@ class Compiler {
     // eslint-disable-next-line no-cond-assign
     while ((queuedBinding = this.bindingQueue.shift())) {
       for (const field of queuedBinding.fields) {
-        this.asm
-          .loadLocal(this.locals.get(queuedBinding.label))
-          .getHeap(field.fieldIndex);
+        this.locals.get(queuedBinding.label);
+        this.asm.getHeap(field.fieldIndex);
         this.compileBinding(field.binding);
       }
     }
@@ -248,7 +247,7 @@ class Compiler {
   private compileExpr(expr: CheckedExpr) {
     switch (expr.tag) {
       case "identifier":
-        this.asm.loadLocal(this.locals.get(expr.value));
+        this.locals.get(expr.value);
         return;
       case "primitive":
         this.asm.loadPrimitive(expr.value);
@@ -316,21 +315,19 @@ class Compiler {
         const labels = this.labels.jumpTable(expr.cases.size);
         for (const { index, bindings, block } of expr.cases.values()) {
           this.labels.create(labels[index]);
-          this.locals.pushScope();
-          for (const { fieldIndex, binding } of bindings) {
-            this.asm
-              .loadLocal(this.locals.get(predicateRef))
-              .getHeap(fieldIndex);
-            this.compileBinding(binding);
-          }
-          this.flushBindingQueue();
+          this.locals.inScope(() => {
+            for (const { fieldIndex, binding } of bindings) {
+              this.locals.get(predicateRef);
+              this.asm.getHeap(fieldIndex);
+              this.compileBinding(binding);
+            }
+            this.flushBindingQueue();
 
-          this.compileBlock(block);
-          this.locals.popScope();
+            this.compileBlock(block);
+          });
           this.labels.jump(condEnd);
         }
-        this.strings.use("Panic: pattern match with no branch taken");
-        this.asm.halt();
+        this.panic("pattern match with no branch taken");
         this.labels.create(condEnd);
         return;
       }
@@ -381,32 +378,34 @@ class Compiler {
     }
 
     for (const [i, name] of upvalues.entries()) {
-      this.asm //
-        .dup()
-        .loadLocal(this.locals.get(name))
-        .setHeap(i);
+      this.asm.dup();
+      this.locals.get(name);
+      this.asm.setHeap(i);
     }
     return;
   }
   private compileFuncBody(func: QueuedFunc) {
     this.labels.create(func.label);
-    this.locals.pushScope();
+    this.locals.inScope(() => {
+      for (const param of func.parameters) {
+        this.compileBinding(param);
+      }
 
-    for (const param of func.parameters) {
-      this.compileBinding(param);
-    }
+      const upvaluesLabel = Symbol("upvalues");
+      this.locals.init(upvaluesLabel);
+      for (const [i, upval] of func.upvalues.entries()) {
+        this.locals.get(upvaluesLabel);
+        this.asm.getHeap(i);
+        this.locals.init(upval);
+      }
 
-    const upvaluesLabel = Symbol("upvalues");
-    this.locals.init(upvaluesLabel);
-    for (const [i, upval] of func.upvalues.entries()) {
-      this.asm.loadLocal(this.locals.get(upvaluesLabel)).getHeap(i);
-      this.locals.init(upval);
-    }
-
-    this.flushBindingQueue();
-    this.compileBlockInner(func.block);
-
-    this.locals.popScope();
+      this.flushBindingQueue();
+      this.compileBlockInner(func.block);
+    });
+  }
+  private panic(message: string) {
+    this.strings.use(`PANIC: ${message}`);
+    this.asm.halt();
   }
 }
 

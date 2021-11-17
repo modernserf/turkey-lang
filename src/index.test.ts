@@ -709,7 +709,11 @@ it("has recursive types", () => {
       Cons(Int, IntList),
     }
 
-    func foldl (list: IntList, acc: Int, fn: func (Int, Int): Int): Int {
+    func foldl (
+      list: IntList,
+      acc: Int,
+      fn: func (Int, Int): Int
+    ): Int {
       match (list) {
         Cons(h, t) => foldl(t, fn(acc, h), fn),
         Nil => acc,
