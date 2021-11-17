@@ -159,7 +159,11 @@ export type CheckedExpr =
       expr: CheckedExpr;
       cases: Map<
         string,
-        { index: number; binding: MatchBinding; block: CheckedStmt[] }
+        {
+          index: number;
+          bindings: CheckedStructFieldBinding[];
+          block: CheckedStmt[];
+        }
       >;
       type: Type;
     };

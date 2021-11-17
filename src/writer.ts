@@ -101,10 +101,12 @@ export class Writer {
     return this;
   }
   patchJumpTable(index: number, addrs: number[]): this {
+    // istanbul ignore next
     if (this.program[index] !== Opcode.JumpTable) {
       throw new Error("invalid jump table");
     }
     const expectedSize = this.program[index + 1] + 1;
+    // istanbul ignore next
     if (expectedSize !== addrs.length) {
       throw new Error("size mismatch");
     }

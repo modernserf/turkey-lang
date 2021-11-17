@@ -1,6 +1,7 @@
 import { Opcode } from "./types";
 
 function assert<T>(value: T | undefined): T {
+  // istanbul ignore next
   if (value === undefined) throw new Error("missing value");
   return value;
 }
@@ -53,6 +54,7 @@ class Heap {
   }
   private _set(address: StackValue, offset: number, value: HeapInternalValue) {
     const idx = getAddress(address) + offset;
+    // istanbul ignore next
     if (idx >= this._heap.length) {
       throw new Error("setting past allocated heap");
     }
@@ -61,6 +63,7 @@ class Heap {
   get(address: StackValue, offset: number): StackValue {
     const res = this._get(address, offset);
     if (isStackValue(res)) return res;
+    // istanbul ignore next
     throw new Error("illegal memory access");
   }
   getString(address: StackValue): string {

@@ -678,7 +678,7 @@ it("has tagged variants", () => {
   expect(run(code)).toEqual(["None", "Some"]);
 });
 
-it.skip("destructures tagged variant values", () => {
+it("destructures tagged variant values", () => {
   const code = `
     enum IntOption {
       None,
@@ -700,4 +700,25 @@ it.skip("destructures tagged variant values", () => {
     print_int_option(Some(5))
   `;
   expect(run(code)).toEqual(["None", "5"]);
+});
+
+it("has recursive types", () => {
+  const code = `
+    enum IntList {
+      Nil,
+      Cons(Int, IntList),
+    }
+
+    func foldl (list: IntList, acc: Int, fn: func (Int, Int): Int): Int {
+      match (list) {
+        Cons(h, t) => foldl(t, fn(acc, h), fn),
+        Nil => acc,
+      }
+    }
+
+    let list = Cons(1, Cons(2, Cons(3, Nil)))
+    let sum  = foldl(list, 0, |acc, value| { acc + value })
+    print(sum)
+  `;
+  expect(run(code)).toEqual(["6"]);
 });

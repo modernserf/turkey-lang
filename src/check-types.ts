@@ -423,7 +423,6 @@ class TypeChecker {
         return res;
       }
       case "match": {
-        // throw new Error("not yet implemented");
         let resultType: Type | null = null;
         const predicate = this.checkExpr(expr.expr, null);
         if (predicate.type.tag !== "enum") {
@@ -440,17 +439,36 @@ class TypeChecker {
         for (const matchCase of expr.cases) {
           // TODO: actually use bindings and not just tag
           const tag = matchCase.binding.value;
-          if (!predicate.type.cases.has(tag)) {
+          const typeCase = predicate.type.cases.get(tag);
+
+          if (!typeCase) {
             throw new Error("unknown tag");
           }
           if (res.cases.has(tag)) {
             throw new Error("duplicate tag");
           }
+
+          this.scope = this.scope.push();
+          const bindings = this.zipFields(
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            predicate.type.cases.get(tag)!.fields,
+            matchCase.binding.fields,
+            (typeField, bindingField, i) => ({
+              binding: this.initScopeBinding(
+                bindingField.binding,
+                typeField.type
+              ),
+              fieldIndex: i + 1, // +1 because tag takes up slot 0
+            })
+          );
+
           const blockRes = this.checkBlock(matchCase.block);
+          this.scope = this.scope.pop();
+
           resultType = this.unify(resultType, blockRes.type);
           res.cases.set(tag, {
-            index: res.cases.size,
-            binding: matchCase.binding,
+            index: typeCase.index,
+            bindings,
             block: blockRes.block,
           });
         }
@@ -604,7 +622,7 @@ class TypeChecker {
   private zipFields<TypeField, ValueField extends { fieldName: string }, U>(
     typeFields: Map<string, TypeField>,
     valueFields: ValueField[],
-    join: (t: TypeField, u: ValueField) => U
+    join: (t: TypeField, u: ValueField, i: number) => U
   ): U[] {
     const valueFieldsMap = new Map<string, ValueField>();
     for (const field of valueFields) {
@@ -617,10 +635,10 @@ class TypeChecker {
       valueFieldsMap.set(field.fieldName, field);
     }
 
-    return Array.from(typeFields.entries()).map(([fieldName, typeField]) => {
+    return Array.from(typeFields.entries()).map(([fieldName, typeField], i) => {
       const valueField = valueFieldsMap.get(fieldName);
       if (!valueField) throw new Error("missing field");
-      return join(typeField, valueField);
+      return join(typeField, valueField, i);
     });
   }
   private arithmeticOp(

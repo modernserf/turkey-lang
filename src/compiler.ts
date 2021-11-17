@@ -310,17 +310,27 @@ class Compiler {
       case "match": {
         const condEnd = Symbol("cond_end");
         this.compileExpr(expr.expr);
+        const predicateRef = Symbol("predicate");
+        this.locals.init(predicateRef);
+        this.asm.dup();
         const labels = this.labels.jumpTable(expr.cases.size);
-        for (const { index, block } of expr.cases.values()) {
+        for (const { index, bindings, block } of expr.cases.values()) {
           this.labels.create(labels[index]);
+          this.locals.pushScope();
+          for (const { fieldIndex, binding } of bindings) {
+            this.asm
+              .loadLocal(this.locals.get(predicateRef))
+              .getHeap(fieldIndex);
+            this.compileBinding(binding);
+          }
+          this.flushBindingQueue();
+
           this.compileBlock(block);
+          this.locals.popScope();
           this.labels.jump(condEnd);
         }
-        // istanbul ignore next
-        {
-          this.strings.use("Panic: pattern match with no branch taken");
-          this.asm.halt();
-        }
+        this.strings.use("Panic: pattern match with no branch taken");
+        this.asm.halt();
         this.labels.create(condEnd);
         return;
       }
