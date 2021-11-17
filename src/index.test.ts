@@ -414,6 +414,13 @@ it("has simple enums", () => {
   expect(run(code)).toEqual(["V2"]);
 });
 
+it("rejects duplicate tags in enums", () => {
+  const code = `
+    enum Version { V1, V1 }
+  `;
+  expect(() => run(code)).toThrow();
+});
+
 it("rejects enun type mismatches", () => {
   const code = `
     enum Foo { Foo }
@@ -568,6 +575,20 @@ it("destructures function parameters", () => {
     }
 
     print(get_x(Point { x: 1, y: 2 }))
+  `;
+  expect(run(code)).toEqual(["1"]);
+});
+
+it.skip("has pattern matching", () => {
+  const code = `
+    match (True) {
+      True => {
+        print(1)
+      },
+      False => {
+        print(0)
+      }
+    }
   `;
   expect(run(code)).toEqual(["1"]);
 });

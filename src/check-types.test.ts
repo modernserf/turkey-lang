@@ -132,16 +132,16 @@ Array [
               "predicate": Object {
                 "tag": "primitive",
                 "type": Object {
-                  "cases": Array [
-                    Object {
+                  "cases": Map {
+                    "False" => Object {
                       "fields": Map {},
-                      "tag": "False",
+                      "index": 0,
                     },
-                    Object {
+                    "True" => Object {
                       "fields": Map {},
-                      "tag": "True",
+                      "index": 1,
                     },
-                  ],
+                  },
                   "tag": "enum",
                   "value": Symbol(Boolean),
                 },
@@ -182,16 +182,16 @@ Array [
               "predicate": Object {
                 "tag": "primitive",
                 "type": Object {
-                  "cases": Array [
-                    Object {
+                  "cases": Map {
+                    "False" => Object {
                       "fields": Map {},
-                      "tag": "False",
+                      "index": 0,
                     },
-                    Object {
+                    "True" => Object {
                       "fields": Map {},
-                      "tag": "True",
+                      "index": 1,
                     },
-                  ],
+                  },
                   "tag": "enum",
                   "value": Symbol(Boolean),
                 },
@@ -211,16 +211,16 @@ Array [
                             Object {
                               "tag": "primitive",
                               "type": Object {
-                                "cases": Array [
-                                  Object {
+                                "cases": Map {
+                                  "False" => Object {
                                     "fields": Map {},
-                                    "tag": "False",
+                                    "index": 0,
                                   },
-                                  Object {
+                                  "True" => Object {
                                     "fields": Map {},
-                                    "tag": "True",
+                                    "index": 1,
                                   },
-                                ],
+                                },
                                 "tag": "enum",
                                 "value": Symbol(Boolean),
                               },
@@ -230,16 +230,16 @@ Array [
                           "opcode": 32,
                           "tag": "callBuiltIn",
                           "type": Object {
-                            "cases": Array [
-                              Object {
+                            "cases": Map {
+                              "False" => Object {
                                 "fields": Map {},
-                                "tag": "False",
+                                "index": 0,
                               },
-                              Object {
+                              "True" => Object {
                                 "fields": Map {},
-                                "tag": "True",
+                                "index": 1,
                               },
-                            ],
+                            },
                             "tag": "enum",
                             "value": Symbol(Boolean),
                           },
@@ -249,16 +249,16 @@ Array [
                     ],
                     "tag": "do",
                     "type": Object {
-                      "cases": Array [
-                        Object {
+                      "cases": Map {
+                        "False" => Object {
                           "fields": Map {},
-                          "tag": "False",
+                          "index": 0,
                         },
-                        Object {
+                        "True" => Object {
                           "fields": Map {},
-                          "tag": "True",
+                          "index": 1,
                         },
-                      ],
+                      },
                       "tag": "enum",
                       "value": Symbol(Boolean),
                     },
@@ -284,16 +284,16 @@ Array [
     "expr": Object {
       "tag": "primitive",
       "type": Object {
-        "cases": Array [
-          Object {
+        "cases": Map {
+          "False" => Object {
             "fields": Map {},
-            "tag": "False",
+            "index": 0,
           },
-          Object {
+          "True" => Object {
             "fields": Map {},
-            "tag": "True",
+            "index": 1,
           },
-        ],
+        },
         "tag": "enum",
         "value": Symbol(Boolean),
       },
@@ -573,16 +573,16 @@ Array [
         "expr": Object {
           "tag": "primitive",
           "type": Object {
-            "cases": Array [
-              Object {
+            "cases": Map {
+              "False" => Object {
                 "fields": Map {},
-                "tag": "False",
+                "index": 0,
               },
-              Object {
+              "True" => Object {
                 "fields": Map {},
-                "tag": "True",
+                "index": 1,
               },
-            ],
+            },
             "tag": "enum",
             "value": Symbol(Boolean),
           },
@@ -822,16 +822,16 @@ Array [
         "expr": Object {
           "tag": "primitive",
           "type": Object {
-            "cases": Array [
-              Object {
+            "cases": Map {
+              "False" => Object {
                 "fields": Map {},
-                "tag": "False",
+                "index": 0,
               },
-              Object {
+              "True" => Object {
                 "fields": Map {},
-                "tag": "True",
+                "index": 1,
               },
-            ],
+            },
             "tag": "enum",
             "value": Symbol(Boolean),
           },
@@ -995,16 +995,16 @@ Array [
           "predicate": Object {
             "tag": "primitive",
             "type": Object {
-              "cases": Array [
-                Object {
+              "cases": Map {
+                "False" => Object {
                   "fields": Map {},
-                  "tag": "False",
+                  "index": 0,
                 },
-                Object {
+                "True" => Object {
                   "fields": Map {},
-                  "tag": "True",
+                  "index": 1,
                 },
-              ],
+              },
               "tag": "enum",
               "value": Symbol(Boolean),
             },

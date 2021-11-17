@@ -114,10 +114,13 @@ export type Type =
   | {
       tag: "enum";
       value: symbol;
-      cases: Array<{
-        tag: string;
-        fields: Map<string, CheckedStructFieldType>;
-      }>;
+      cases: Map<
+        string,
+        {
+          index: number;
+          fields: Map<string, CheckedStructFieldType>;
+        }
+      >;
     }
   | {
       tag: "struct";
@@ -153,7 +156,10 @@ export type CheckedExpr =
   | {
       tag: "match";
       expr: CheckedExpr;
-      cases: Array<{ binding: MatchBinding; block: CheckedStmt[] }>;
+      cases: Map<
+        string,
+        { index: number; binding: MatchBinding; block: CheckedStmt[] }
+      >;
       type: Type;
     };
 

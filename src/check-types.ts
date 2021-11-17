@@ -22,10 +22,10 @@ const stringType: Type = { tag: "string" };
 const boolType: Type = {
   tag: "enum",
   value: Symbol("Boolean"),
-  cases: [
-    { tag: "False", fields: new Map() },
-    { tag: "True", fields: new Map() },
-  ],
+  cases: new Map([
+    ["False", { index: 0, fields: new Map() }],
+    ["True", { index: 1, fields: new Map() }],
+  ]),
 };
 const builtInTypes = new Scope<string, Type>()
   .set("Int", integerType)
@@ -140,13 +140,13 @@ class TypeChecker {
         const type: Type = {
           tag: "enum",
           value: Symbol(stmt.binding.value),
-          cases: [],
+          cases: new Map(),
         };
         this.types.init(stmt.binding.value, type);
         for (const [i, enumCase] of stmt.cases.entries()) {
           this.typeConstructors.init(enumCase.tagName, { type, value: i });
-          type.cases.push({
-            tag: enumCase.tagName,
+          type.cases.set(enumCase.tagName, {
+            index: i,
             fields: this.buildFields(enumCase.fields),
           });
         }
@@ -423,53 +423,19 @@ class TypeChecker {
         // const res: CheckedExpr = {
         //   tag: "match",
         //   expr: predicate,
-        //   cases: [],
+        //   cases: new Map(),
         //   type: voidType,
         // };
 
-        // const validTags = new Set(predicate.type.cases.map((c) => c.tag));
-
-        // const matchCaseMap = new Map<string, MatchCase>();
         // for (const matchCase of expr.cases) {
-        //   const tag = matchCase.binding.value;
-        //   if (matchCaseMap.has(tag)) {
-        //     throw new Error("duplicate match cases");
+        //   const tag = matchCase.binding.tag
+        //   if (predicate.type.)
+
+        //   if (res.cases.has(tag)) {
+        //     throw new Error('duplicate tag')
         //   }
-        //   if (!validTags.has(tag)) {
-        //     throw new Error("invalid match case");
-        //   }
-        //   matchCaseMap.set(tag, matchCase);
+        //   const blockRes = matchCase
         // }
-
-        // for (const enumCase of predicate.type.cases) {
-        //   const matchCase = matchCaseMap.get(enumCase.tag);
-        //   if (!matchCase) {
-        //     throw new Error("incomplete match cases");
-        //   }
-
-        //   const fieldMap = new Map(
-        //     enumCase.fields.map((field) => [field.fieldName, field.type])
-        //   );
-
-        //   this.scope = this.scope.push();
-        //   // TODO: i want to allow partial { } bindings, but only complete ( ) bindings
-        //   for (const field of matchCase.binding.fields) {
-        //     const type = fieldMap.get(field.fieldName);
-        //     if (!type) throw new Error("missing field");
-        //     this.initScopeBinding(field.binding, type);
-        //   }
-
-        //   const block = this.checkBlock(matchCase.block);
-        //   this.scope = this.scope.pop();
-        //   resultType = this.unify(resultType, block.type);
-
-        //   res.cases.push({ binding: matchCase.binding, block: block.block });
-        // }
-
-        // if (resultType) {
-        //   res.type = resultType;
-        // }
-
         // return res;
       }
     }
