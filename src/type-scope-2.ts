@@ -5,15 +5,35 @@ import {
   TypeBinding,
   EnumCase,
   CheckedStructFieldType,
+  TypeParam,
 } from "./types";
 import { Scope } from "./scope";
 
 type ConstructableType = Type & ({ tag: "struct" } | { tag: "enum" });
 export type TypeConstructor = { value: number; type: ConstructableType };
 
+function logType(type: Type): string {
+  switch (type.tag) {
+    case "var":
+    case "primitive":
+    case "enum":
+    case "struct":
+      return type.value.description || "<anon>";
+    case "func":
+      return "func";
+  }
+}
+
+export class TypeMismatchError extends Error {
+  constructor(left: Type, right: Type) {
+    super(`mismatch between ${logType(left)} & ${logType(right)}`);
+  }
+}
+
 export class TypeScope {
   private types: Scope<string, Type>;
   private typeConstructors: Scope<string, TypeConstructor>;
+  private vars: Scope<symbol, Type> = new Scope();
   constructor(
     builtInTypes: Scope<string, Type>,
     builtInTypeConstructors: Scope<string, TypeConstructor>
@@ -55,19 +75,29 @@ export class TypeScope {
   }
   forwardType(typeExpr: TypeExpr | null): Type {
     if (!typeExpr) {
-      return { tag: "var", value: Symbol("forwardType"), type: null };
+      return { tag: "var", value: Symbol("forwardType") };
     }
     return this.checkTypeExpr(typeExpr);
   }
   func(
+    typeParameters: TypeParam[],
     parameters: Array<{ type: TypeExpr }>,
     returnType: TypeExpr
   ): Type & { parameters: Type[]; returnType: Type } {
-    return {
-      tag: "func",
-      parameters: parameters.map(({ type }) => this.checkTypeExpr(type)),
-      returnType: this.checkTypeExpr(returnType),
-    };
+    return this.withScope(() => {
+      for (const typeParam of typeParameters) {
+        this.types.init(typeParam.value, {
+          tag: "var",
+          value: Symbol(typeParam.value),
+        });
+      }
+
+      return {
+        tag: "func",
+        parameters: parameters.map(({ type }) => this.checkTypeExpr(type)),
+        returnType: this.checkTypeExpr(returnType),
+      };
+    });
   }
   // check if types can be used for purpose
   checkEnum(type: Type): Type & {
@@ -97,7 +127,7 @@ export class TypeScope {
     }
     return forwardType;
   }
-  getField(type: Type, fieldName: string): CheckedStructFieldType {
+  checkField(type: Type, fieldName: string): CheckedStructFieldType {
     type = this.unwrap(type);
     if (type.tag !== "struct") {
       throw new Error("can only destructure structs");
@@ -106,43 +136,54 @@ export class TypeScope {
     if (!typeField) throw new Error("invalid field");
     return typeField;
   }
+  checkBuiltInCall(type: Type): Type {
+    return this.unwrap(type);
+  }
   ///
   unify(left: Type, right: Type): Type {
+    left = this.deref(left);
+    right = this.deref(right);
+
     if (left.tag === "var") {
-      if (left.type) return this.unify(left.type, right);
-      left.type = right;
+      this.vars.set(left.value, right);
       return left;
     }
     if (right.tag === "var") {
-      if (right.type) return this.unify(left, right.type);
-      right.type = left;
+      this.vars.set(right.value, left);
       return right;
     }
-    if (left.tag !== right.tag) throw new Error("type mismatch");
 
     switch (left.tag) {
       case "primitive":
       case "struct":
       case "enum":
-        if (left.value === (right as typeof left).value) return left;
-        throw new Error("type mismatch");
+        if (left.tag !== right.tag) throw new TypeMismatchError(left, right);
+        if (left.value === right.value) return left;
+        throw new TypeMismatchError(left, right);
       case "func": {
-        const returnType = this.unify(
-          left.returnType,
-          (right as typeof left).returnType
-        );
-        if (
-          left.parameters.length !== (right as typeof left).parameters.length
-        ) {
+        if (left.tag !== right.tag) throw new TypeMismatchError(left, right);
+        const returnType = this.unify(left.returnType, right.returnType);
+        if (left.parameters.length !== right.parameters.length) {
           throw new Error("arity mismatch");
         }
+        const rightParams = right.parameters;
         const parameters = left.parameters.map((param, i) => {
-          return this.unify(param, (right as typeof left).parameters[i]);
+          return this.unify(param, rightParams[i]);
         });
 
         return { tag: "func", parameters, returnType };
       }
     }
+  }
+  withScope<T>(fn: () => T): T {
+    this.types = this.types.push();
+    this.typeConstructors = this.typeConstructors.push();
+    this.vars = this.vars.push();
+    const res = fn();
+    this.vars = this.vars.pop();
+    this.typeConstructors = this.typeConstructors.pop();
+    this.types = this.types.pop();
+    return res;
   }
   private buildFields(fields: StructFieldType[]) {
     const fieldsResult = new Map<string, { type: Type; index: number }>();
@@ -158,13 +199,21 @@ export class TypeScope {
 
     return fieldsResult;
   }
-  private unwrap(type: Type, visited = new Set<symbol>()): Type {
+  deref(type: Type, visited = new Set<symbol>()): Type {
     if (type.tag !== "var") return type;
     // istanbul ignore next
     if (visited.has(type.value)) throw new Error("infinte loop in type var");
     visited.add(type.value);
-    if (type.type) return this.unwrap(type.type, visited);
-    throw new Error("unbound type variable");
+    if (this.vars.has(type.value)) {
+      return this.deref(this.vars.get(type.value), visited);
+    }
+    return type;
+  }
+
+  unwrap(type: Type): Type {
+    const deref = this.deref(type);
+    if (deref.tag === "var") throw new Error("unbound type variable");
+    return deref;
   }
   private checkTypeExpr(type: TypeExpr): Type {
     switch (type.tag) {

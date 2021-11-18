@@ -41,31 +41,54 @@ export function check(program: Stmt[]): CheckedStmt[] {
   return TypeChecker.check(program);
 }
 
+class VarScope {
+  scope: Scope<string, Type> = new Scope();
+  init(key: string, value: Type): void {
+    this.scope.init(key, value);
+  }
+  get(key: string): Type {
+    return this.scope.get(key);
+  }
+  withScope<T>(fn: (prevScope: Scope<string, Type>) => T): T {
+    const prevScope = this.scope;
+    this.scope = this.scope.push();
+    const res = fn(prevScope);
+    this.scope = this.scope.pop();
+    return res;
+  }
+}
+
 class TypeChecker {
-  private scope: Scope<string, Type> = new Scope();
+  scope = new VarScope();
   private currentFunc = new CurrentFuncState();
   private types = new TypeScope(builtInTypes, builtInTypeConstructors);
   static check(program: Stmt[]): CheckedStmt[] {
     return new TypeChecker().checkBlock(program).block;
   }
+  private withScope<T>(fn: (prevScope: Scope<string, Type>) => T): T {
+    return this.scope.withScope((prevScope) =>
+      this.types.withScope(() => fn(prevScope))
+    );
+  }
   private checkBlock(block: Stmt[]): { block: CheckedStmt[]; type: Type } {
     const checkedBlock: CheckedStmt[] = [];
     let type = voidType;
-    this.scope = this.scope.push();
-    for (const stmt of block) {
-      const checkedStmt = this.checkStmt(stmt);
-      if (!checkedStmt) {
-        type = voidType;
-        continue;
+    this.withScope(() => {
+      for (const stmt of block) {
+        const checkedStmt = this.checkStmt(stmt);
+        if (!checkedStmt) {
+          type = voidType;
+          continue;
+        }
+        checkedBlock.push(checkedStmt);
+        if (checkedStmt.tag === "expr") {
+          type = checkedStmt.expr.type;
+        } else {
+          type = voidType;
+        }
       }
-      checkedBlock.push(checkedStmt);
-      if (checkedStmt.tag === "expr") {
-        type = checkedStmt.expr.type;
-      } else {
-        type = voidType;
-      }
-    }
-    this.scope = this.scope.pop();
+    });
+
     return { block: checkedBlock, type };
   }
   private checkStmt(stmt: Stmt): CheckedStmt | null {
@@ -108,7 +131,11 @@ class TypeChecker {
         return { tag: "return", expr };
       }
       case "func": {
-        const type = this.types.func(stmt.parameters, stmt.returnType);
+        const type = this.types.func(
+          stmt.typeParameters,
+          stmt.parameters,
+          stmt.returnType
+        );
         const rawParams = stmt.parameters.map(({ binding }, i) => ({
           binding,
           type: type.parameters[i],
@@ -150,7 +177,7 @@ class TypeChecker {
 
       case "identifier": {
         const type = this.scope.get(expr.value);
-        this.currentFunc.checkUpvalue(this.scope, expr.value, type);
+        this.currentFunc.checkUpvalue(this.scope.scope, expr.value, type);
 
         return { tag: "identifier", value: expr.value, type };
       }
@@ -258,8 +285,8 @@ class TypeChecker {
           if (expr.args.length !== 1) throw new Error("arity mismatch");
 
           const arg = this.checkExpr(expr.args[0], null);
-          const op =
-            arg.type === stringType ? Opcode.PrintStr : Opcode.PrintNum;
+          const type = this.types.checkBuiltInCall(arg.type);
+          const op = type === stringType ? Opcode.PrintStr : Opcode.PrintNum;
 
           return {
             tag: "callBuiltIn",
@@ -269,23 +296,34 @@ class TypeChecker {
           };
         }
 
-        const callee = this.checkExpr(expr.expr, null);
-        const { parameters, returnType } = this.types.checkFunc(
-          callee.type,
-          expr.args
-        );
-        const args: CheckedExpr[] = [];
-        for (const [i, arg] of expr.args.entries()) {
-          const argType = parameters[i];
-          const checkedArg = this.checkExpr(arg, argType);
-          this.types.unify(checkedArg.type, argType);
-          args.push(checkedArg);
-        }
-        return { tag: "call", callee, args, type: returnType };
+        // create scope around call, so unified args can be reused in subsequent calls
+        return this.types.withScope(() => {
+          const callee = this.checkExpr(expr.expr, null);
+          const { parameters, returnType } = this.types.checkFunc(
+            callee.type,
+            expr.args
+          );
+          const args: CheckedExpr[] = [];
+          for (const [i, arg] of expr.args.entries()) {
+            const argType = parameters[i];
+            const checkedArg = this.checkExpr(arg, argType);
+            this.types.unify(checkedArg.type, argType);
+            args.push(checkedArg);
+          }
+          return {
+            tag: "call",
+            callee,
+            args,
+            type: this.types.deref(returnType),
+          };
+        });
       }
       case "field": {
         const checkedExpr = this.checkExpr(expr.expr, null);
-        const typeField = this.types.getField(checkedExpr.type, expr.fieldName);
+        const typeField = this.types.checkField(
+          checkedExpr.type,
+          expr.fieldName
+        );
 
         return {
           tag: "field",
@@ -302,7 +340,6 @@ class TypeChecker {
         const resultType: Type = {
           tag: "var",
           value: Symbol("result"),
-          type: null,
         };
 
         const res: CheckedExpr = {
@@ -333,7 +370,6 @@ class TypeChecker {
         const resultType: Type = {
           tag: "var",
           value: Symbol("result"),
-          type: null,
         };
         const predicate = this.checkExpr(expr.expr, null);
         const predicateType = this.types.checkEnum(predicate.type);
@@ -351,22 +387,23 @@ class TypeChecker {
           if (!typeCase) throw new Error("unknown tag");
           if (res.cases.has(tag)) throw new Error("duplicate tag");
 
-          this.scope = this.scope.push();
-          const bindings = zipFields(
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            predicateType.cases.get(tag)!.fields,
-            matchCase.binding.fields,
-            (typeField, bindingField, i) => ({
-              binding: this.initScopeBinding(
-                bindingField.binding,
-                typeField.type
-              ),
-              fieldIndex: i + 1, // +1 because tag takes up slot 0
-            })
-          );
+          const { bindings, blockRes } = this.withScope(() => {
+            const bindings = zipFields(
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+              predicateType.cases.get(tag)!.fields,
+              matchCase.binding.fields,
+              (typeField, bindingField, i) => ({
+                binding: this.initScopeBinding(
+                  bindingField.binding,
+                  typeField.type
+                ),
+                fieldIndex: i + 1, // +1 because tag takes up slot 0
+              })
+            );
 
-          const blockRes = this.checkBlock(matchCase.block);
-          this.scope = this.scope.pop();
+            const blockRes = this.checkBlock(matchCase.block);
+            return { bindings, blockRes };
+          });
 
           this.types.unify(resultType, blockRes.type);
           res.cases.set(tag, {
@@ -394,7 +431,7 @@ class TypeChecker {
       case "struct": {
         const fields: CheckedStructFieldBinding[] = [];
         for (const bindingField of binding.fields) {
-          const typeField = this.types.getField(type, bindingField.fieldName);
+          const typeField = this.types.checkField(type, bindingField.fieldName);
           const checkedField = this.initScopeBinding(
             bindingField.binding,
             typeField.type
@@ -415,45 +452,42 @@ class TypeChecker {
     returnType: Type,
     rawBlock: Stmt[]
   ): FuncFields {
-    // save current context
-    const outerScope = this.scope;
-    this.scope = this.scope.push();
+    const res = this.withScope((outerScope) => {
+      return this.currentFunc.withFunc(returnType, outerScope, () => {
+        // add parameters to scope
+        const checkedParams = parameters.map((param) => ({
+          type: param.type,
+          binding: this.initScopeBinding(param.binding, param.type),
+        }));
 
-    const res = this.currentFunc.withFunc(returnType, outerScope, () => {
-      // add parameters to scope
-      const checkedParams = parameters.map((param) => ({
-        type: param.type,
-        binding: this.initScopeBinding(param.binding, param.type),
-      }));
+        // check function body
+        const { block } = this.checkBlock(rawBlock);
 
-      // check function body
-      const { block } = this.checkBlock(rawBlock);
+        // handle implicit returns
+        const lastStmt = block.pop() ?? { tag: "noop" };
+        switch (lastStmt.tag) {
+          case "return":
+            block.push(lastStmt);
+            break;
+          case "expr":
+            this.types.unify(returnType, lastStmt.expr.type);
+            block.push({ tag: "return", expr: lastStmt.expr });
+            break;
+          case "noop":
+            this.types.unify(returnType, voidType);
+            block.push({ tag: "return", expr: null });
+            break;
+          default:
+            this.types.unify(returnType, voidType);
+            block.push(lastStmt);
+            block.push({ tag: "return", expr: null });
+            break;
+        }
 
-      // handle implicit returns
-      const lastStmt = block.pop() ?? { tag: "noop" };
-      switch (lastStmt.tag) {
-        case "return":
-          block.push(lastStmt);
-          break;
-        case "expr":
-          this.types.unify(returnType, lastStmt.expr.type);
-          block.push({ tag: "return", expr: lastStmt.expr });
-          break;
-        case "noop":
-          this.types.unify(returnType, voidType);
-          block.push({ tag: "return", expr: null });
-          break;
-        default:
-          this.types.unify(returnType, voidType);
-          block.push(lastStmt);
-          block.push({ tag: "return", expr: null });
-          break;
-      }
-
-      return { parameters: checkedParams, block };
+        return { parameters: checkedParams, block };
+      });
     });
-
-    this.scope = this.scope.pop();
+    // save current context
     return res;
   }
 

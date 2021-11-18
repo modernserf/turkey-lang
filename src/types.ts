@@ -119,7 +119,7 @@ export type TypeParam = { tag: "identifier"; value: string };
 // typechecker -> compiler
 
 export type Type =
-  | { tag: "var"; value: symbol; type: Type | null }
+  | { tag: "var"; value: symbol }
   | { tag: "primitive"; value: symbol }
   | {
       tag: "enum";

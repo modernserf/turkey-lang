@@ -726,3 +726,15 @@ it("has recursive types", () => {
   `;
   expect(run(code)).toEqual(["6"]);
 });
+
+it("has generic function params", () => {
+  const code = `
+    func id<T> (value: T): T {
+      value
+    } 
+
+    print(id(1))
+    print(id("hello"))
+  `;
+  expect(run(code)).toEqual(["1", "hello"]);
+});
