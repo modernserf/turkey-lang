@@ -84,13 +84,10 @@ class TypeChecker {
         this.types.struct(stmt.binding, stmt.fields);
         return null;
       case "let": {
-        const forwardType = stmt.type
-          ? this.types.checkTypeExpr(stmt.type)
-          : null;
+        const forwardType = this.types.forwardType(stmt.type);
         const expr = this.checkExpr(stmt.expr, forwardType);
-        if (forwardType) {
-          this.types.unify(expr.type, forwardType);
-        }
+        this.types.unify(expr.type, forwardType);
+
         const binding = this.initScopeBinding(stmt.binding, expr.type);
         return { tag: "let", binding, expr };
       }
@@ -302,7 +299,11 @@ class TypeChecker {
         return { tag: "do", block, type };
       }
       case "if": {
-        let resultType: Type | null = null;
+        const resultType: Type = {
+          tag: "var",
+          value: Symbol("result"),
+          type: null,
+        };
 
         const res: CheckedExpr = {
           tag: "if",
@@ -315,7 +316,7 @@ class TypeChecker {
           const checkedPredicate = this.checkExpr(predicate, null);
           this.types.unify(boolType, checkedPredicate.type);
           const checkedBlock = this.checkBlock(block);
-          resultType = this.types.unify(resultType, checkedBlock.type);
+          this.types.unify(resultType, checkedBlock.type);
           res.cases.push({
             predicate: checkedPredicate,
             block: checkedBlock.block,
@@ -329,7 +330,11 @@ class TypeChecker {
         return res;
       }
       case "match": {
-        let resultType: Type | null = null;
+        const resultType: Type = {
+          tag: "var",
+          value: Symbol("result"),
+          type: null,
+        };
         const predicate = this.checkExpr(expr.expr, null);
         const predicateType = this.types.checkEnum(predicate.type);
 
@@ -341,16 +346,10 @@ class TypeChecker {
         };
 
         for (const matchCase of expr.cases) {
-          // TODO: actually use bindings and not just tag
           const tag = matchCase.binding.value;
           const typeCase = predicateType.cases.get(tag);
-
-          if (!typeCase) {
-            throw new Error("unknown tag");
-          }
-          if (res.cases.has(tag)) {
-            throw new Error("duplicate tag");
-          }
+          if (!typeCase) throw new Error("unknown tag");
+          if (res.cases.has(tag)) throw new Error("duplicate tag");
 
           this.scope = this.scope.push();
           const bindings = zipFields(
@@ -369,16 +368,12 @@ class TypeChecker {
           const blockRes = this.checkBlock(matchCase.block);
           this.scope = this.scope.pop();
 
-          resultType = this.types.unify(resultType, blockRes.type);
+          this.types.unify(resultType, blockRes.type);
           res.cases.set(tag, {
             index: typeCase.index,
             bindings,
             block: blockRes.block,
           });
-        }
-        // istanbul ignore next
-        if (!resultType) {
-          throw new Error("invalid match");
         }
 
         if (res.cases.size !== predicateType.cases.size) {

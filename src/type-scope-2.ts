@@ -24,10 +24,11 @@ export class TypeScope {
   getConstructor(name: string): TypeConstructor {
     return this.typeConstructors.get(name);
   }
-  alias(binding: TypeBinding, expr: TypeExpr) {
+  // create & store types
+  alias(binding: TypeBinding, expr: TypeExpr): void {
     this.types.init(binding.value, this.checkTypeExpr(expr));
   }
-  enum(binding: TypeBinding, cases: EnumCase[]) {
+  enum(binding: TypeBinding, cases: EnumCase[]): void {
     const type: Type = {
       tag: "enum",
       value: Symbol(binding.value),
@@ -42,7 +43,7 @@ export class TypeScope {
       });
     }
   }
-  struct(binding: TypeBinding, fields: StructFieldType[]) {
+  struct(binding: TypeBinding, fields: StructFieldType[]): void {
     const type: Type = {
       tag: "struct",
       value: Symbol(binding.value),
@@ -51,6 +52,12 @@ export class TypeScope {
     this.types.init(binding.value, type);
     type.fields = this.buildFields(fields);
     this.typeConstructors.init(binding.value, { type, value: 0 });
+  }
+  forwardType(typeExpr: TypeExpr | null): Type {
+    if (!typeExpr) {
+      return { tag: "var", value: Symbol("forwardType"), type: null };
+    }
+    return this.checkTypeExpr(typeExpr);
   }
   func(
     parameters: Array<{ type: TypeExpr }>,
@@ -62,6 +69,7 @@ export class TypeScope {
       returnType: this.checkTypeExpr(returnType),
     };
   }
+  // check if types can be used for purpose
   checkEnum(type: Type): Type & {
     cases: Map<
       string,
@@ -71,6 +79,7 @@ export class TypeScope {
       }
     >;
   } {
+    type = this.unwrap(type);
     if (type.tag !== "enum") {
       throw new Error("can only pattern match with enums");
     }
@@ -81,26 +90,34 @@ export class TypeScope {
     parameters: any[]
   ): Type & { parameters: Type[]; returnType: Type } {
     if (!forwardType) throw new Error("missing type for closure");
+    forwardType = this.unwrap(forwardType);
     if (forwardType.tag !== "func") throw new Error("non-function type");
     if (forwardType.parameters.length !== parameters.length) {
       throw new Error("arity mismatch");
     }
     return forwardType;
   }
-  checkTypeExpr(type: TypeExpr): Type {
-    switch (type.tag) {
-      case "identifier":
-        return this.types.get(type.value);
-      case "func":
-        return {
-          tag: "func",
-          parameters: type.parameters.map((param) => this.checkTypeExpr(param)),
-          returnType: this.checkTypeExpr(type.returnType),
-        };
+  getField(type: Type, fieldName: string): CheckedStructFieldType {
+    type = this.unwrap(type);
+    if (type.tag !== "struct") {
+      throw new Error("can only destructure structs");
     }
+    const typeField = type.fields.get(fieldName);
+    if (!typeField) throw new Error("invalid field");
+    return typeField;
   }
-  unify(left: Type | null, right: Type): Type {
-    if (!left) return right;
+  ///
+  unify(left: Type, right: Type): Type {
+    if (left.tag === "var") {
+      if (left.type) return this.unify(left.type, right);
+      left.type = right;
+      return left;
+    }
+    if (right.tag === "var") {
+      if (right.type) return this.unify(left, right.type);
+      right.type = left;
+      return right;
+    }
     if (left.tag !== right.tag) throw new Error("type mismatch");
 
     switch (left.tag) {
@@ -141,12 +158,24 @@ export class TypeScope {
 
     return fieldsResult;
   }
-  getField(type: Type, fieldName: string) {
-    if (type.tag !== "struct") {
-      throw new Error("can only destructure structs");
+  private unwrap(type: Type, visited = new Set<symbol>()): Type {
+    if (type.tag !== "var") return type;
+    // istanbul ignore next
+    if (visited.has(type.value)) throw new Error("infinte loop in type var");
+    visited.add(type.value);
+    if (type.type) return this.unwrap(type.type, visited);
+    throw new Error("unbound type variable");
+  }
+  private checkTypeExpr(type: TypeExpr): Type {
+    switch (type.tag) {
+      case "identifier":
+        return this.types.get(type.value);
+      case "func":
+        return {
+          tag: "func",
+          parameters: type.parameters.map((param) => this.checkTypeExpr(param)),
+          returnType: this.checkTypeExpr(type.returnType),
+        };
     }
-    const typeField = type.fields.get(fieldName);
-    if (!typeField) throw new Error("invalid field");
-    return typeField;
   }
 }
