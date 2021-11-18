@@ -12,6 +12,7 @@ import { Scope } from "./scope";
 type ConstructableType = Type & ({ tag: "struct" } | { tag: "enum" });
 export type TypeConstructor = { value: number; type: ConstructableType };
 
+// istanbul ignore next
 function logType(type: Type): string {
   switch (type.tag) {
     case "var":
@@ -48,7 +49,7 @@ export class TypeScope {
   alias(binding: TypeBinding, expr: TypeExpr): void {
     this.types.init(binding.value, this.checkTypeExpr(expr));
   }
-  enum(binding: TypeBinding, cases: EnumCase[]): void {
+  enumType(binding: TypeBinding, cases: EnumCase[]): void {
     const type: Type = {
       tag: "enum",
       value: Symbol(binding.value),
@@ -63,14 +64,28 @@ export class TypeScope {
       });
     }
   }
-  struct(binding: TypeBinding, fields: StructFieldType[]): void {
-    const type: Type = {
-      tag: "struct",
-      value: Symbol(binding.value),
-      fields: new Map(),
-    };
+  structType(binding: TypeBinding, fields: StructFieldType[]): void {
+    const type = this.withScope(() => {
+      const type: Type = {
+        tag: "struct",
+        value: Symbol(binding.value),
+        parameters: [],
+        fields: new Map(),
+      };
+      this.types.init(binding.value, type);
+      for (const typeParam of binding.typeParameters) {
+        const param: Type = {
+          tag: "var",
+          value: Symbol(typeParam.value),
+        };
+        type.parameters.push(param);
+        this.types.init(typeParam.value, param);
+      }
+
+      type.fields = this.buildFields(fields);
+      return type;
+    });
     this.types.init(binding.value, type);
-    type.fields = this.buildFields(fields);
     this.typeConstructors.init(binding.value, { type, value: 0 });
   }
   forwardType(typeExpr: TypeExpr | null): Type {
@@ -85,12 +100,7 @@ export class TypeScope {
     returnType: TypeExpr
   ): Type & { parameters: Type[]; returnType: Type } {
     return this.withScope(() => {
-      for (const typeParam of typeParameters) {
-        this.types.init(typeParam.value, {
-          tag: "var",
-          value: Symbol(typeParam.value),
-        });
-      }
+      this.initParams(typeParameters);
 
       return {
         tag: "func",
@@ -98,6 +108,14 @@ export class TypeScope {
         returnType: this.checkTypeExpr(returnType),
       };
     });
+  }
+  private initParams(typeParameters: TypeParam[]) {
+    for (const typeParam of typeParameters) {
+      this.types.init(typeParam.value, {
+        tag: "var",
+        value: Symbol(typeParam.value),
+      });
+    }
   }
   // check if types can be used for purpose
   checkEnum(type: Type): Type & {
@@ -134,7 +152,8 @@ export class TypeScope {
     }
     const typeField = type.fields.get(fieldName);
     if (!typeField) throw new Error("invalid field");
-    return typeField;
+
+    return { index: typeField.index, type: this.deref(typeField.type) };
   }
   checkBuiltInCall(type: Type): Type {
     return this.unwrap(type);
@@ -146,20 +165,34 @@ export class TypeScope {
 
     if (left.tag === "var") {
       this.vars.set(left.value, right);
-      return left;
+      return right;
     }
     if (right.tag === "var") {
       this.vars.set(right.value, left);
-      return right;
+      return left;
     }
 
     switch (left.tag) {
       case "primitive":
-      case "struct":
       case "enum":
         if (left.tag !== right.tag) throw new TypeMismatchError(left, right);
         if (left.value === right.value) return left;
         throw new TypeMismatchError(left, right);
+      case "struct": {
+        if (left.tag !== right.tag || left.value !== right.value) {
+          throw new TypeMismatchError(left, right);
+        }
+        const rightParams = right.parameters;
+        const parameters = left.parameters.map((param, i) => {
+          return this.unify(param, rightParams[i]);
+        });
+        return {
+          tag: "struct",
+          value: left.value,
+          parameters,
+          fields: left.fields,
+        };
+      }
       case "func": {
         if (left.tag !== right.tag) throw new TypeMismatchError(left, right);
         const returnType = this.unify(left.returnType, right.returnType);
@@ -212,7 +245,9 @@ export class TypeScope {
 
   unwrap(type: Type): Type {
     const deref = this.deref(type);
-    if (deref.tag === "var") throw new Error("unbound type variable");
+    if (deref.tag === "var") {
+      throw new Error(`unbound type variable ${deref.value.description}`);
+    }
     return deref;
   }
   private checkTypeExpr(type: TypeExpr): Type {

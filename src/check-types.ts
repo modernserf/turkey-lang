@@ -10,7 +10,7 @@ import {
   CheckedStructFieldBinding,
 } from "./types";
 import { Scope } from "./scope";
-import { noMatch } from "./utils";
+import { noMatch, mapMap } from "./utils";
 import { CurrentFuncState, FuncFields } from "./current-func";
 import { TypeScope, TypeConstructor } from "./type-scope-2";
 
@@ -101,10 +101,10 @@ class TypeChecker {
         this.types.alias(stmt.binding, stmt.type);
         return null;
       case "enum":
-        this.types.enum(stmt.binding, stmt.cases);
+        this.types.enumType(stmt.binding, stmt.cases);
         return null;
       case "struct":
-        this.types.struct(stmt.binding, stmt.fields);
+        this.types.structType(stmt.binding, stmt.fields);
         return null;
       case "let": {
         const forwardType = this.types.forwardType(stmt.type);
@@ -198,17 +198,38 @@ class TypeChecker {
             return { tag: "enum", index: value, fields, type };
           }
           case "struct": {
-            const fields = zipFields(
-              type.fields,
-              expr.fields,
-              (typeField, exprField) => {
-                const checked = this.checkExpr(exprField.expr, typeField.type);
-                this.types.unify(typeField.type, checked.type);
-                return checked;
-              }
-            );
+            return this.types.withScope(() => {
+              const fields = zipFields(
+                type.fields,
+                expr.fields,
+                (typeField, exprField) => {
+                  const checked = this.checkExpr(
+                    exprField.expr,
+                    typeField.type
+                  );
+                  checked.type = this.types.unify(typeField.type, checked.type);
+                  return checked;
+                }
+              );
+              const thisType: Type = {
+                ...type,
+                parameters: type.parameters.map((param) =>
+                  this.types.deref(param)
+                ),
+                fields: mapMap(type.fields, (value) => {
+                  return {
+                    index: value.index,
+                    type: this.types.deref(value.type),
+                  };
+                }),
+              };
 
-            return { tag: "struct", value: fields, type };
+              return {
+                tag: "struct",
+                value: fields,
+                type: thisType,
+              };
+            });
           }
           // istanbul ignore next
           default:

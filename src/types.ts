@@ -135,6 +135,7 @@ export type Type =
   | {
       tag: "struct";
       value: symbol;
+      parameters: Type[];
       fields: Map<string, CheckedStructFieldType>;
     }
   | { tag: "func"; parameters: Type[]; returnType: Type };

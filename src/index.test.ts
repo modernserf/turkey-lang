@@ -738,3 +738,18 @@ it("has generic function params", () => {
   `;
   expect(run(code)).toEqual(["1", "hello"]);
 });
+
+it("has generic struct params", () => {
+  const code = `
+    struct Cell <T> {
+      current: T
+    }
+
+    let x = Cell { current: 1 }
+    let y = Cell { current: "hello" }
+    
+    print(x:current)
+    print(y:current)
+  `;
+  expect(run(code)).toEqual(["1", "hello"]);
+});
