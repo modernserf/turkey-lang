@@ -171,7 +171,7 @@ class Compiler {
         this.asm.drop();
       }
       this.compileStmt(stmt);
-      valueOnStack = stmt.tag === "expr" && stmt.expr.type.tag !== "void";
+      valueOnStack = stmt.tag === "expr" && stmt.hasValue;
     }
   }
   private flushBindingQueue() {
@@ -412,5 +412,5 @@ class Compiler {
 function hasValue(block: CheckedStmt[]): boolean {
   if (!block.length) return false;
   const stmt = block[block.length - 1];
-  return stmt.tag === "expr" && stmt.expr.type.tag !== "void";
+  return stmt.tag === "expr" && stmt.hasValue;
 }

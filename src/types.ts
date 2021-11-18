@@ -192,7 +192,7 @@ export type CheckedStmt =
       type: Type;
     }
   | { tag: "while"; expr: CheckedExpr; block: CheckedStmt[] }
-  | { tag: "expr"; expr: CheckedExpr };
+  | { tag: "expr"; expr: CheckedExpr; hasValue: boolean };
 
 export type CheckedBinding =
   | { tag: "identifier"; value: string }

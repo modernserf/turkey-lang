@@ -70,8 +70,10 @@ class TypeChecker {
   }
   private checkStmt(stmt: Stmt): CheckedStmt | null {
     switch (stmt.tag) {
-      case "expr":
-        return { tag: "expr", expr: this.checkExpr(stmt.expr, null) };
+      case "expr": {
+        const expr = this.checkExpr(stmt.expr, null);
+        return { tag: "expr", expr, hasValue: expr.type.tag !== "void" };
+      }
       case "type":
         this.types.alias(stmt.binding, stmt.type);
         return null;
