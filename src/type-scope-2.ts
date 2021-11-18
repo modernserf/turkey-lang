@@ -8,6 +8,7 @@ import {
   TypeParam,
 } from "./types";
 import { Scope } from "./scope";
+import { mapMap } from "./utils";
 
 type ConstructableType = Type & ({ tag: "struct" } | { tag: "enum" });
 export type TypeConstructor = { value: number; type: ConstructableType };
@@ -109,13 +110,21 @@ export class TypeScope {
       };
     });
   }
-  private initParams(typeParameters: TypeParam[]) {
-    for (const typeParam of typeParameters) {
-      this.types.init(typeParam.value, {
-        tag: "var",
-        value: Symbol(typeParam.value),
-      });
-    }
+  structValue(type: Type & { tag: "struct" }): Type {
+    return {
+      tag: "struct",
+      value: type.value,
+      parameters: type.parameters.map((param) => this.deref(param)),
+      fields: mapMap(type.fields, (value) => {
+        return {
+          index: value.index,
+          type: this.deref(value.type),
+        };
+      }),
+    };
+  }
+  callValue(type: Type): Type {
+    return this.deref(type);
   }
   // check if types can be used for purpose
   checkEnum(type: Type): Type & {
@@ -134,16 +143,16 @@ export class TypeScope {
     return type;
   }
   checkFunc(
-    forwardType: Type | null,
+    type: Type | null,
     parameters: any[]
   ): Type & { parameters: Type[]; returnType: Type } {
-    if (!forwardType) throw new Error("missing type for closure");
-    forwardType = this.unwrap(forwardType);
-    if (forwardType.tag !== "func") throw new Error("non-function type");
-    if (forwardType.parameters.length !== parameters.length) {
+    if (!type) throw new Error("missing type for closure");
+    type = this.unwrap(type);
+    if (type.tag !== "func") throw new Error("non-function type");
+    if (type.parameters.length !== parameters.length) {
       throw new Error("arity mismatch");
     }
-    return forwardType;
+    return type;
   }
   checkField(type: Type, fieldName: string): CheckedStructFieldType {
     type = this.unwrap(type);
@@ -218,6 +227,7 @@ export class TypeScope {
     this.types = this.types.pop();
     return res;
   }
+
   private buildFields(fields: StructFieldType[]) {
     const fieldsResult = new Map<string, { type: Type; index: number }>();
     for (const field of fields) {
@@ -232,7 +242,7 @@ export class TypeScope {
 
     return fieldsResult;
   }
-  deref(type: Type, visited = new Set<symbol>()): Type {
+  private deref(type: Type, visited = new Set<symbol>()): Type {
     if (type.tag !== "var") return type;
     // istanbul ignore next
     if (visited.has(type.value)) throw new Error("infinte loop in type var");
@@ -242,8 +252,15 @@ export class TypeScope {
     }
     return type;
   }
-
-  unwrap(type: Type): Type {
+  private initParams(typeParameters: TypeParam[]) {
+    for (const typeParam of typeParameters) {
+      this.types.init(typeParam.value, {
+        tag: "var",
+        value: Symbol(typeParam.value),
+      });
+    }
+  }
+  private unwrap(type: Type): Type {
     const deref = this.deref(type);
     if (deref.tag === "var") {
       throw new Error(`unbound type variable ${deref.value.description}`);

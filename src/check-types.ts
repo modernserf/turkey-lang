@@ -10,7 +10,7 @@ import {
   CheckedStructFieldBinding,
 } from "./types";
 import { Scope } from "./scope";
-import { noMatch, mapMap } from "./utils";
+import { noMatch } from "./utils";
 import { CurrentFuncState, FuncFields } from "./current-func";
 import { TypeScope, TypeConstructor } from "./type-scope-2";
 
@@ -211,23 +211,11 @@ class TypeChecker {
                   return checked;
                 }
               );
-              const thisType: Type = {
-                ...type,
-                parameters: type.parameters.map((param) =>
-                  this.types.deref(param)
-                ),
-                fields: mapMap(type.fields, (value) => {
-                  return {
-                    index: value.index,
-                    type: this.types.deref(value.type),
-                  };
-                }),
-              };
 
               return {
                 tag: "struct",
                 value: fields,
-                type: thisType,
+                type: this.types.structValue(type),
               };
             });
           }
@@ -317,25 +305,25 @@ class TypeChecker {
           };
         }
 
+        const callee = this.checkExpr(expr.expr, null);
+        const { parameters, returnType } = this.types.checkFunc(
+          callee.type,
+          expr.args
+        );
         // create scope around call, so unified args can be reused in subsequent calls
         return this.types.withScope(() => {
-          const callee = this.checkExpr(expr.expr, null);
-          const { parameters, returnType } = this.types.checkFunc(
-            callee.type,
-            expr.args
-          );
-          const args: CheckedExpr[] = [];
-          for (const [i, arg] of expr.args.entries()) {
+          const args = expr.args.map((arg, i) => {
             const argType = parameters[i];
             const checkedArg = this.checkExpr(arg, argType);
             this.types.unify(checkedArg.type, argType);
-            args.push(checkedArg);
-          }
+            return checkedArg;
+          });
+
           return {
             tag: "call",
             callee,
             args,
-            type: this.types.deref(returnType),
+            type: this.types.callValue(returnType),
           };
         });
       }

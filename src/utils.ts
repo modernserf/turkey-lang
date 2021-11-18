@@ -11,9 +11,9 @@ export const tap = <T>(value: T) => {
 
 export function mapMap<K, V, V2>(
   map: Map<K, V>,
-  fn: (value: V, key: K) => V2
+  fn: (value: V, key: K, index: number) => V2
 ): Map<K, V2> {
   return new Map(
-    Array.from(map.entries()).map(([key, value]) => [key, fn(value, key)])
+    Array.from(map.entries()).map(([key, value], i) => [key, fn(value, key, i)])
   );
 }
