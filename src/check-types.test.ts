@@ -32,7 +32,8 @@ Array [
     "expr": Object {
       "tag": "primitive",
       "type": Object {
-        "tag": "integer",
+        "tag": "primitive",
+        "value": Symbol(integer),
       },
       "value": 1,
     },
@@ -46,7 +47,8 @@ Array [
     "expr": Object {
       "tag": "primitive",
       "type": Object {
-        "tag": "float",
+        "tag": "primitive",
+        "value": Symbol(float),
       },
       "value": 1.5,
     },
@@ -60,14 +62,16 @@ Array [
             Object {
               "tag": "identifier",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
               "value": "a",
             },
             Object {
               "tag": "primitive",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
               "value": 2,
             },
@@ -75,14 +79,16 @@ Array [
           "opcode": 17,
           "tag": "callBuiltIn",
           "type": Object {
-            "tag": "integer",
+            "tag": "primitive",
+            "value": Symbol(integer),
           },
         },
       ],
       "opcode": 33,
       "tag": "callBuiltIn",
       "type": Object {
-        "tag": "void",
+        "tag": "primitive",
+        "value": Symbol(void),
       },
     },
     "hasValue": false,
@@ -96,14 +102,16 @@ Array [
             Object {
               "tag": "identifier",
               "type": Object {
-                "tag": "float",
+                "tag": "primitive",
+                "value": Symbol(float),
               },
               "value": "b",
             },
             Object {
               "tag": "primitive",
               "type": Object {
-                "tag": "float",
+                "tag": "primitive",
+                "value": Symbol(float),
               },
               "value": 2.5,
             },
@@ -111,14 +119,16 @@ Array [
           "opcode": 17,
           "tag": "callBuiltIn",
           "type": Object {
-            "tag": "float",
+            "tag": "primitive",
+            "value": Symbol(float),
           },
         },
       ],
       "opcode": 33,
       "tag": "callBuiltIn",
       "type": Object {
-        "tag": "void",
+        "tag": "primitive",
+        "value": Symbol(void),
       },
     },
     "hasValue": false,
@@ -161,7 +171,8 @@ Array [
                           Object {
                             "tag": "identifier",
                             "type": Object {
-                              "tag": "integer",
+                              "tag": "primitive",
+                              "value": Symbol(integer),
                             },
                             "value": "a",
                           },
@@ -169,14 +180,16 @@ Array [
                         "opcode": 22,
                         "tag": "callBuiltIn",
                         "type": Object {
-                          "tag": "integer",
+                          "tag": "primitive",
+                          "value": Symbol(integer),
                         },
                       },
                     ],
                     "opcode": 33,
                     "tag": "callBuiltIn",
                     "type": Object {
-                      "tag": "void",
+                      "tag": "primitive",
+                      "value": Symbol(void),
                     },
                   },
                   "hasValue": false,
@@ -274,7 +287,8 @@ Array [
                 "opcode": 33,
                 "tag": "callBuiltIn",
                 "type": Object {
-                  "tag": "void",
+                  "tag": "primitive",
+                  "value": Symbol(void),
                 },
               },
               "hasValue": false,
@@ -283,7 +297,8 @@ Array [
           ],
           "tag": "if",
           "type": Object {
-            "tag": "void",
+            "tag": "primitive",
+            "value": Symbol(void),
           },
         },
         "hasValue": false,
@@ -329,7 +344,8 @@ Array [
                 Object {
                   "tag": "primitive",
                   "type": Object {
-                    "tag": "integer",
+                    "tag": "primitive",
+                    "value": Symbol(integer),
                   },
                   "value": 1,
                 },
@@ -338,14 +354,16 @@ Array [
                     Object {
                       "tag": "primitive",
                       "type": Object {
-                        "tag": "integer",
+                        "tag": "primitive",
+                        "value": Symbol(integer),
                       },
                       "value": 2,
                     },
                     Object {
                       "tag": "primitive",
                       "type": Object {
-                        "tag": "integer",
+                        "tag": "primitive",
+                        "value": Symbol(integer),
                       },
                       "value": 3,
                     },
@@ -353,20 +371,23 @@ Array [
                   "opcode": 19,
                   "tag": "callBuiltIn",
                   "type": Object {
-                    "tag": "integer",
+                    "tag": "primitive",
+                    "value": Symbol(integer),
                   },
                 },
               ],
               "opcode": 17,
               "tag": "callBuiltIn",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
             },
             Object {
               "tag": "primitive",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
               "value": 4,
             },
@@ -374,13 +395,15 @@ Array [
           "opcode": 18,
           "tag": "callBuiltIn",
           "type": Object {
-            "tag": "integer",
+            "tag": "primitive",
+            "value": Symbol(integer),
           },
         },
         Object {
           "tag": "primitive",
           "type": Object {
-            "tag": "integer",
+            "tag": "primitive",
+            "value": Symbol(integer),
           },
           "value": 5,
         },
@@ -388,7 +411,8 @@ Array [
       "opcode": 20,
       "tag": "callBuiltIn",
       "type": Object {
-        "tag": "float",
+        "tag": "primitive",
+        "value": Symbol(float),
       },
     },
     "hasValue": true,
@@ -466,7 +490,8 @@ Array [
             Object {
               "tag": "primitive",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
               "value": 1,
             },
@@ -474,7 +499,8 @@ Array [
           "opcode": 33,
           "tag": "callBuiltIn",
           "type": Object {
-            "tag": "void",
+            "tag": "primitive",
+            "value": Symbol(void),
           },
         },
         "tag": "return",
@@ -486,7 +512,8 @@ Array [
     "type": Object {
       "parameters": Array [],
       "returnType": Object {
-        "tag": "void",
+        "tag": "primitive",
+        "value": Symbol(void),
       },
       "tag": "func",
     },
@@ -513,7 +540,8 @@ Array [
             Object {
               "tag": "primitive",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
               "value": 1,
             },
@@ -521,7 +549,8 @@ Array [
           "opcode": 33,
           "tag": "callBuiltIn",
           "type": Object {
-            "tag": "void",
+            "tag": "primitive",
+            "value": Symbol(void),
           },
         },
         "hasValue": false,
@@ -538,7 +567,8 @@ Array [
     "type": Object {
       "parameters": Array [],
       "returnType": Object {
-        "tag": "void",
+        "tag": "primitive",
+        "value": Symbol(void),
       },
       "tag": "func",
     },
@@ -568,7 +598,8 @@ Array [
                 Object {
                   "tag": "primitive",
                   "type": Object {
-                    "tag": "integer",
+                    "tag": "primitive",
+                    "value": Symbol(integer),
                   },
                   "value": 0,
                 },
@@ -576,7 +607,8 @@ Array [
               "opcode": 33,
               "tag": "callBuiltIn",
               "type": Object {
-                "tag": "void",
+                "tag": "primitive",
+                "value": Symbol(void),
               },
             },
             "hasValue": false,
@@ -615,7 +647,8 @@ Array [
     "type": Object {
       "parameters": Array [],
       "returnType": Object {
-        "tag": "void",
+        "tag": "primitive",
+        "value": Symbol(void),
       },
       "tag": "func",
     },
@@ -641,14 +674,16 @@ Array [
             Object {
               "tag": "identifier",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
               "value": "x",
             },
             Object {
               "tag": "primitive",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
               "value": 1,
             },
@@ -656,7 +691,8 @@ Array [
           "opcode": 17,
           "tag": "callBuiltIn",
           "type": Object {
-            "tag": "integer",
+            "tag": "primitive",
+            "value": Symbol(integer),
           },
         },
         "tag": "return",
@@ -670,7 +706,8 @@ Array [
           "value": "x",
         },
         "type": Object {
-          "tag": "integer",
+          "tag": "primitive",
+          "value": Symbol(integer),
         },
       },
     ],
@@ -678,11 +715,13 @@ Array [
     "type": Object {
       "parameters": Array [
         Object {
-          "tag": "integer",
+          "tag": "primitive",
+          "value": Symbol(integer),
         },
       ],
       "returnType": Object {
-        "tag": "integer",
+        "tag": "primitive",
+        "value": Symbol(integer),
       },
       "tag": "func",
     },
@@ -711,7 +750,8 @@ Array [
     "expr": Object {
       "tag": "primitive",
       "type": Object {
-        "tag": "integer",
+        "tag": "primitive",
+        "value": Symbol(integer),
       },
       "value": 1,
     },
@@ -725,14 +765,16 @@ Array [
             Object {
               "tag": "identifier",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
               "value": "x",
             },
             Object {
               "tag": "identifier",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
               "value": "y",
             },
@@ -740,7 +782,8 @@ Array [
           "opcode": 17,
           "tag": "callBuiltIn",
           "type": Object {
-            "tag": "integer",
+            "tag": "primitive",
+            "value": Symbol(integer),
           },
         },
         "tag": "return",
@@ -754,7 +797,8 @@ Array [
           "value": "x",
         },
         "type": Object {
-          "tag": "integer",
+          "tag": "primitive",
+          "value": Symbol(integer),
         },
       },
     ],
@@ -762,11 +806,13 @@ Array [
     "type": Object {
       "parameters": Array [
         Object {
-          "tag": "integer",
+          "tag": "primitive",
+          "value": Symbol(integer),
         },
       ],
       "returnType": Object {
-        "tag": "integer",
+        "tag": "primitive",
+        "value": Symbol(integer),
       },
       "tag": "func",
     },
@@ -774,7 +820,8 @@ Array [
       Object {
         "name": "y",
         "type": Object {
-          "tag": "integer",
+          "tag": "primitive",
+          "value": Symbol(integer),
         },
       },
     ],
@@ -819,7 +866,8 @@ Array [
                 Object {
                   "tag": "primitive",
                   "type": Object {
-                    "tag": "integer",
+                    "tag": "primitive",
+                    "value": Symbol(integer),
                   },
                   "value": 1,
                 },
@@ -827,7 +875,8 @@ Array [
               "opcode": 33,
               "tag": "callBuiltIn",
               "type": Object {
-                "tag": "void",
+                "tag": "primitive",
+                "value": Symbol(void),
               },
             },
             "hasValue": false,
@@ -866,7 +915,8 @@ Array [
     "type": Object {
       "parameters": Array [],
       "returnType": Object {
-        "tag": "void",
+        "tag": "primitive",
+        "value": Symbol(void),
       },
       "tag": "func",
     },
@@ -891,7 +941,8 @@ Array [
     "type": Object {
       "parameters": Array [],
       "returnType": Object {
-        "tag": "void",
+        "tag": "primitive",
+        "value": Symbol(void),
       },
       "tag": "func",
     },
@@ -918,14 +969,16 @@ Array [
             Object {
               "tag": "identifier",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
               "value": "x",
             },
             Object {
               "tag": "primitive",
               "type": Object {
-                "tag": "integer",
+                "tag": "primitive",
+                "value": Symbol(integer),
               },
               "value": 1,
             },
@@ -933,7 +986,8 @@ Array [
           "opcode": 17,
           "tag": "callBuiltIn",
           "type": Object {
-            "tag": "integer",
+            "tag": "primitive",
+            "value": Symbol(integer),
           },
         },
         "tag": "return",
@@ -947,7 +1001,8 @@ Array [
           "value": "x",
         },
         "type": Object {
-          "tag": "integer",
+          "tag": "primitive",
+          "value": Symbol(integer),
         },
       },
     ],
@@ -955,11 +1010,13 @@ Array [
     "type": Object {
       "parameters": Array [
         Object {
-          "tag": "integer",
+          "tag": "primitive",
+          "value": Symbol(integer),
         },
       ],
       "returnType": Object {
-        "tag": "integer",
+        "tag": "primitive",
+        "value": Symbol(integer),
       },
       "tag": "func",
     },
@@ -980,7 +1037,8 @@ Array [
                   Object {
                     "tag": "primitive",
                     "type": Object {
-                      "tag": "integer",
+                      "tag": "primitive",
+                      "value": Symbol(integer),
                     },
                     "value": 1,
                   },
@@ -990,11 +1048,13 @@ Array [
                   "type": Object {
                     "parameters": Array [
                       Object {
-                        "tag": "integer",
+                        "tag": "primitive",
+                        "value": Symbol(integer),
                       },
                     ],
                     "returnType": Object {
-                      "tag": "integer",
+                      "tag": "primitive",
+                      "value": Symbol(integer),
                     },
                     "tag": "func",
                   },
@@ -1002,7 +1062,8 @@ Array [
                 },
                 "tag": "call",
                 "type": Object {
-                  "tag": "integer",
+                  "tag": "primitive",
+                  "value": Symbol(integer),
                 },
               },
               "hasValue": true,
@@ -1037,7 +1098,8 @@ Array [
               Object {
                 "tag": "primitive",
                 "type": Object {
-                  "tag": "integer",
+                  "tag": "primitive",
+                  "value": Symbol(integer),
                 },
                 "value": 2,
               },
@@ -1047,11 +1109,13 @@ Array [
               "type": Object {
                 "parameters": Array [
                   Object {
-                    "tag": "integer",
+                    "tag": "primitive",
+                    "value": Symbol(integer),
                   },
                 ],
                 "returnType": Object {
-                  "tag": "integer",
+                  "tag": "primitive",
+                  "value": Symbol(integer),
                 },
                 "tag": "func",
               },
@@ -1059,7 +1123,8 @@ Array [
             },
             "tag": "call",
             "type": Object {
-              "tag": "integer",
+              "tag": "primitive",
+              "value": Symbol(integer),
             },
           },
           "hasValue": true,
@@ -1068,7 +1133,8 @@ Array [
       ],
       "tag": "if",
       "type": Object {
-        "tag": "integer",
+        "tag": "primitive",
+        "value": Symbol(integer),
       },
     },
     "tag": "let",

@@ -4,6 +4,7 @@ import {
   StructFieldType,
   TypeBinding,
   EnumCase,
+  CheckedStructFieldType,
 } from "./types";
 import { Scope } from "./scope";
 
@@ -54,12 +55,37 @@ export class TypeScope {
   func(
     parameters: Array<{ type: TypeExpr }>,
     returnType: TypeExpr
-  ): Type & { tag: "func" } {
+  ): Type & { parameters: Type[]; returnType: Type } {
     return {
       tag: "func",
       parameters: parameters.map(({ type }) => this.checkTypeExpr(type)),
       returnType: this.checkTypeExpr(returnType),
     };
+  }
+  checkEnum(type: Type): Type & {
+    cases: Map<
+      string,
+      {
+        index: number;
+        fields: Map<string, CheckedStructFieldType>;
+      }
+    >;
+  } {
+    if (type.tag !== "enum") {
+      throw new Error("can only pattern match with enums");
+    }
+    return type;
+  }
+  checkFunc(
+    forwardType: Type | null,
+    parameters: any[]
+  ): Type & { parameters: Type[]; returnType: Type } {
+    if (!forwardType) throw new Error("missing type for closure");
+    if (forwardType.tag !== "func") throw new Error("non-function type");
+    if (forwardType.parameters.length !== parameters.length) {
+      throw new Error("arity mismatch");
+    }
+    return forwardType;
   }
   checkTypeExpr(type: TypeExpr): Type {
     switch (type.tag) {
@@ -78,11 +104,7 @@ export class TypeScope {
     if (left.tag !== right.tag) throw new Error("type mismatch");
 
     switch (left.tag) {
-      case "void":
-      case "integer":
-      case "float":
-      case "string":
-        return left;
+      case "primitive":
       case "struct":
       case "enum":
         if (left.value === (right as typeof left).value) return left;
@@ -118,5 +140,13 @@ export class TypeScope {
     }
 
     return fieldsResult;
+  }
+  getField(type: Type, fieldName: string) {
+    if (type.tag !== "struct") {
+      throw new Error("can only destructure structs");
+    }
+    const typeField = type.fields.get(fieldName);
+    if (!typeField) throw new Error("invalid field");
+    return typeField;
   }
 }

@@ -14,10 +14,10 @@ import { noMatch } from "./utils";
 import { CurrentFuncState, FuncFields } from "./current-func";
 import { TypeScope, TypeConstructor } from "./type-scope-2";
 
-const voidType: Type = { tag: "void" };
-const integerType: Type = { tag: "integer" };
-const floatType: Type = { tag: "float" };
-const stringType: Type = { tag: "string" };
+const voidType: Type = { tag: "primitive", value: Symbol("void") };
+const integerType: Type = { tag: "primitive", value: Symbol("integer") };
+const floatType: Type = { tag: "primitive", value: Symbol("float") };
+const stringType: Type = { tag: "primitive", value: Symbol("string") };
 const boolType: Type = {
   tag: "enum",
   value: Symbol("Boolean"),
@@ -72,7 +72,7 @@ class TypeChecker {
     switch (stmt.tag) {
       case "expr": {
         const expr = this.checkExpr(stmt.expr, null);
-        return { tag: "expr", expr, hasValue: expr.type.tag !== "void" };
+        return { tag: "expr", expr, hasValue: expr.type !== voidType };
       }
       case "type":
         this.types.alias(stmt.binding, stmt.type);
@@ -138,20 +138,16 @@ class TypeChecker {
       case "string":
         return { tag: "string", value: expr.value, type: stringType };
       case "closure": {
-        if (!forwardType) throw new Error("missing type for closure");
-        if (forwardType.tag !== "func") throw new Error("non-function type");
-        if (forwardType.parameters.length !== expr.parameters.length) {
-          throw new Error("arity mismatch");
-        }
-        const rawParams = forwardType.parameters.map((type, i) => ({
+        const type = this.types.checkFunc(forwardType, expr.parameters);
+        const rawParams = type.parameters.map((type, i) => ({
           type,
           binding: expr.parameters[i],
         }));
 
         return {
           tag: "closure",
-          type: forwardType,
-          ...this.checkFunc(rawParams, forwardType.returnType, expr.block),
+          type,
+          ...this.checkFunc(rawParams, type.returnType, expr.block),
         };
       }
 
@@ -266,7 +262,7 @@ class TypeChecker {
 
           const arg = this.checkExpr(expr.args[0], null);
           const op =
-            arg.type.tag === "string" ? Opcode.PrintStr : Opcode.PrintNum;
+            arg.type === stringType ? Opcode.PrintStr : Opcode.PrintNum;
 
           return {
             tag: "callBuiltIn",
@@ -277,37 +273,29 @@ class TypeChecker {
         }
 
         const callee = this.checkExpr(expr.expr, null);
-        if (callee.type.tag !== "func") {
-          throw new Error("not callable");
-        }
-        if (callee.type.parameters.length !== expr.args.length) {
-          throw new Error("arity mismatch");
-        }
+        const { parameters, returnType } = this.types.checkFunc(
+          callee.type,
+          expr.args
+        );
         const args: CheckedExpr[] = [];
         for (const [i, arg] of expr.args.entries()) {
-          const argType = callee.type.parameters[i];
+          const argType = parameters[i];
           const checkedArg = this.checkExpr(arg, argType);
           this.types.unify(checkedArg.type, argType);
           args.push(checkedArg);
         }
-        return { tag: "call", callee, args, type: callee.type.returnType };
+        return { tag: "call", callee, args, type: returnType };
       }
       case "field": {
         const checkedExpr = this.checkExpr(expr.expr, null);
-        switch (checkedExpr.type.tag) {
-          case "struct": {
-            const typeField = getField(checkedExpr.type, expr.fieldName);
+        const typeField = this.types.getField(checkedExpr.type, expr.fieldName);
 
-            return {
-              tag: "field",
-              index: typeField.index,
-              expr: checkedExpr,
-              type: typeField.type,
-            };
-          }
-          default:
-            throw new Error("value does not have irrefutable fields");
-        }
+        return {
+          tag: "field",
+          index: typeField.index,
+          expr: checkedExpr,
+          type: typeField.type,
+        };
       }
       case "do": {
         const { block, type } = this.checkBlock(expr.block);
@@ -343,9 +331,7 @@ class TypeChecker {
       case "match": {
         let resultType: Type | null = null;
         const predicate = this.checkExpr(expr.expr, null);
-        if (predicate.type.tag !== "enum") {
-          throw new Error("can only pattern match with enums");
-        }
+        const predicateType = this.types.checkEnum(predicate.type);
 
         const res: CheckedExpr = {
           tag: "match",
@@ -357,7 +343,7 @@ class TypeChecker {
         for (const matchCase of expr.cases) {
           // TODO: actually use bindings and not just tag
           const tag = matchCase.binding.value;
-          const typeCase = predicate.type.cases.get(tag);
+          const typeCase = predicateType.cases.get(tag);
 
           if (!typeCase) {
             throw new Error("unknown tag");
@@ -369,7 +355,7 @@ class TypeChecker {
           this.scope = this.scope.push();
           const bindings = zipFields(
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            predicate.type.cases.get(tag)!.fields,
+            predicateType.cases.get(tag)!.fields,
             matchCase.binding.fields,
             (typeField, bindingField, i) => ({
               binding: this.initScopeBinding(
@@ -395,7 +381,7 @@ class TypeChecker {
           throw new Error("invalid match");
         }
 
-        if (res.cases.size !== predicate.type.cases.size) {
+        if (res.cases.size !== predicateType.cases.size) {
           throw new Error("incomplete match");
         }
 
@@ -413,7 +399,7 @@ class TypeChecker {
       case "struct": {
         const fields: CheckedStructFieldBinding[] = [];
         for (const bindingField of binding.fields) {
-          const typeField = getField(type, bindingField.fieldName);
+          const typeField = this.types.getField(type, bindingField.fieldName);
           const checkedField = this.initScopeBinding(
             bindingField.binding,
             typeField.type
@@ -477,10 +463,10 @@ class TypeChecker {
   }
 
   private checkNumber(type: Type) {
-    if (type.tag !== "float" && type.tag !== "integer") {
-      throw new Error("type mismatch");
+    if (type === integerType || type === floatType) {
+      return type;
     }
-    return type;
+    throw new Error("type mismatch");
   }
 
   private arithmeticOp(
@@ -503,14 +489,6 @@ class TypeChecker {
   }
 }
 
-function getField(type: Type, fieldName: string) {
-  if (type.tag !== "struct") {
-    throw new Error("can only destructure structs");
-  }
-  const typeField = type.fields.get(fieldName);
-  if (!typeField) throw new Error("invalid field");
-  return typeField;
-}
 function zipFields<TypeField, ValueField extends { fieldName: string }, U>(
   typeFields: Map<string, TypeField>,
   valueFields: ValueField[],
