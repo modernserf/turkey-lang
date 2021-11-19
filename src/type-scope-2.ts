@@ -51,18 +51,34 @@ export class TypeScope {
     this.types.init(binding.value, this.checkTypeExpr(expr));
   }
   enumType(binding: TypeBinding, cases: EnumCase[]): void {
-    const type: Type = {
-      tag: "enum",
-      value: Symbol(binding.value),
-      cases: new Map(),
-    };
+    const type = this.withScope(() => {
+      const type: Type = {
+        tag: "enum",
+        value: Symbol(binding.value),
+        parameters: [],
+        cases: new Map(),
+      };
+      this.types.init(binding.value, type);
+      for (const typeParam of binding.typeParameters) {
+        const param: Type = {
+          tag: "var",
+          value: Symbol(typeParam.value),
+        };
+        type.parameters.push(param);
+        this.types.init(typeParam.value, param);
+      }
+
+      for (const [i, enumCase] of cases.entries()) {
+        type.cases.set(enumCase.tagName, {
+          index: i,
+          fields: this.buildFields(enumCase.fields),
+        });
+      }
+      return type;
+    });
     this.types.init(binding.value, type);
     for (const [i, enumCase] of cases.entries()) {
       this.typeConstructors.init(enumCase.tagName, { type, value: i });
-      type.cases.set(enumCase.tagName, {
-        index: i,
-        fields: this.buildFields(enumCase.fields),
-      });
     }
   }
   structType(binding: TypeBinding, fields: StructFieldType[]): void {
@@ -119,6 +135,22 @@ export class TypeScope {
         return {
           index: value.index,
           type: this.deref(value.type),
+        };
+      }),
+    };
+  }
+  enumValue(type: Type & { tag: "enum" }): Type {
+    return {
+      tag: "enum",
+      value: type.value,
+      parameters: type.parameters.map((param) => this.deref(param)),
+      cases: mapMap(type.cases, (value) => {
+        return {
+          index: value.index,
+          fields: mapMap(value.fields, (field) => ({
+            index: field.index,
+            type: this.deref(field.type),
+          })),
         };
       }),
     };

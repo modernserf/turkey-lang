@@ -124,6 +124,7 @@ export type Type =
   | {
       tag: "enum";
       value: symbol;
+      parameters: Type[];
       cases: Map<
         string,
         {

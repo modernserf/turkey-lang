@@ -753,3 +753,70 @@ it("has generic struct params", () => {
   `;
   expect(run(code)).toEqual(["1", "hello"]);
 });
+
+it("has generic enum params", () => {
+  const code = `
+    enum List<T> {
+      Nil,
+      Cons(T, List<T>),
+    }
+
+    func length<T>(list: List<T>): Int {
+      match (list) {
+        Nil => 0,
+        Cons(h, t) => 1 + length(t),
+      }
+    }
+
+    let list1 = Cons(1, Cons(2, Cons(3, Nil)))
+    let list2 = Cons("foo", Cons("bar", Nil))
+    print(length(list1))
+    print(length(list2))
+  `;
+  expect(run(code)).toEqual(["3", "2"]);
+});
+
+it("unifies types across if branches", () => {
+  const code = `
+    enum Either<L, R> {
+      Left(L),
+      Right(R),
+    }
+
+    let res = if (True) {
+      Left(1)
+    } else {
+      Right("foo")
+    }
+
+    match (res) {
+      Left(x) => print("left"),
+      Right(x) => print("right"),
+    }
+  `;
+  expect(run(code)).toEqual(["left"]);
+});
+
+it("allows unbound & unused type parameters", () => {
+  const code = `
+    enum Either<L, R> {
+      Left(L),
+      Right(R),
+    }
+
+    let res = Left(1)
+
+    func print_left_int<T>(x: Either<Int, T>): Void {
+      match (res) {
+        Left(x) => {
+          print("left")
+        },
+        Right(x) => {},
+      }
+    }
+
+    print_left_int(res)
+`;
+
+  expect(run(code)).toEqual(["left"]);
+});

@@ -21,6 +21,7 @@ const stringType: Type = { tag: "primitive", value: Symbol("string") };
 const boolType: Type = {
   tag: "enum",
   value: Symbol("Boolean"),
+  parameters: [],
   cases: new Map([
     ["False", { index: 0, fields: new Map() }],
     ["True", { index: 1, fields: new Map() }],
@@ -185,17 +186,28 @@ class TypeChecker {
         const { value, type } = this.types.getConstructor(expr.value);
         switch (type.tag) {
           case "enum": {
-            const fields = zipFields(
-              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-              type.cases.get(expr.value)!.fields,
-              expr.fields,
-              (typeField, exprField) => {
-                const checked = this.checkExpr(exprField.expr, typeField.type);
-                this.types.unify(typeField.type, checked.type);
-                return checked;
-              }
-            );
-            return { tag: "enum", index: value, fields, type };
+            return this.types.withScope(() => {
+              const fields = zipFields(
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                type.cases.get(expr.value)!.fields,
+                expr.fields,
+                (typeField, exprField) => {
+                  const checked = this.checkExpr(
+                    exprField.expr,
+                    typeField.type
+                  );
+                  this.types.unify(typeField.type, checked.type);
+                  checked.type = this.types.unify(typeField.type, checked.type);
+                  return checked;
+                }
+              );
+              return {
+                tag: "enum",
+                index: value,
+                fields,
+                type: this.types.enumValue(type),
+              };
+            });
           }
           case "struct": {
             return this.types.withScope(() => {
