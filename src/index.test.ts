@@ -850,3 +850,33 @@ it("has methods without arguments", () => {
   const code = `"foo".print`;
   expect(run(code)).toEqual(["foo"]);
 });
+
+it("has tuple literals", () => {
+  const code = `
+    let (x, y) = (1, "foo")
+    print(x)
+    print(y) 
+  `;
+  expect(run(code)).toEqual(["1", "foo"]);
+});
+
+it("has tuple type literals", () => {
+  const code = `
+    let pair: (Int, String) = (1, "foo")
+    print(pair:0)
+    print(pair:1) 
+  `;
+  expect(run(code)).toEqual(["1", "foo"]);
+});
+
+it.skip("_has tuple type literals", () => {
+  const code = `
+    struct Pair<T, U> { left: T, right: U }
+
+    func print_left<T, U> (pair: Pair<T, U>): Void {
+      print(pair:left)
+    }
+    print_left(Pair { left: T, right: U })
+  `;
+  expect(run(code)).toEqual(["1"]);
+});

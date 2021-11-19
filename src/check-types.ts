@@ -162,6 +162,27 @@ class TypeChecker {
         return { tag: "primitive", value: expr.value, type: floatType };
       case "string":
         return { tag: "string", value: expr.value, type: stringType };
+      case "tuple": {
+        const type = this.types.getTuple(expr.fields.length);
+        return this.types.withScope(() => {
+          const fields = zipFields(
+            type.fields,
+            expr.fields,
+            (typeField, exprField) => {
+              const checked = this.checkExpr(exprField.expr, typeField.type);
+              checked.type = this.types.unify(typeField.type, checked.type);
+              return checked;
+            }
+          );
+
+          return {
+            tag: "struct",
+            value: fields,
+            type: this.types.structValue(type),
+          };
+        });
+      }
+
       case "closure": {
         const type = this.types.checkFunc(forwardType, expr.parameters);
         const rawParams = type.parameters.map((type, i) => ({

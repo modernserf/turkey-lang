@@ -189,8 +189,20 @@ const parseBaseExpr: Parser<Expr | null> = (state) => {
     case "(": {
       state.advance();
       const expr = matchExpr(state);
-      match(state, ")");
-      return expr;
+      if (check(state, ",")) {
+        const rest = commaList(state, checkExpr);
+        match(state, ")");
+        return {
+          tag: "tuple",
+          fields: [expr, ...rest].map((expr, i) => ({
+            fieldName: String(i),
+            expr,
+          })),
+        };
+      } else {
+        match(state, ")");
+        return expr;
+      }
     }
     case "typeIdentifier": {
       state.advance();
@@ -345,6 +357,12 @@ const checkType: Parser<TypeExpr | null> = (state) => {
       state.advance();
       const typeArgs = matchTypeArgs(state);
       return { tag: "identifier", value: token.value, typeArgs };
+    }
+    case "(": {
+      state.advance();
+      const typeArgs = commaList(state, checkType);
+      match(state, ")");
+      return { tag: "tuple", typeArgs };
     }
     case "func": {
       state.advance();

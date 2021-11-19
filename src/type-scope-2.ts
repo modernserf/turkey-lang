@@ -32,10 +32,38 @@ export class TypeMismatchError extends Error {
   }
 }
 
+type StructType = Type & { tag: "struct" };
+
+class TupleState {
+  private tuples: Map<number, StructType> = new Map();
+  get(size: number): StructType {
+    const val = this.tuples.get(size);
+    if (val) return val;
+    const type = this.makeTupleType(size);
+    this.tuples.set(size, type);
+    return type;
+  }
+  private makeTupleType(size: number): StructType {
+    const parameters: Type[] = Array(size)
+      .fill(null)
+      .map((_, i) => ({ tag: "var", value: Symbol(i) }));
+
+    return {
+      tag: "struct",
+      value: Symbol(`tuple ${size}`),
+      parameters,
+      fields: new Map(
+        parameters.map((type, index) => [String(index), { type, index }])
+      ),
+    };
+  }
+}
+
 export class TypeScope {
   private types: Scope<string, Type>;
   private typeConstructors: Scope<string, TypeConstructor>;
   private vars: Scope<symbol, Type> = new Scope();
+  private tuples = new TupleState();
   constructor(
     builtInTypes: Scope<string, Type>,
     builtInTypeConstructors: Scope<string, TypeConstructor>
@@ -45,6 +73,9 @@ export class TypeScope {
   }
   getConstructor(name: string): TypeConstructor {
     return this.typeConstructors.get(name);
+  }
+  getTuple(size: number): StructType {
+    return this.tuples.get(size);
   }
   // create & store types
   alias(binding: TypeBinding, expr: TypeExpr): void {
@@ -302,6 +333,20 @@ export class TypeScope {
     switch (type.tag) {
       case "identifier":
         return this.types.get(type.value);
+      case "tuple": {
+        const baseType = this.tuples.get(type.typeArgs.length);
+        const parameters = type.typeArgs.map((type) =>
+          this.checkTypeExpr(type)
+        );
+        return {
+          tag: "struct",
+          value: baseType.value,
+          parameters,
+          fields: new Map(
+            parameters.map((type, index) => [String(index), { type, index }])
+          ),
+        };
+      }
       case "func":
         return {
           tag: "func",

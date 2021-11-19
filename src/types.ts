@@ -76,6 +76,7 @@ export type StructFieldBinding = { fieldName: string; binding: Binding };
 export type Expr =
   | { tag: "identifier"; value: string }
   | { tag: "typeConstructor"; value: string; fields: StructFieldValue[] }
+  | { tag: "tuple"; fields: StructFieldValue[] }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "string"; value: string }
@@ -103,6 +104,7 @@ export type Binding =
 
 export type TypeExpr =
   | { tag: "identifier"; value: string; typeArgs: TypeExpr[] }
+  | { tag: "tuple"; typeArgs: TypeExpr[] }
   | {
       tag: "func";
       typeParameters: TypeParam[];
