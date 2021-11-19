@@ -164,6 +164,19 @@ const parsePostfixExpr: Parser<Expr | null> = (state) => {
         expr = { tag: "field", expr, fieldName };
         break;
       }
+      case ".": {
+        state.advance();
+        const ident = match(state, "identifier");
+        const target: Expr = { tag: "identifier", value: ident.value };
+        if (check(state, "(")) {
+          const args = commaList(state, checkExpr);
+          match(state, ")");
+          expr = { tag: "call", expr: target, args: [expr, ...args] };
+        } else {
+          expr = { tag: "call", expr: target, args: [expr] };
+        }
+        break;
+      }
       default:
         return expr;
     }

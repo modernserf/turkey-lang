@@ -276,8 +276,7 @@ export class TypeScope {
   }
   private deref(type: Type, visited = new Set<symbol>()): Type {
     if (type.tag !== "var") return type;
-    // istanbul ignore next
-    if (visited.has(type.value)) throw new Error("infinte loop in type var");
+    if (visited.has(type.value)) return type;
     visited.add(type.value);
     if (this.vars.has(type.value)) {
       return this.deref(this.vars.get(type.value), visited);

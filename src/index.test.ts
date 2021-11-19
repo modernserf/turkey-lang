@@ -820,3 +820,33 @@ it("allows unbound & unused type parameters", () => {
 
   expect(run(code)).toEqual(["left"]);
 });
+
+it("has method syntax", () => {
+  const code = `
+    enum List<T> {
+      Nil,
+      Cons(T, List<T>),
+    }
+
+    func foldl<Item, Acc> (
+      list: List<Item>,
+      acc: Acc,
+      fn: func (Acc, Item): Acc
+    ): Acc {
+      match (list) {
+        Cons(h, t) => t.foldl(fn(acc, h), fn),
+        Nil => acc,
+      }
+    }
+
+    let list = Cons(1, Cons(2, Cons(3, Nil)))
+    let sum = list.foldl(0, |acc, value| { acc + value })
+    print(sum)
+  `;
+  expect(run(code)).toEqual(["6"]);
+});
+
+it("has methods without arguments", () => {
+  const code = `"foo".print`;
+  expect(run(code)).toEqual(["foo"]);
+});

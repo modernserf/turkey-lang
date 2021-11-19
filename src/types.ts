@@ -38,6 +38,8 @@ export type Token =
   | { tag: ":" }
   | { tag: "," }
   | { tag: "|" }
+  | { tag: "." }
+  | { tag: "error"; value: string }
   | { tag: "endOfInput" };
 
 // parser -> typechecker
