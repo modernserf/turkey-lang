@@ -305,21 +305,47 @@ export class TypeScope {
 
     return fieldsResult;
   }
-  private deref(type: Type, visited = new Set<symbol>()): Type {
-    if (type.tag !== "var") return type;
-    if (visited.has(type.value)) return type;
-    visited.add(type.value);
-    if (this.vars.has(type.value)) {
-      return this.deref(this.vars.get(type.value), visited);
-    }
-    return type;
-  }
   private initParams(typeParameters: TypeParam[]) {
     for (const typeParam of typeParameters) {
       this.types.init(typeParam.value, {
         tag: "var",
         value: Symbol(typeParam.value),
       });
+    }
+  }
+  private deref(type: Type, visited = new Set<symbol>()): Type {
+    switch (type.tag) {
+      case "var": {
+        if (visited.has(type.value)) return type;
+        visited.add(type.value);
+        if (this.vars.has(type.value)) {
+          return this.deref(this.vars.get(type.value), visited);
+        } else {
+          return type;
+        }
+      }
+      case "primitive":
+        return type;
+      case "func":
+        return {
+          tag: "func",
+          parameters: type.parameters.map((type) => this.deref(type, visited)),
+          returnType: this.deref(type.returnType),
+        };
+      case "struct":
+        return {
+          tag: "struct",
+          value: type.value,
+          parameters: type.parameters.map((type) => this.deref(type, visited)),
+          fields: type.fields,
+        };
+      case "enum":
+        return {
+          tag: "enum",
+          value: type.value,
+          parameters: type.parameters.map((type) => this.deref(type, visited)),
+          cases: type.cases,
+        };
     }
   }
   private unwrap(type: Type): Type {

@@ -111,7 +111,6 @@ class TypeChecker {
         const forwardType = this.types.forwardType(stmt.type);
         const expr = this.checkExpr(stmt.expr, forwardType);
         this.types.unify(expr.type, forwardType);
-
         const binding = this.initScopeBinding(stmt.binding, expr.type);
         return { tag: "let", binding, expr };
       }
@@ -244,11 +243,11 @@ class TypeChecker {
                   return checked;
                 }
               );
-
+              const structType = this.types.structValue(type);
               return {
                 tag: "struct",
                 value: fields,
-                type: this.types.structValue(type),
+                type: structType,
               };
             });
           }
@@ -366,7 +365,6 @@ class TypeChecker {
           checkedExpr.type,
           expr.fieldName
         );
-
         return {
           tag: "field",
           index: typeField.index,

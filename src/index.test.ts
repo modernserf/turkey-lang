@@ -754,6 +754,22 @@ it("has generic struct params", () => {
   expect(run(code)).toEqual(["1", "hello"]);
 });
 
+it.skip("propagates generic args", () => {
+  const code = `
+    struct Cell<T> { 
+      current: T 
+    }
+
+    func current<T> (cell: Cell<T>): T {
+      cell:current
+    }
+    
+    let x = current(Cell { current: 1 })
+    print(x)
+  `;
+  expect(run(code)).toEqual(["ok", "1"]);
+});
+
 it("has generic enum params", () => {
   const code = `
     enum List<T> {
@@ -867,16 +883,4 @@ it("has tuple type literals", () => {
     print(pair:1) 
   `;
   expect(run(code)).toEqual(["1", "foo"]);
-});
-
-it.skip("_has tuple type literals", () => {
-  const code = `
-    struct Pair<T, U> { left: T, right: U }
-
-    func print_left<T, U> (pair: Pair<T, U>): Void {
-      print(pair:left)
-    }
-    print_left(Pair { left: T, right: U })
-  `;
-  expect(run(code)).toEqual(["1"]);
 });
