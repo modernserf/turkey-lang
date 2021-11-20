@@ -17,15 +17,15 @@ export class TypeMismatchError extends Error {
   }
 }
 
-export class TypeCheckerInner {
+export class TypeChecker {
   private scope: Scope<symbol, Type> = new Scope();
-  createVar(name: symbol, traits: Trait[]): Type {
+  static createVar(name: symbol, traits: Trait[]): Type {
     return { tag: "var", name, traits };
   }
-  createTrait(name: symbol, parameters: Type[]): Trait {
+  static createTrait(name: symbol, parameters: Type[]): Trait {
     return { tag: "trait", name, parameters };
   }
-  createValue(
+  static createValue(
     name: symbol,
     matchTypes: Type[],
     allTypes: Type[],
@@ -35,7 +35,7 @@ export class TypeCheckerInner {
   }
   createRec(traits: Trait[], fn: (value: Type, traits: Trait[]) => Type): Type {
     return this.inScope(() => {
-      const rec = this.createVar(Symbol("rec"), traits);
+      const rec = TypeChecker.createVar(Symbol("rec"), traits);
       this.unify(rec, fn(rec, traits));
       return this.resolve(rec);
     });
@@ -53,25 +53,26 @@ export class TypeCheckerInner {
       return this.resolve(fieldType);
     });
   }
-  getAll(target: Type, type: symbol, fields: Type[], error: string): Type[] {
+  getAllMatchTypes(
+    target: Type,
+    type: symbol,
+    fields: Type[],
+    error: string
+  ): Type[] {
     return this.inScope(() => {
       target = this.checkValueType(target, type, error);
       this.unifyList(target.matchTypes, fields);
       return fields.map((type) => this.resolve(type));
     });
   }
-  private checkValueType(
-    type: Type,
-    typeName: symbol,
-    error: string
-  ): ValueType {
+  checkValueType(type: Type, typeName: symbol, error: string): ValueType {
     type = this.deref(type);
     if (type.tag === "var" || type.name !== typeName) {
       throw new Error(error);
     }
     return type;
   }
-  private inScope<T>(fn: () => T): T {
+  inScope<T>(fn: () => T): T {
     this.scope = this.scope.push();
     try {
       return fn();
@@ -79,12 +80,12 @@ export class TypeCheckerInner {
       this.scope = this.scope.pop();
     }
   }
-  private unifyList(left: Type[], right: Type[]): void {
+  unifyList(left: Type[], right: Type[]): void {
     for (let i = 0; i < left.length; i++) {
       this.unify(left[i], right[i]);
     }
   }
-  private unify(left: Type, right: Type): void {
+  unify(left: Type, right: Type): void {
     left = this.deref(left);
     right = this.deref(right);
     if (left.tag === "var") {
@@ -110,7 +111,7 @@ export class TypeCheckerInner {
       }
     }
   }
-  private resolve(type: Type, visited = new Map<Type, Type>()): Type {
+  resolve(type: Type, visited = new Map<Type, Type>()): Type {
     type = this.deref(type);
     if (type.tag === "var") return type;
     const prev = visited.get(type);

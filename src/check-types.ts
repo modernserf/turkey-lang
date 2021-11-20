@@ -61,7 +61,7 @@ class VarScope {
 
 class TypeChecker {
   scope = new VarScope();
-  private currentFunc = new CurrentFuncState();
+  private currentFunc = new CurrentFuncState<Type>();
   private types = new TypeScope(builtInTypes, builtInTypeConstructors);
   static check(program: Stmt[]): CheckedStmt[] {
     return new TypeChecker().checkBlock(program).block;
@@ -491,7 +491,7 @@ class TypeChecker {
     parameters: Array<{ binding: Binding; type: Type }>,
     returnType: Type,
     rawBlock: Stmt[]
-  ): FuncFields {
+  ): FuncFields<Type> {
     const res = this.withScope((outerScope) => {
       return this.currentFunc.withFunc(returnType, outerScope, () => {
         // add parameters to scope

@@ -1,4 +1,9 @@
-import { TypeCheckerInner, Type, ValueType, Trait } from "./type-scope-3";
+import {
+  TypeChecker as TypeCheckerInner,
+  Type,
+  ValueType,
+  Trait,
+} from "./type-scope-3";
 
 class ArityName {
   private map: Map<number, symbol> = new Map();
@@ -16,16 +21,16 @@ export class TypeChecker {
   private funcs = new ArityName();
   private tuples = new ArityName();
   createVar(name: string, traits: Trait[] = []): Type {
-    return this.checker.createVar(Symbol(name), traits);
+    return TypeCheckerInner.createVar(Symbol(name), traits);
   }
   createTrait(name: string): Trait {
-    return this.checker.createTrait(Symbol(name), []);
+    return TypeCheckerInner.createTrait(Symbol(name), []);
   }
   createRec(fn: (value: Type) => Type): Type {
     return this.checker.createRec([], fn);
   }
   createFunc(parameters: Type[], returnType: Type): Type {
-    return this.checker.createValue(
+    return TypeCheckerInner.createValue(
       this.funcs.use(parameters.length),
       [returnType, ...parameters],
       [],
@@ -33,7 +38,7 @@ export class TypeChecker {
     );
   }
   createTuple(fields: Type[]): Type {
-    return this.checker.createValue(
+    return TypeCheckerInner.createValue(
       this.tuples.use(fields.length),
       fields,
       [],
@@ -41,7 +46,7 @@ export class TypeChecker {
     );
   }
   createPrimitive(name: string, traits: Trait[] = []): ValueType {
-    return this.checker.createValue(Symbol(name), [], [], traits);
+    return TypeCheckerInner.createValue(Symbol(name), [], [], traits);
   }
   createStruct(
     name: string | symbol,
@@ -49,10 +54,10 @@ export class TypeChecker {
     fields: Type[]
   ): ValueType {
     const sym = typeof name === "symbol" ? name : Symbol(name);
-    return this.checker.createValue(sym, typeParameters, fields, []);
+    return TypeCheckerInner.createValue(sym, typeParameters, fields, []);
   }
   callFunc(callee: Type, args: Type[], returnType: Type): Type {
-    return this.checker.getAll(
+    return this.checker.getAllMatchTypes(
       callee,
       this.funcs.use(args.length),
       [returnType, ...args],
@@ -60,7 +65,7 @@ export class TypeChecker {
     )[0];
   }
   unpackTuple(tuple: Type, expectedResult: Type[]): Type[] {
-    return this.checker.getAll(
+    return this.checker.getAllMatchTypes(
       tuple,
       this.tuples.use(expectedResult.length),
       expectedResult,
