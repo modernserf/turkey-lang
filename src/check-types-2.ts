@@ -13,6 +13,7 @@ import {
   CheckedStmt,
   CheckedBinding,
   Opcode,
+  TypeParam,
 } from "./types";
 import { noMatch } from "./utils";
 
@@ -31,7 +32,7 @@ const boolType = primitive("Bool", eqTrait);
 
 type TypeConstructor =
   | { tag: "struct"; type: ValueType }
-  | { tag: "enum"; type: ValueType; value: number };
+  | { tag: "enum"; type: ValueType; index: number };
 
 class ArityName {
   private map: Map<number, symbol> = new Map();
@@ -77,11 +78,11 @@ export class Thing {
       .init("String", stringType)
       .init("Bool", boolType);
     this.typeConstructors
-      .init("False", { tag: "enum", type: boolType, value: 0 })
+      .init("False", { tag: "enum", type: boolType, index: 0 })
       .init("True", {
         tag: "enum",
         type: boolType,
-        value: 1,
+        index: 1,
       });
   }
   private checkBlock(block: Stmt[]): { block: CheckedStmt[]; type: Type } {
@@ -107,10 +108,64 @@ export class Thing {
 
   private checkStmt(stmt: Stmt): CheckedStmt | null {
     switch (stmt.tag) {
-      case "type":
-      case "struct":
-      case "enum":
-        throw new Error("todo type defs");
+      case "type": {
+        if (stmt.binding.typeParameters.length) {
+          throw new Error("todo: type params");
+        }
+        const resolvedType = this.checker.createRec([], (type) => {
+          this.types.init(stmt.binding.value, type);
+          return this.checkTypeExpr(stmt.type);
+        });
+        this.types.set(stmt.binding.value, resolvedType);
+        return null;
+      }
+      case "enum": {
+        if (stmt.binding.typeParameters.length) {
+          throw new Error("todo: type params");
+        }
+        const type = TypeChecker.createValue(
+          Symbol(stmt.binding.value),
+          [],
+          [],
+          [eqTrait]
+        );
+        this.types.init(stmt.binding.value, type);
+        for (const [i, enumCase] of stmt.cases.entries()) {
+          this.typeConstructors.init(enumCase.tagName, {
+            tag: "enum",
+            type,
+            index: i,
+          });
+        }
+        return null;
+      }
+      case "struct": {
+        if (stmt.binding.typeParameters.length) {
+          throw new Error("todo: type params");
+        }
+        const fields = stmt.fields.map((field) => ({
+          fieldName: field.fieldName,
+          type: this.checkTypeExpr(field.type),
+        }));
+        const type = TypeChecker.createValue(
+          Symbol(stmt.binding.value),
+          [],
+          fields.map((field) => field.type),
+          []
+        );
+        this.types.init(stmt.binding.value, type);
+        const fieldsMap = new Scope<string, FieldInfo>();
+        for (const [i, field] of fields.entries()) {
+          fieldsMap.init(field.fieldName, { typeIndex: i, compileIndex: i });
+        }
+        this.structFields.init(type.name, fieldsMap);
+        this.typeConstructors.init(stmt.binding.value, {
+          tag: "struct",
+          type,
+        });
+
+        return null;
+      }
       case "expr": {
         const expr = this.checkExpr(stmt.expr, null);
         return {
@@ -153,25 +208,10 @@ export class Thing {
         return { tag: "while", expr: predicate, block };
       }
       case "func": {
-        const matchTypes = this.inScope(() => {
-          for (const typeParam of stmt.typeParameters) {
-            this.types.init(
-              typeParam.value,
-              TypeChecker.createVar(Symbol(typeParam.value), [])
-            );
-          }
-          const parameters = stmt.parameters.map(({ type }) =>
-            this.checkTypeExpr(type)
-          );
-          const returnType = this.checkTypeExpr(stmt.returnType);
-          return [returnType, ...parameters];
-        });
-
-        const type = TypeChecker.createValue(
-          this.funcTypes.use(stmt.parameters.length),
-          matchTypes,
-          [],
-          []
+        const type = this.funcType(
+          stmt.typeParameters,
+          stmt.parameters.map((p) => p.type),
+          stmt.returnType
         );
         this.vars.init(stmt.name, type);
 
@@ -228,7 +268,7 @@ export class Thing {
           [],
           []
         );
-        return { tag: "struct", type, value: fields };
+        return { tag: "struct", type, fields: fields };
       }
       case "do": {
         const { block, type } = this.checkBlock(expr.block);
@@ -255,10 +295,30 @@ export class Thing {
 
         return { tag: "if", cases, elseBlock, type };
       }
+      case "closure": {
+        if (!forwardType) throw new Error("closure needs forward type");
+        const type = this.checker.inScope(() => {
+          const resolved = this.checker.resolve(forwardType);
+          if (resolved.name !== this.funcTypes.use(expr.parameters.length)) {
+            throw new Error("not a func");
+          }
+          return resolved as ValueType;
+        });
 
-      case "closure":
+        const params = expr.parameters.map((binding, i) => ({
+          type: type.matchTypes[i + 1],
+          binding,
+        }));
+        const returnType = type.matchTypes[0];
+
+        return {
+          tag: "closure",
+          type,
+          ...this.checkFunc(params, returnType, expr.block),
+        };
+      }
       case "match":
-        throw new Error("TODO: blocks");
+        throw new Error("TODO: enums");
       case "field": {
         const target = this.checkExpr(expr.expr, null);
         // TODO: handle field info in type-scope?
@@ -332,13 +392,37 @@ export class Thing {
         });
       }
       case "typeConstructor": {
-        switch (expr.value) {
-          case "False":
-            return { tag: "enum", type: boolType, index: 0, fields: [] };
-          case "True":
-            return { tag: "enum", type: boolType, index: 1, fields: [] };
+        const constructor = this.typeConstructors.get(expr.value);
+        switch (constructor.tag) {
+          case "enum":
+            if (expr.fields.length) throw new Error("todo fields");
+            return { ...constructor, fields: [] };
+          case "struct":
+            return this.checker.inScope(() => {
+              const fieldsMap = this.structFields.get(constructor.type.name);
+              const fields: CheckedExpr[] = Array(
+                constructor.type.allTypes.length
+              ).fill(undefined);
+              for (const field of expr.fields) {
+                const info = fieldsMap.get(field.fieldName);
+                const expectedType = constructor.type.allTypes[info.typeIndex];
+                const fieldExpr = this.checkExpr(field.expr, expectedType);
+                this.checker.unify(fieldExpr.type, expectedType);
+                fieldExpr.type = this.checker.resolve(fieldExpr.type);
+                if (fields[info.compileIndex]) {
+                  throw new Error("duplicate field");
+                }
+                fields[info.compileIndex] = fieldExpr;
+              }
+              if (fields.some((f) => !f)) {
+                throw new Error("missing field");
+              }
+              return { ...constructor, fields };
+            });
+
+          // istanbul ignore next
           default:
-            throw new Error("TODO: type constructors");
+            return noMatch(constructor);
         }
       }
       case "unaryOp": {
@@ -464,8 +548,14 @@ export class Thing {
     switch (type.tag) {
       case "identifier":
         return this.types.get(type.value);
-      case "tuple":
       case "func":
+        return this.funcType(
+          type.typeParameters,
+          type.parameters,
+          type.returnType
+        );
+
+      case "tuple":
         throw new Error("not yet implemented");
     }
   }
@@ -480,6 +570,30 @@ export class Thing {
       this.types = this.types.pop();
       this.vars = this.vars.pop();
     }
+  }
+  private funcType(
+    typeParameters: TypeParam[],
+    parameters: TypeExpr[],
+    returnType: TypeExpr
+  ) {
+    const matchTypes = this.inScope(() => {
+      for (const typeParam of typeParameters) {
+        this.types.init(
+          typeParam.value,
+          TypeChecker.createVar(Symbol(typeParam.value), [])
+        );
+      }
+      const checkedParams = parameters.map((type) => this.checkTypeExpr(type));
+      const checkedReturnType = this.checkTypeExpr(returnType);
+      return [checkedReturnType, ...checkedParams];
+    });
+
+    return TypeChecker.createValue(
+      this.funcTypes.use(parameters.length),
+      matchTypes,
+      [],
+      []
+    );
   }
   private checkFunc(
     parameters: Array<{ binding: Binding; type: Type }>,

@@ -272,8 +272,8 @@ class Compiler {
         }
         return;
       case "struct":
-        this.asm.newObject(expr.value.length);
-        for (const [i, value] of expr.value.entries()) {
+        this.asm.newObject(expr.fields.length);
+        for (const [i, value] of expr.fields.entries()) {
           this.asm.dup();
           this.compileExpr(value);
           this.asm.setHeap(i);
