@@ -469,15 +469,14 @@ class TypeChecker {
         this.scope.init(binding.value, type);
         return binding;
       case "struct": {
-        const fields: CheckedStructFieldBinding[] = [];
-        for (const bindingField of binding.fields) {
+        const fields = binding.fields.map((bindingField) => {
           const typeField = this.types.checkField(type, bindingField.fieldName);
           const checkedField = this.initScopeBinding(
             bindingField.binding,
             typeField.type
           );
-          fields.push({ fieldIndex: typeField.index, binding: checkedField });
-        }
+          return { fieldIndex: typeField.index, binding: checkedField };
+        });
 
         return { tag: "struct", fields };
       }

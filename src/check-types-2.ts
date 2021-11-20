@@ -321,21 +321,12 @@ export class Thing {
         throw new Error("TODO: enums");
       case "field": {
         const target = this.checkExpr(expr.expr, null);
-        // TODO: handle field info in type-scope?
-        const fieldInfo = this.getFieldInfo(target.type, expr.fieldName);
-        const type = this.checker.getField(
+        const { type, index } = this.checkField(
           target.type,
-          target.type.name,
-          fieldInfo.typeIndex,
-          forwardType || TypeChecker.createVar(Symbol(), []),
-          "cannot get field"
+          expr.fieldName,
+          forwardType
         );
-        return {
-          tag: "field",
-          type,
-          index: fieldInfo.compileIndex,
-          expr: target,
-        };
+        return { tag: "field", type, index, expr: target };
       }
       case "call": {
         if (expr.expr.tag === "identifier" && expr.expr.value === "print") {
@@ -540,8 +531,18 @@ export class Thing {
       case "identifier":
         this.vars.init(binding.value, type);
         return binding;
-      case "struct":
-        throw new Error("not yet implemented");
+      case "struct": {
+        const fields = binding.fields.map((bindingField) => {
+          // TODO: is there a reasonable forwardType for this?
+          const typeField = this.checkField(type, bindingField.fieldName, null);
+          const checkedField = this.initScopeBinding(
+            bindingField.binding,
+            typeField.type
+          );
+          return { fieldIndex: typeField.index, binding: checkedField };
+        });
+        return { tag: "struct", fields };
+      }
     }
   }
   private checkTypeExpr(type: TypeExpr): Type {
@@ -594,6 +595,21 @@ export class Thing {
       [],
       []
     );
+  }
+  private checkField(
+    targetType: Type,
+    fieldName: string,
+    forwardType: Type | null
+  ) {
+    const fieldInfo = this.getFieldInfo(targetType, fieldName);
+    const type = this.checker.getField(
+      targetType,
+      targetType.name,
+      fieldInfo.typeIndex,
+      forwardType || TypeChecker.createVar(Symbol(), []),
+      "cannot get field"
+    );
+    return { type, index: fieldInfo.compileIndex };
   }
   private checkFunc(
     parameters: Array<{ binding: Binding; type: Type }>,
