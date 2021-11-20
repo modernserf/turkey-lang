@@ -1,4 +1,4 @@
-import { TypeCheckerInner, Type, ValueType } from "./type-scope-3";
+import { TypeCheckerInner, Type, ValueType, Trait } from "./type-scope-3";
 
 class ArityName {
   private map: Map<number, symbol> = new Map();
@@ -15,24 +15,33 @@ export class TypeChecker {
   private checker = new TypeCheckerInner();
   private funcs = new ArityName();
   private tuples = new ArityName();
-  createVar(name: string): Type {
-    return this.checker.createVar(Symbol(name));
+  createVar(name: string, traits: Trait[] = []): Type {
+    return this.checker.createVar(Symbol(name), traits);
+  }
+  createTrait(name: string): Trait {
+    return this.checker.createTrait(Symbol(name), []);
   }
   createRec(fn: (value: Type) => Type): Type {
-    return this.checker.createRec(fn);
+    return this.checker.createRec([], fn);
   }
   createFunc(parameters: Type[], returnType: Type): Type {
     return this.checker.createValue(
       this.funcs.use(parameters.length),
       [returnType, ...parameters],
+      [],
       []
     );
   }
   createTuple(fields: Type[]): Type {
-    return this.checker.createValue(this.tuples.use(fields.length), fields, []);
+    return this.checker.createValue(
+      this.tuples.use(fields.length),
+      fields,
+      [],
+      []
+    );
   }
-  createPrimitive(name: string): ValueType {
-    return this.checker.createValue(Symbol(name), [], []);
+  createPrimitive(name: string, traits: Trait[] = []): ValueType {
+    return this.checker.createValue(Symbol(name), [], [], traits);
   }
   createStruct(
     name: string | symbol,
@@ -40,7 +49,7 @@ export class TypeChecker {
     fields: Type[]
   ): ValueType {
     const sym = typeof name === "symbol" ? name : Symbol(name);
-    return this.checker.createValue(sym, typeParameters, fields);
+    return this.checker.createValue(sym, typeParameters, fields, []);
   }
   callFunc(callee: Type, args: Type[], returnType: Type): Type {
     return this.checker.getAll(
@@ -370,4 +379,42 @@ it("checks parameterized recursive values", () => {
   expect(
     checker.callFunc(car, [checker.callFunc(cdr, [intList], intList)], intType)
   ).toEqual(intType);
+});
+
+it("checks traits", () => {
+  const checker = new TypeChecker();
+  const numTrait = checker.createTrait("num");
+  const printTrait = checker.createTrait("print");
+  const intType = checker.createPrimitive("int", [numTrait, printTrait]);
+  const floatType = checker.createPrimitive("float", [numTrait, printTrait]);
+  const stringType = checker.createPrimitive("string", [printTrait]);
+
+  const numType = checker.createVar("num", [numTrait]);
+  const add = checker.createFunc([numType, numType], numType);
+
+  expect(() => {
+    checker.callFunc(add, [stringType, stringType], stringType);
+  }).toThrow();
+
+  expect(
+    checker.callFunc(
+      add,
+      [intType, intType],
+      checker.createVar("a", [numTrait])
+    )
+  ).toEqual(intType);
+  expect(
+    checker.callFunc(
+      add,
+      [floatType, floatType],
+      checker.createVar("b", [numTrait])
+    )
+  ).toEqual(floatType);
+  expect(() => {
+    checker.callFunc(
+      add,
+      [intType, floatType],
+      checker.createVar("c", [numTrait])
+    );
+  }).toThrow();
 });
