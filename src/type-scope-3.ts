@@ -1,15 +1,5 @@
 import { Scope } from "./scope";
-
-export type Trait = { tag: "trait"; name: symbol; parameters: Type[] };
-
-export type ValueType = {
-  tag: "value";
-  name: symbol;
-  matchTypes: Type[];
-  allTypes: Type[];
-  traits: Trait[];
-};
-export type Type = { tag: "var"; name: symbol; traits: Trait[] } | ValueType;
+import { Type, ValueType, Trait } from "./types";
 
 export class TypeMismatchError extends Error {
   constructor(public left: Type, public right: Type) {

@@ -122,28 +122,16 @@ export type TypeParam = { tag: "identifier"; value: string };
 
 // typechecker -> compiler
 
-export type Type =
-  | { tag: "var"; value: symbol }
-  | { tag: "primitive"; value: symbol }
-  | {
-      tag: "enum";
-      value: symbol;
-      parameters: Type[];
-      cases: Map<
-        string,
-        {
-          index: number;
-          fields: Map<string, CheckedStructFieldType>;
-        }
-      >;
-    }
-  | {
-      tag: "struct";
-      value: symbol;
-      parameters: Type[];
-      fields: Map<string, CheckedStructFieldType>;
-    }
-  | { tag: "func"; parameters: Type[]; returnType: Type };
+export type Trait = { tag: "trait"; name: symbol; parameters: Type[] };
+
+export type ValueType = {
+  tag: "value";
+  name: symbol;
+  matchTypes: Type[];
+  allTypes: Type[];
+  traits: Trait[];
+};
+export type Type = { tag: "var"; name: symbol; traits: Trait[] } | ValueType;
 
 export type CheckedStructFieldType = { type: Type; index: number };
 

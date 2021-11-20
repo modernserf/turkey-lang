@@ -1,6 +1,6 @@
 import { check as checkAST } from "./check-types";
-import { parse } from "./parser";
-import { lex } from "./lexer";
+import { parse } from "../parser";
+import { lex } from "../lexer";
 
 function check(program: string) {
   return checkAST(parse(lex(program)));

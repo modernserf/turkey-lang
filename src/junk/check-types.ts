@@ -8,10 +8,10 @@ import {
   Binding,
   CheckedBinding,
   CheckedStructFieldBinding,
-} from "./types";
-import { Scope } from "./scope";
-import { noMatch } from "./utils";
-import { CurrentFuncState, FuncFields } from "./current-func";
+} from "../types";
+import { Scope } from "../scope";
+import { noMatch } from "../utils";
+import { CurrentFuncState, FuncFields } from "../current-func";
 import { TypeScope, TypeConstructor } from "./type-scope-2";
 
 const voidType: Type = { tag: "primitive", value: Symbol("void") };

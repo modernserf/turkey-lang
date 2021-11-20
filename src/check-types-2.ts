@@ -1,83 +1,33 @@
-import { CurrentFuncState } from "./current-func";
+import { CurrentFuncState, FuncFields } from "./current-func";
 import { Scope } from "./scope";
-import { Trait, Type, TypeChecker, ValueType } from "./type-scope-3";
-import { Binding, Expr, Opcode, Stmt, TypeExpr } from "./types";
+import { TypeChecker } from "./type-scope-3";
+import {
+  Binding,
+  Expr,
+  Stmt,
+  TypeExpr,
+  Trait,
+  Type,
+  ValueType,
+  CheckedExpr,
+  CheckedStmt,
+  CheckedBinding,
+  Opcode,
+} from "./types";
 import { noMatch } from "./utils";
-
-export type CheckedExpr =
-  | { tag: "primitive"; value: number; type: Type }
-  | { tag: "string"; value: string; type: Type }
-  | { tag: "enum"; index: number; fields: CheckedExpr[]; type: Type }
-  | { tag: "struct"; value: CheckedExpr[]; type: Type }
-  | { tag: "identifier"; value: string; type: Type }
-  | {
-      tag: "closure";
-      parameters: CheckedParam[];
-      upvalues: CheckedUpvalue[];
-      block: CheckedStmt[];
-      type: Type;
-    }
-  | { tag: "field"; expr: CheckedExpr; index: number; type: Type }
-  | { tag: "callBuiltIn"; opcode: Opcode; args: CheckedExpr[]; type: Type }
-  | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: Type }
-  | { tag: "do"; block: CheckedStmt[]; type: Type }
-  | {
-      tag: "if";
-      cases: Array<{ predicate: CheckedExpr; block: CheckedStmt[] }>;
-      elseBlock: CheckedStmt[];
-      type: Type;
-    }
-  | {
-      tag: "match";
-      expr: CheckedExpr;
-      cases: Map<
-        string,
-        {
-          index: number;
-          bindings: CheckedStructFieldBinding[];
-          block: CheckedStmt[];
-        }
-      >;
-      type: Type;
-    };
-
-export type CheckedStmt =
-  | { tag: "let"; binding: CheckedBinding; expr: CheckedExpr }
-  | { tag: "return"; expr: CheckedExpr | null }
-  | {
-      tag: "func";
-      name: string;
-      parameters: CheckedParam[];
-      upvalues: CheckedUpvalue[];
-      block: CheckedStmt[];
-      type: Type;
-    }
-  | { tag: "while"; expr: CheckedExpr; block: CheckedStmt[] }
-  | { tag: "expr"; expr: CheckedExpr; hasValue: boolean };
-
-export type CheckedBinding =
-  | { tag: "identifier"; value: string }
-  | { tag: "struct"; fields: CheckedStructFieldBinding[] };
-
-export type CheckedStructFieldBinding = {
-  fieldIndex: number;
-  binding: CheckedBinding;
-};
-
-export type CheckedParam = { binding: CheckedBinding; type: Type };
-export type CheckedUpvalue = { name: string; type: Type };
 
 const primitive = (name: string, ...traits: Trait[]) =>
   TypeChecker.createValue(Symbol(name), [], [], traits);
 
 const numTrait = TypeChecker.createTrait(Symbol("Num"), []);
 const debugTrait = TypeChecker.createTrait(Symbol("Debug"), []);
+const eqTrait = TypeChecker.createTrait(Symbol("Eq"), []);
 
 const voidType = primitive("Void");
-const intType = primitive("Int", numTrait, debugTrait);
-const floatType = primitive("Float", numTrait, debugTrait);
-const stringType = primitive("String", debugTrait);
-const boolType = primitive("Bool");
+const intType = primitive("Int", numTrait, debugTrait, eqTrait);
+const floatType = primitive("Float", numTrait, debugTrait, eqTrait);
+const stringType = primitive("String", debugTrait, eqTrait);
+const boolType = primitive("Bool", eqTrait);
 
 type TypeConstructor =
   | { tag: "struct"; type: ValueType }
@@ -99,6 +49,10 @@ type FieldInfo = {
   compileIndex: number;
 };
 
+export function check(program: Stmt[]): CheckedStmt[] {
+  return Thing.checkProgram(program);
+}
+
 export class Thing {
   private vars: Scope<string, Type>;
   private types: Scope<string, Type>;
@@ -108,6 +62,9 @@ export class Thing {
   private funcTypes = new ArityName();
   private tupleTypes = new ArityName();
   private structFields: Scope<symbol, Scope<string, FieldInfo>> = new Scope();
+  static checkProgram(program: Stmt[]): CheckedStmt[] {
+    return new Thing().checkBlock(program).block;
+  }
   constructor() {
     this.vars = new Scope();
     this.types = new Scope();
@@ -127,6 +84,27 @@ export class Thing {
         value: 1,
       });
   }
+  private checkBlock(block: Stmt[]): { block: CheckedStmt[]; type: Type } {
+    const checkedBlock: CheckedStmt[] = [];
+    let type: Type = voidType;
+    this.inScope(() => {
+      for (const stmt of block) {
+        const checkedStmt = this.checkStmt(stmt);
+        if (!checkedStmt) {
+          type = voidType;
+          continue;
+        }
+        checkedBlock.push(checkedStmt);
+        if (checkedStmt.tag === "expr") {
+          type = checkedStmt.expr.type;
+        } else {
+          type = voidType;
+        }
+      }
+    });
+    return { block: checkedBlock, type };
+  }
+
   private checkStmt(stmt: Stmt): CheckedStmt | null {
     switch (stmt.tag) {
       case "type":
@@ -166,10 +144,49 @@ export class Thing {
           return { tag: "return", expr };
         });
       }
-      case "func":
-      case "while":
-        throw new Error("todo: blocks");
+      case "while": {
+        const predicate = this.checkExpr(stmt.expr, null);
+        this.checker.inScope(() => {
+          this.checker.unify(predicate.type, boolType);
+        });
+        const { block } = this.checkBlock(stmt.block);
+        return { tag: "while", expr: predicate, block };
+      }
+      case "func": {
+        const matchTypes = this.inScope(() => {
+          for (const typeParam of stmt.typeParameters) {
+            this.types.init(
+              typeParam.value,
+              TypeChecker.createVar(Symbol(typeParam.value), [])
+            );
+          }
+          const parameters = stmt.parameters.map(({ type }) =>
+            this.checkTypeExpr(type)
+          );
+          const returnType = this.checkTypeExpr(stmt.returnType);
+          return [returnType, ...parameters];
+        });
 
+        const type = TypeChecker.createValue(
+          this.funcTypes.use(stmt.parameters.length),
+          matchTypes,
+          [],
+          []
+        );
+        this.vars.init(stmt.name, type);
+
+        const rawParams = stmt.parameters.map(({ binding }, i) => ({
+          binding,
+          type: type.matchTypes[i + 1],
+        }));
+
+        return {
+          tag: "func",
+          name: stmt.name,
+          type,
+          ...this.checkFunc(rawParams, type.matchTypes[0], stmt.block),
+        };
+      }
       default:
         noMatch(stmt);
     }
@@ -213,9 +230,33 @@ export class Thing {
         );
         return { tag: "struct", type, value: fields };
       }
+      case "do": {
+        const { block, type } = this.checkBlock(expr.block);
+        return { tag: "do", block, type };
+      }
+      case "if": {
+        const cases = expr.cases.map((ifCase) => {
+          const predicate = this.checkExpr(ifCase.predicate, null);
+          this.checker.inScope(() => {
+            this.checker.unify(boolType, predicate.type);
+          });
+          const { block, type } = this.checkBlock(ifCase.block);
+          return { predicate, block, type };
+        });
+        const { block: elseBlock, type: elseType } = this.checkBlock(
+          expr.elseBlock
+        );
+        const type = this.checker.inScope(() => {
+          for (const { type: caseType } of cases) {
+            this.checker.unify(caseType, elseType);
+          }
+          return this.checker.resolve(elseType);
+        });
+
+        return { tag: "if", cases, elseBlock, type };
+      }
+
       case "closure":
-      case "do":
-      case "if":
       case "match":
         throw new Error("TODO: blocks");
       case "field": {
@@ -237,6 +278,37 @@ export class Thing {
         };
       }
       case "call": {
+        if (expr.expr.tag === "identifier" && expr.expr.value === "print") {
+          if (expr.args.length !== 1) throw new Error();
+          const checkedArg = this.checkExpr(expr.args[0], null);
+          const resolvedType = this.checker.inScope(() => {
+            this.checker.unify(
+              checkedArg.type,
+              TypeChecker.createVar(Symbol(), [debugTrait])
+            );
+            return this.checker.resolve(checkedArg.type);
+          });
+          switch (resolvedType.name) {
+            case stringType.name:
+              return {
+                tag: "callBuiltIn",
+                opcode: Opcode.PrintStr,
+                args: [checkedArg],
+                type: voidType,
+              };
+            case intType.name:
+            case floatType.name:
+              return {
+                tag: "callBuiltIn",
+                opcode: Opcode.PrintNum,
+                args: [checkedArg],
+                type: voidType,
+              };
+            default:
+              throw new Error("cannot print");
+          }
+        }
+
         // TODO: handle built-in functions
         const callee = this.checkExpr(expr.expr, null);
         return this.checker.inScope(() => {
@@ -259,12 +331,122 @@ export class Thing {
           return { tag: "call", callee, args, type: returnType };
         });
       }
-      case "typeConstructor":
-        throw new Error("type constructors");
-      case "unaryOp":
-      case "binaryOp":
-        throw new Error("todo: operators");
+      case "typeConstructor": {
+        switch (expr.value) {
+          case "False":
+            return { tag: "enum", type: boolType, index: 0, fields: [] };
+          case "True":
+            return { tag: "enum", type: boolType, index: 1, fields: [] };
+          default:
+            throw new Error("TODO: type constructors");
+        }
+      }
+      case "unaryOp": {
+        const operand = this.checkExpr(expr.expr, null);
+        switch (expr.operator) {
+          case "-": {
+            const type = this.checker.inScope(() => {
+              this.checker.unify(
+                TypeChecker.createVar(Symbol(), [numTrait]),
+                operand.type
+              );
+              return this.checker.resolve(operand.type);
+            });
+            return {
+              tag: "callBuiltIn",
+              opcode: Opcode.Neg,
+              type,
+              args: [operand],
+            };
+          }
+          case "!": {
+            this.checker.inScope(() => {
+              this.checker.unify(boolType, operand.type);
+            });
+            return {
+              tag: "callBuiltIn",
+              opcode: Opcode.Not,
+              type: boolType,
+              args: [operand],
+            };
+          }
+          // istanbul ignore next
+          default:
+            throw new Error("unknown operator");
+        }
+      }
+      case "binaryOp": {
+        const left = this.checkExpr(expr.left, null);
+        const right = this.checkExpr(expr.right, null);
+        switch (expr.operator) {
+          case "+":
+            return this.arithmeticOp(left, right, Opcode.Add);
+          case "-":
+            return this.arithmeticOp(left, right, Opcode.Sub);
+          case "%":
+            return this.arithmeticOp(left, right, Opcode.Mod);
+          case ">":
+            return this.comparisonOp(left, right, Opcode.Gt);
+          case "==":
+            return this.eqOp(left, right, Opcode.Eq);
+          // istanbul ignore next
+          default:
+            throw new Error("unknown operator");
+        }
+      }
     }
+  }
+  private arithmeticOp(
+    left: CheckedExpr,
+    right: CheckedExpr,
+    opcode: Opcode
+  ): CheckedExpr {
+    const type = this.checker.inScope(() => {
+      const t = TypeChecker.createVar(Symbol(), [numTrait]);
+      this.checker.unify(t, left.type);
+      this.checker.unify(t, right.type);
+      return this.checker.resolve(t);
+    });
+    return {
+      tag: "callBuiltIn",
+      opcode,
+      type,
+      args: [left, right],
+    };
+  }
+  private comparisonOp(
+    left: CheckedExpr,
+    right: CheckedExpr,
+    opcode: Opcode
+  ): CheckedExpr {
+    this.checker.inScope(() => {
+      const t = TypeChecker.createVar(Symbol(), [numTrait]);
+      this.checker.unify(t, left.type);
+      this.checker.unify(t, right.type);
+    });
+    return {
+      tag: "callBuiltIn",
+      opcode,
+      type: boolType,
+      args: [left, right],
+    };
+  }
+  private eqOp(
+    left: CheckedExpr,
+    right: CheckedExpr,
+    opcode: Opcode
+  ): CheckedExpr {
+    this.checker.inScope(() => {
+      const t = TypeChecker.createVar(Symbol(), [eqTrait]);
+      this.checker.unify(t, left.type);
+      this.checker.unify(t, right.type);
+    });
+    return {
+      tag: "callBuiltIn",
+      opcode,
+      type: boolType,
+      args: [left, right],
+    };
   }
   private getFieldInfo(type: Type, fieldName: string) {
     return this.structFields.get(type.name).get(fieldName);
@@ -286,5 +468,61 @@ export class Thing {
       case "func":
         throw new Error("not yet implemented");
     }
+  }
+  private inScope<T>(fn: () => T): T {
+    this.vars = this.vars.push();
+    this.types = this.types.push();
+    this.typeConstructors = this.typeConstructors.push();
+    try {
+      return fn();
+    } finally {
+      this.typeConstructors = this.typeConstructors.pop();
+      this.types = this.types.pop();
+      this.vars = this.vars.pop();
+    }
+  }
+  private checkFunc(
+    parameters: Array<{ binding: Binding; type: Type }>,
+    returnType: Type,
+    rawBlock: Stmt[]
+  ): FuncFields<Type> {
+    return this.inScope(() => {
+      const outerScope = this.vars.pop();
+      return this.currentFunc.withFunc(returnType, outerScope, () => {
+        // add parameters to scope
+        const checkedParams = parameters.map((param) => ({
+          type: param.type,
+          binding: this.initScopeBinding(param.binding, param.type),
+        }));
+
+        // check function body
+        const { block } = this.checkBlock(rawBlock);
+
+        return this.checker.inScope(() => {
+          // handle implicit returns
+          const lastStmt = block.pop() ?? { tag: "noop" };
+          switch (lastStmt.tag) {
+            case "return":
+              block.push(lastStmt);
+              break;
+            case "expr":
+              this.checker.unify(returnType, lastStmt.expr.type);
+              block.push({ tag: "return", expr: lastStmt.expr });
+              break;
+            case "noop":
+              this.checker.unify(returnType, voidType);
+              block.push({ tag: "return", expr: null });
+              break;
+            default:
+              this.checker.unify(returnType, voidType);
+              block.push(lastStmt);
+              block.push({ tag: "return", expr: null });
+              break;
+          }
+
+          return { parameters: checkedParams, block };
+        });
+      });
+    });
   }
 }

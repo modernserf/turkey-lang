@@ -1,9 +1,5 @@
-import {
-  TypeChecker as TypeCheckerInner,
-  Type,
-  ValueType,
-  Trait,
-} from "./type-scope-3";
+import { TypeChecker as TypeCheckerInner } from "./type-scope-3";
+import { Type, ValueType, Trait } from "./types";
 
 class ArityName {
   private map: Map<number, symbol> = new Map();

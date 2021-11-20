@@ -6,9 +6,9 @@ import {
   EnumCase,
   CheckedStructFieldType,
   TypeParam,
-} from "./types";
-import { Scope } from "./scope";
-import { mapMap } from "./utils";
+} from "../types";
+import { Scope } from "../scope";
+import { mapMap } from "../utils";
 
 type ConstructableType = Type & ({ tag: "struct" } | { tag: "enum" });
 export type TypeConstructor = { value: number; type: ConstructableType };
