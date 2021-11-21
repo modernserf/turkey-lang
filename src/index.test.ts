@@ -738,30 +738,30 @@ it("destructures tagged variant values", () => {
   expect(run(code)).toEqual(["None", "5"]);
 });
 
-// it("has recursive types", () => {
-//   const code = `
-//     enum IntList {
-//       Nil,
-//       Cons(Int, IntList),
-//     }
+it("has recursive types", () => {
+  const code = `
+    enum IntList {
+      Nil,
+      Cons(Int, IntList),
+    }
 
-//     func foldl (
-//       list: IntList,
-//       acc: Int,
-//       fn: func (Int, Int): Int
-//     ): Int {
-//       match (list) {
-//         Cons(h, t) => foldl(t, fn(acc, h), fn),
-//         Nil => acc,
-//       }
-//     }
+    func foldl (
+      list: IntList,
+      acc: Int,
+      fn: func (Int, Int): Int
+    ): Int {
+      match (list) {
+        Cons(h, t) => foldl(t, fn(acc, h), fn),
+        Nil => acc,
+      }
+    }
 
-//     let list = Cons(1, Cons(2, Cons(3, Nil)))
-//     let sum  = foldl(list, 0, |acc, value| { acc + value })
-//     print(sum)
-//   `;
-//   expect(run(code)).toEqual(["6"]);
-// });
+    let list = Cons(1, Cons(2, Cons(3, Nil)))
+    let sum  = foldl(list, 0, |acc, value| { acc + value })
+    print(sum)
+  `;
+  expect(run(code)).toEqual(["6"]);
+});
 
 // it("has generic function params", () => {
 //   const code = `

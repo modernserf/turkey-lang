@@ -93,59 +93,58 @@ export class Thing {
     });
     return { block: checkedBlock, type };
   }
-
   private checkStmt(stmt: Stmt): CheckedStmt | null {
     switch (stmt.tag) {
       case "type": {
         if (stmt.binding.typeParameters.length) {
           throw new Error("todo: type params");
         }
-
-        const resolvedType = new TypeChecker().createRec([], (type) => {
-          this.types.init(stmt.binding.value, type);
+        this.initType(stmt.binding.value, () => {
           return this.checkTypeExpr(stmt.type);
         });
-        this.types.set(stmt.binding.value, resolvedType);
         return null;
       }
       case "enum": {
         if (stmt.binding.typeParameters.length) {
           throw new Error("todo: type params");
         }
-        const { type, casesMap } = this.enumFields.init(
-          stmt.binding.value,
-          stmt.cases.map((c) => ({
-            tagName: c.tagName,
-            isTuple: c.isTuple,
-            fields: c.fields.map((field) => ({
-              fieldName: field.fieldName,
-              type: this.checkTypeExpr(field.type),
+        this.initType(stmt.binding.value, () => {
+          const { type, casesMap } = this.enumFields.init(
+            stmt.binding.value,
+            stmt.cases.map((c) => ({
+              tagName: c.tagName,
+              isTuple: c.isTuple,
+              fields: c.fields.map((field) => ({
+                fieldName: field.fieldName,
+                type: this.checkTypeExpr(field.type),
+              })),
             })),
-          })),
-          [eqTrait]
-        );
+            [eqTrait]
+          );
 
-        this.types.init(stmt.binding.value, type);
-        for (const [tagName, enumCase] of casesMap) {
-          this.typeConstructors.init(tagName, enumCase);
-        }
+          for (const [tagName, enumCase] of casesMap) {
+            this.typeConstructors.init(tagName, enumCase);
+          }
+          return type;
+        });
         return null;
       }
       case "struct": {
         if (stmt.binding.typeParameters.length) {
           throw new Error("todo: type params");
         }
-        const structCase = this.structFields.init(
-          stmt.binding.value,
-          stmt.fields.map((field) => ({
-            fieldName: field.fieldName,
-            type: this.checkTypeExpr(field.type),
-          })),
-          stmt.isTuple
-        );
-        this.types.init(stmt.binding.value, structCase.type);
-        this.typeConstructors.init(stmt.binding.value, structCase);
-
+        this.initType(stmt.binding.value, () => {
+          const structCase = this.structFields.init(
+            stmt.binding.value,
+            stmt.fields.map((field) => ({
+              fieldName: field.fieldName,
+              type: this.checkTypeExpr(field.type),
+            })),
+            stmt.isTuple
+          );
+          this.typeConstructors.init(stmt.binding.value, structCase);
+          return structCase.type;
+        });
         return null;
       }
       case "expr": {
@@ -464,7 +463,13 @@ export class Thing {
       args: [left, right],
     };
   }
-
+  private initType(name: string, fn: () => Type) {
+    const resolvedType = new TypeChecker().createRec([], (recurType) => {
+      this.types.init(name, recurType);
+      return fn();
+    });
+    this.types.set(name, resolvedType);
+  }
   private initScopeBinding(binding: Binding, type: Type): CheckedBinding {
     switch (binding.tag) {
       case "identifier":
