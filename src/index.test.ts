@@ -591,13 +591,64 @@ it("rejects field access on non-structs", () => {
   expect(() => run(`"foo":0`)).toThrow();
 });
 
-it("rejects invalid field access ", () => {
+it("rejects invalid field access", () => {
   const code = `
     struct Point { x: Int, y: Int }
     let point = Point { x: 1, y: 1 }
     print(point:z)
   `;
   expect(() => run(code)).toThrow();
+});
+
+it("has destructuring", () => {
+  const code = `
+  struct Point {
+    x: Int,
+    y: Int,
+  }
+
+  let point = Point { x: 1, y: 2 }
+  let { x: x } = point
+  print(x)
+  `;
+  expect(run(code)).toEqual(["1"]);
+});
+
+it("rejects destructuring of non-structs", () => {
+  const code = `
+    let { x, y } = 1
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("puns struct fields in destructuring", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,
+    }
+
+    let point = Point { x: 1, y: 2 }
+    let { x } = point
+    print(x)
+  `;
+  expect(run(code)).toEqual(["1"]);
+});
+
+it("destructures function parameters", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,
+    }
+
+    func get_x ({ x }: Point): Int {
+      x
+    }
+
+    print(get_x(Point { x: 1, y: 2 }))
+  `;
+  expect(run(code)).toEqual(["1"]);
 });
 
 // it("has tuple structs", () => {
@@ -615,57 +666,6 @@ it("rejects invalid field access ", () => {
 //     print(manhattan_distance(Point(1,1), Point(2,0)))
 //   `;
 //   expect(run(code)).toEqual(["2"]);
-// });
-
-// it("has destructuring", () => {
-//   const code = `
-//   struct Point {
-//     x: Int,
-//     y: Int,
-//   }
-
-//   let point = Point { x: 1, y: 2 }
-//   let { x: x } = point
-//   print(x)
-//   `;
-//   expect(run(code)).toEqual(["1"]);
-// });
-
-// it("rejects destructuring of non-structs", () => {
-//   const code = `
-//     let { x, y } = 1
-//   `;
-//   expect(() => run(code)).toThrow();
-// });
-
-// it("puns struct fields in destructuring", () => {
-//   const code = `
-//     struct Point {
-//       x: Int,
-//       y: Int,
-//     }
-
-//     let point = Point { x: 1, y: 2 }
-//     let { x } = point
-//     print(x)
-//   `;
-//   expect(run(code)).toEqual(["1"]);
-// });
-
-// it("destructures function parameters", () => {
-//   const code = `
-//     struct Point {
-//       x: Int,
-//       y: Int,
-//     }
-
-//     func get_x ({ x }: Point): Int {
-//       x
-//     }
-
-//     print(get_x(Point { x: 1, y: 2 }))
-//   `;
-//   expect(run(code)).toEqual(["1"]);
 // });
 
 // it("has tagged variants", () => {
