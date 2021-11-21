@@ -1,3 +1,4 @@
+import { check } from "./check-types-2";
 import { Scope } from "./scope";
 import { TypeChecker } from "./type-scope-4";
 import {
@@ -12,9 +13,7 @@ import {
   ValueType,
 } from "./types";
 
-type FieldInfo =
-  | { tag: "concrete"; compileIndex: number; type: Type }
-  | { tag: "parameterized"; compileIndex: number; paramIndex: number };
+type FieldInfo = { compileIndex: number; type: Type };
 
 type FieldResult = { type: Type; index: number };
 
@@ -36,19 +35,17 @@ export class Case {
   }
   addConcreteField(name: string, type: Type) {
     this.fields.init(name, {
-      tag: "concrete",
       type,
       compileIndex: this.size++,
     });
   }
-  getField(name: string): FieldResult {
+  getField(name: string, target: Type): FieldResult {
     const info = this.fields.get(name);
-    switch (info.tag) {
-      case "concrete":
-        return { type: info.type, index: info.compileIndex };
-      case "parameterized":
-        throw new Error("todo");
-    }
+    const checker = new TypeChecker();
+    checker.unify(this.type, target);
+
+    const type = checker.resolve(info.type);
+    return { type, index: info.compileIndex };
   }
   construct(
     inFields: Array<{ fieldName: string; expr: Expr }>,
@@ -58,50 +55,44 @@ export class Case {
     const map = new Scope<string, CheckedExpr>();
     for (const { fieldName, expr } of inFields) {
       const info = this.fields.get(fieldName);
-      switch (info.tag) {
-        case "parameterized":
-          throw new Error("todo");
-        case "concrete": {
-          const checked = checkExpr(expr, info.type);
-          checker.unify(checked.type, info.type);
-          map.init(fieldName, checked);
-        }
-      }
+      const checked = checkExpr(expr, info.type);
+      checker.unify(checked.type, info.type);
+      checked.type = checker.resolve(checked.type);
+      map.init(fieldName, checked);
     }
+
+    const matchTypes = this.type.matchTypes.map((matchType) => {
+      return checker.resolve(matchType);
+    });
+    const type = { ...this.type, matchTypes };
 
     const outFields = Array.from(this.fields).map(([fieldName]) =>
       map.get(fieldName)
     );
 
     if (this.isEnum) {
-      return {
-        tag: "enum",
-        type: this.type,
-        fields: outFields,
-        index: this.index,
-      };
+      return { tag: "enum", type, fields: outFields, index: this.index };
     } else {
-      return { tag: "struct", type: this.type, fields: outFields };
+      return { tag: "struct", type, fields: outFields };
     }
   }
   destructure(
     bindings: StructFieldBinding[],
+    target: Type,
     initScopeBinding: (binding: Binding, type: Type) => CheckedBinding
   ): CheckedStructFieldBinding[] {
     if (this.isTuple && this.fields.size !== bindings.length) {
       throw new Error("invalid tuple destructuring");
     }
+    const checker = new TypeChecker();
+    checker.unify(this.type, target);
     return bindings.map(({ fieldName, binding }) => {
       const info = this.fields.get(fieldName);
-      switch (info.tag) {
-        case "parameterized":
-          throw new Error("todo");
-        case "concrete":
-          return {
-            fieldIndex: info.compileIndex,
-            binding: initScopeBinding(binding, info.type),
-          };
-      }
+      const type = checker.resolve(info.type);
+      return {
+        fieldIndex: info.compileIndex,
+        binding: initScopeBinding(binding, type),
+      };
     });
   }
 }
@@ -110,10 +101,11 @@ export class StructFields {
   private structFields: Scope<symbol, Case> = new Scope();
   init(
     name: string,
+    matchTypes: Type[],
     fields: Array<{ fieldName: string; type: Type }>,
     isTuple: boolean
   ): Case {
-    const type = TypeChecker.createValue(Symbol(name), [], []);
+    const type = TypeChecker.createValue(Symbol(name), matchTypes, []);
     const structCase = new Case(type, isTuple);
     for (const field of fields) {
       structCase.addConcreteField(field.fieldName, field.type);
@@ -130,6 +122,7 @@ export class EnumFields {
   private enumFields: Scope<symbol, Scope<string, Case>> = new Scope();
   init(
     name: string,
+    matchTypes: Type[],
     enumCases: Array<{
       tagName: string;
       fields: Array<{ fieldName: string; type: Type }>;
@@ -137,7 +130,7 @@ export class EnumFields {
     }>,
     traits: Trait[]
   ): { type: Type; casesMap: Scope<string, Case> } {
-    const type = TypeChecker.createValue(Symbol(name), [], traits);
+    const type = TypeChecker.createValue(Symbol(name), matchTypes, traits);
     const casesMap = new Scope<string, Case>();
     for (const [i, { fields, tagName, isTuple }] of enumCases.entries()) {
       const enumCase = new Case(type, isTuple, i);
@@ -149,7 +142,4 @@ export class EnumFields {
     this.enumFields.init(type.name, casesMap);
     return { type, casesMap };
   }
-  // get(type: Type, tagName: string, fieldName: string): FieldResult {
-  //   return this.enumFields.get(type.name).get(tagName).getField(fieldName);
-  // }
 }

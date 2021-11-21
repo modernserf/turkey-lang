@@ -763,32 +763,55 @@ it("has recursive types", () => {
   expect(run(code)).toEqual(["6"]);
 });
 
-// it("has generic function params", () => {
-//   const code = `
-//     func id<T> (value: T): T {
-//       value
-//     }
+it("has generic function params", () => {
+  const code = `
+    func id<T> (value: T): T {
+      value
+    }
 
-//     print(id(1))
-//     print(id("hello"))
-//   `;
-//   expect(run(code)).toEqual(["1", "hello"]);
-// });
+    print(id(1))
+    print(id("hello"))
+  `;
+  expect(run(code)).toEqual(["1", "hello"]);
+});
 
-// it("has generic struct params", () => {
-//   const code = `
-//     struct Cell <T> {
-//       current: T
-//     }
+it("has generic struct params", () => {
+  const code = `
+    struct Cell <T> {
+      current: T
+    }
 
-//     let x = Cell { current: 1 }
-//     let y = Cell { current: "hello" }
+    let x = Cell { current: 1 }
+    let y: Cell<String> = Cell { current: "hello" }
 
-//     print(x:current)
-//     print(y:current)
-//   `;
-//   expect(run(code)).toEqual(["1", "hello"]);
-// });
+    print(x:current)
+    print(y:current)
+  `;
+  expect(run(code)).toEqual(["1", "hello"]);
+});
+
+it("destructures generic struct params", () => {
+  const code = `
+    struct Cell <T> {
+      current: T
+    }
+
+    let { current } = Cell { current: "hello" }
+    print(current)
+  `;
+  expect(run(code)).toEqual(["hello"]);
+});
+
+it("rejects mismatched params in type declarations", () => {
+  const code = `
+    struct Cell <T> {
+      current: T
+    }
+
+    let x: Cell<Int> = Cell { current: "hello" }
+  `;
+  expect(() => run(code)).toThrow();
+});
 
 // it("propagates generic args", () => {
 //   const code = `

@@ -56,7 +56,7 @@ export class TypeChecker {
   private unifyTraits(varTraits: Trait[], concreteTraits: Trait[]): void {
     for (const l of varTraits) {
       if (!concreteTraits.find((r) => r.name === l.name)) {
-        throw new Error("trait mismatch ");
+        throw new Error("trait mismatch");
       }
     }
   }
