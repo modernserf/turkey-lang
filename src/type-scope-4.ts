@@ -20,7 +20,7 @@ export class TypeChecker {
     matchTypes: Type[],
     traits: Trait[]
   ): ValueType {
-    return { tag: "value", name, matchTypes, allTypes: [], traits };
+    return { tag: "value", name, matchTypes, traits };
   }
   createRec(traits: Trait[], fn: (value: Type, traits: Trait[]) => Type): Type {
     const rec = TypeChecker.createVar("rec", ...traits);
@@ -69,15 +69,11 @@ export class TypeChecker {
       tag: "value",
       name: type.name,
       matchTypes: [],
-      allTypes: [],
       traits: type.traits,
     };
     visited.set(type, nextType);
     for (const t of type.matchTypes) {
       nextType.matchTypes.push(this.resolve(t, visited));
-    }
-    for (const t of type.allTypes) {
-      nextType.allTypes.push(this.resolve(t, visited));
     }
 
     return nextType;
@@ -85,8 +81,11 @@ export class TypeChecker {
   private deref(type: Type): Type {
     const visited = new Set<Type>();
     while (type.tag === "var") {
-      // istanbul ignore next
-      if (visited.has(type)) throw new Error("loop in type definition");
+      if (visited.has(type)) {
+        // return type;
+        throw new Error("loop in type definition");
+      }
+
       visited.add(type);
       if (!this.scope.has(type.name)) break;
       type = this.scope.get(type.name);

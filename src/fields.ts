@@ -1,4 +1,3 @@
-import { check } from "./check-types-2";
 import { Scope } from "./scope";
 import { TypeChecker } from "./type-scope-4";
 import {

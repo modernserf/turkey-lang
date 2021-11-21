@@ -141,7 +141,6 @@ export type ValueType = {
   tag: "value";
   name: symbol;
   matchTypes: Type[];
-  allTypes: Type[];
   traits: Trait[];
 };
 export type Type = { tag: "var"; name: symbol; traits: Trait[] } | ValueType;

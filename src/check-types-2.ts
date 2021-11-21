@@ -351,17 +351,18 @@ export class Thing {
           this.funcTypes.use(expr.args.length),
           "cannot call func"
         );
+
         const args = expr.args.map((arg, i) => {
           const forwardType = calleeType.matchTypes[i + 1];
           const checkedArg = this.checkExpr(arg, forwardType);
           checker.unify(forwardType, checkedArg.type);
           return checkedArg;
         });
+
         if (forwardType) {
           checker.unify(forwardType, calleeType.matchTypes[0]);
         }
         const returnType = checker.resolve(calleeType.matchTypes[0]);
-
         return { tag: "call", callee, args, type: returnType };
       }
       case "typeConstructor": {
@@ -375,7 +376,10 @@ export class Thing {
         switch (expr.operator) {
           case "-": {
             const checker = new TypeChecker();
-            checker.unify(TypeChecker.createVar("T", numTrait), operand.type);
+            checker.unify(
+              TypeChecker.createVar("Number", numTrait),
+              operand.type
+            );
             const type = checker.resolve(operand.type);
 
             return {
@@ -427,7 +431,7 @@ export class Thing {
     opcode: Opcode
   ): CheckedExpr {
     const checker = new TypeChecker();
-    const t = TypeChecker.createVar("T", numTrait);
+    const t = TypeChecker.createVar("Number", numTrait);
     checker.unify(t, left.type);
     checker.unify(t, right.type);
     const type = checker.resolve(t);
@@ -444,7 +448,7 @@ export class Thing {
     opcode: Opcode
   ): CheckedExpr {
     const checker = new TypeChecker();
-    const t = TypeChecker.createVar("T", numTrait);
+    const t = TypeChecker.createVar("Number", numTrait);
     checker.unify(t, left.type);
     checker.unify(t, right.type);
     return {
@@ -460,7 +464,7 @@ export class Thing {
     opcode: Opcode
   ): CheckedExpr {
     const checker = new TypeChecker();
-    const t = TypeChecker.createVar("T", eqTrait);
+    const t = TypeChecker.createVar("Equatable", eqTrait);
     checker.unify(t, left.type);
     checker.unify(t, right.type);
 
@@ -510,14 +514,17 @@ export class Thing {
     switch (typeExpr.tag) {
       case "identifier": {
         const checker = new TypeChecker();
-        const type = this.types.get(typeExpr.value);
+        const abstractType = this.types.get(typeExpr.value);
+
+        const concreteType = { ...abstractType };
         for (const [i, arg] of typeExpr.typeArgs.entries()) {
           const argType = this.checkTypeExpr(arg);
-          if (type.tag === "value") {
-            checker.unify(argType, type.matchTypes[i]);
+          if (concreteType.tag === "value") {
+            checker.unify(argType, concreteType.matchTypes[i]);
+            concreteType.matchTypes[i] = argType;
           }
         }
-        return checker.resolve(type);
+        return concreteType;
       }
       case "func":
         return this.funcType(

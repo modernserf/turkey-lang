@@ -813,88 +813,120 @@ it("rejects mismatched params in type declarations", () => {
   expect(() => run(code)).toThrow();
 });
 
-// it("propagates generic args", () => {
-//   const code = `
-//     struct Cell<T> {
-//       current: T
-//     }
+it("accepts concrete parameterized types in function bindings", () => {
+  const code = `
+    struct Cell<Value> {
+      current: Value
+    }
 
-//     func current<T> (cell: Cell<T>): T {
-//       cell:current
-//     }
+    func current (cell: Cell<Int>): Int {
+      cell:current
+    }
 
-//     let x = current(Cell { current: 1 })
-//     print(x)
-//   `;
-//   expect(run(code)).toEqual(["ok", "1"]);
-// });
+    let x = current(Cell { current: 1 })
+    print(x)
+  `;
+  expect(run(code)).toEqual(["1"]);
+});
 
-// it("has generic enum params", () => {
-//   const code = `
-//     enum List<T> {
-//       Nil,
-//       Cons(T, List<T>),
-//     }
+it("propagates generic args", () => {
+  const code = `
+    struct Cell<Value> {
+      current: Value
+    }
 
-//     func length<T>(list: List<T>): Int {
-//       match (list) {
-//         Nil => 0,
-//         Cons(h, t) => 1 + length(t),
-//       }
-//     }
+    func current<U> (cell: Cell<U>): Cell<U> {
+      cell
+    }
 
-//     let list1 = Cons(1, Cons(2, Cons(3, Nil)))
-//     let list2 = Cons("foo", Cons("bar", Nil))
-//     print(length(list1))
-//     print(length(list2))
-//   `;
-//   expect(run(code)).toEqual(["3", "2"]);
-// });
+    let x = current(Cell { current: 1 })
+    print(x:current)
+  `;
+  expect(run(code)).toEqual(["1"]);
+});
 
-// it("unifies types across if branches", () => {
-//   const code = `
-//     enum Either<L, R> {
-//       Left(L),
-//       Right(R),
-//     }
+it("makes generic args concrete at call time", () => {
+  const code = `
+    struct Cell<Value> {
+      current: Value
+    }
 
-//     let res = if (True) {
-//       Left(1)
-//     } else {
-//       Right("foo")
-//     }
+    func current<U> (cell: Cell<U>): U {
+      cell:current
+    }
 
-//     match (res) {
-//       Left(x) => print("left"),
-//       Right(x) => print("right"),
-//     }
-//   `;
-//   expect(run(code)).toEqual(["left"]);
-// });
+    let x = current(Cell { current: 1 })
+    print(x)
+  `;
+  expect(run(code)).toEqual(["1"]);
+});
 
-// it("allows unbound & unused type parameters", () => {
-//   const code = `
-//     enum Either<L, R> {
-//       Left(L),
-//       Right(R),
-//     }
+it("has generic enum params", () => {
+  const code = `
+    enum List<T> {
+      Nil,
+      Cons(T, List<T>),
+    }
 
-//     let res = Left(1)
+    func length<T>(list: List<T>): Int {
+      match (list) {
+        Nil => 0,
+        Cons(h, t) => 1 + length(t),
+      }
+    }
 
-//     func print_left_int<T>(x: Either<Int, T>): Void {
-//       match (res) {
-//         Left(x) => {
-//           print("left")
-//         },
-//         Right(x) => {},
-//       }
-//     }
+    let list1 = Cons(1, Cons(2, Cons(3, Nil)))
+    let list2 = Cons("foo", Cons("bar", Nil))
+    print(length(list1))
+    print(length(list2))
+  `;
+  expect(run(code)).toEqual(["3", "2"]);
+});
 
-//     print_left_int(res)
-// `;
+it("unifies types across if branches", () => {
+  const code = `
+    enum Either<L, R> {
+      Left(L),
+      Right(R),
+    }
 
-//   expect(run(code)).toEqual(["left"]);
-// });
+    let res = if (True) {
+      Left(1)
+    } else {
+      Right("foo")
+    }
+
+    match (res) {
+      Left(x) => print("left"),
+      Right(x) => print("right"),
+    }
+  `;
+  expect(run(code)).toEqual(["left"]);
+});
+
+it("allows unbound & unused type parameters", () => {
+  const code = `
+    enum Either<L, R> {
+      Left(L),
+      Right(R),
+    }
+
+    let res = Left(1)
+
+    func print_left_int<T>(x: Either<Int, T>): Void {
+      match (res) {
+        Left(x) => {
+          print("left")
+        },
+        Right(x) => {},
+      }
+    }
+
+    print_left_int(res)
+`;
+
+  expect(run(code)).toEqual(["left"]);
+});
 
 // it("has method syntax", () => {
 //   const code = `
