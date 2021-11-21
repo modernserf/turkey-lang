@@ -161,16 +161,15 @@ export type CheckedExpr =
   | {
       tag: "match";
       expr: CheckedExpr;
-      cases: Map<
-        string,
-        {
-          index: number;
-          bindings: CheckedStructFieldBinding[];
-          block: CheckedStmt[];
-        }
-      >;
+      cases: Map<string, CheckedMatchCase>;
       type: Type;
     };
+
+export type CheckedMatchCase = {
+  index: number;
+  bindings: CheckedStructFieldBinding[];
+  block: CheckedStmt[];
+};
 
 export type CheckedStmt =
   | { tag: "let"; binding: CheckedBinding; expr: CheckedExpr }

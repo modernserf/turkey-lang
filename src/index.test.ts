@@ -446,6 +446,81 @@ it("rejects enun type mismatches", () => {
   expect(() => run(code)).toThrow();
 });
 
+it("has pattern matching", () => {
+  const code = `
+    enum V { V1, V2 }
+
+    match (V1) {
+      V1 => {
+        print(1)
+      },
+      V2 => {
+        print(2)
+      }
+    }
+  `;
+  expect(run(code)).toEqual(["1"]);
+});
+
+it("rejects pattern matching on non-enums", () => {
+  const code = `
+    match ("hello") {
+      True => {
+        print("hello")
+      },
+      False => {
+        print("goodbye")
+      }
+    }
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("rejects incomplete cases", () => {
+  const code = `
+    match (True) {
+      True => {
+        print("hello")
+      },
+    }
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("rejects duplicate cases", () => {
+  const code = `
+    match (True) {
+      True => {
+        print("hello")
+      },
+      True => {
+        print("hello")
+      },
+      False => {
+        print("goodbye")
+      },
+    }
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("rejects invalid branches", () => {
+  const code = `
+    match (True) {
+      True => {
+        print("hello")
+      },
+      False => {
+        print("goodbye")
+      },
+      Other => {
+        print("hmmm")
+      },
+    }
+  `;
+  expect(() => run(code)).toThrow();
+});
+
 it("has structs", () => {
   const code = `
     struct Point {
@@ -525,147 +600,72 @@ it("rejects invalid field access ", () => {
   expect(() => run(code)).toThrow();
 });
 
-it("has tuple structs", () => {
-  const code = `
-    struct Point (Int, Int)
-
-    func abs (x: Int): Int {
-      if (x > 0) { x } else { -x }
-    }
-
-    func manhattan_distance (from: Point, to: Point): Int {
-      abs(to:0 - from:0) + abs(to:1 - from:1)
-    }
-
-    print(manhattan_distance(Point(1,1), Point(2,0)))
-  `;
-  expect(run(code)).toEqual(["2"]);
-});
-
-it("has destructuring", () => {
-  const code = `
-  struct Point {
-    x: Int,
-    y: Int,
-  }
-
-  let point = Point { x: 1, y: 2 }
-  let { x: x } = point
-  print(x)
-  `;
-  expect(run(code)).toEqual(["1"]);
-});
-
-it("rejects destructuring of non-structs", () => {
-  const code = `
-    let { x, y } = 1
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("puns struct fields in destructuring", () => {
-  const code = `
-    struct Point {
-      x: Int,
-      y: Int,
-    }
-
-    let point = Point { x: 1, y: 2 }
-    let { x } = point
-    print(x)
-  `;
-  expect(run(code)).toEqual(["1"]);
-});
-
-it("destructures function parameters", () => {
-  const code = `
-    struct Point {
-      x: Int,
-      y: Int,
-    }
-
-    func get_x ({ x }: Point): Int {
-      x
-    }
-
-    print(get_x(Point { x: 1, y: 2 }))
-  `;
-  expect(run(code)).toEqual(["1"]);
-});
-
-// it("has pattern matching", () => {
+// it("has tuple structs", () => {
 //   const code = `
-//     enum V { V1, V2 }
+//     struct Point (Int, Int)
 
-//     match (V1) {
-//       V1 => {
-//         print(1)
-//       },
-//       V2 => {
-//         print(2)
-//       }
+//     func abs (x: Int): Int {
+//       if (x > 0) { x } else { -x }
 //     }
+
+//     func manhattan_distance (from: Point, to: Point): Int {
+//       abs(to:0 - from:0) + abs(to:1 - from:1)
+//     }
+
+//     print(manhattan_distance(Point(1,1), Point(2,0)))
+//   `;
+//   expect(run(code)).toEqual(["2"]);
+// });
+
+// it("has destructuring", () => {
+//   const code = `
+//   struct Point {
+//     x: Int,
+//     y: Int,
+//   }
+
+//   let point = Point { x: 1, y: 2 }
+//   let { x: x } = point
+//   print(x)
 //   `;
 //   expect(run(code)).toEqual(["1"]);
 // });
 
-// it("rejects pattern matching on non-enums", () => {
+// it("rejects destructuring of non-structs", () => {
 //   const code = `
-//     match ("hello") {
-//       True => {
-//         print("hello")
-//       },
-//       False => {
-//         print("goodbye")
-//       }
-//     }
+//     let { x, y } = 1
 //   `;
 //   expect(() => run(code)).toThrow();
 // });
 
-// it("rejects incomplete cases", () => {
+// it("puns struct fields in destructuring", () => {
 //   const code = `
-//     match (True) {
-//       True => {
-//         print("hello")
-//       },
+//     struct Point {
+//       x: Int,
+//       y: Int,
 //     }
+
+//     let point = Point { x: 1, y: 2 }
+//     let { x } = point
+//     print(x)
 //   `;
-//   expect(() => run(code)).toThrow();
+//   expect(run(code)).toEqual(["1"]);
 // });
 
-// it("rejects duplicate cases", () => {
+// it("destructures function parameters", () => {
 //   const code = `
-//     match (True) {
-//       True => {
-//         print("hello")
-//       },
-//       True => {
-//         print("hello")
-//       },
-//       False => {
-//         print("goodbye")
-//       },
+//     struct Point {
+//       x: Int,
+//       y: Int,
 //     }
-//   `;
-//   expect(() => run(code)).toThrow();
-// });
 
-// it("rejects invalid branches", () => {
-//   const code = `
-//     match (True) {
-//       True => {
-//         print("hello")
-//       },
-//       False => {
-//         print("goodbye")
-//       },
-//       Other => {
-//         print("hmmm")
-//       },
+//     func get_x ({ x }: Point): Int {
+//       x
 //     }
+
+//     print(get_x(Point { x: 1, y: 2 }))
 //   `;
-//   expect(() => run(code)).toThrow();
+//   expect(run(code)).toEqual(["1"]);
 // });
 
 // it("has tagged variants", () => {
@@ -876,10 +876,13 @@ it("destructures function parameters", () => {
 //   expect(run(code)).toEqual(["6"]);
 // });
 
-// it("has methods without arguments", () => {
-//   const code = `"foo".print`;
-//   expect(run(code)).toEqual(["foo"]);
-// });
+it("has methods without arguments", () => {
+  const code = `
+    "foo".print
+    "bar".print()  
+  `;
+  expect(run(code)).toEqual(["foo", "bar"]);
+});
 
 // it("has tuple literals", () => {
 //   const code = `

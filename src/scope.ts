@@ -36,6 +36,7 @@ export class Scope<K, V> {
     if (this.parent) return this.parent.get(key);
     throw new KeyNotFoundError(key);
   }
+
   init(key: K, value: V): this {
     if (this.map.has(key)) throw new DuplicateScopeMemberError(key);
     this.map.set(key, value);
@@ -69,5 +70,9 @@ export class Scope<K, V> {
     if (found) return false;
     current.get(key);
     return true;
+  }
+  *[Symbol.iterator](): IterableIterator<[K, V]> {
+    if (this.parent) yield* this.parent;
+    yield* this.map;
   }
 }
