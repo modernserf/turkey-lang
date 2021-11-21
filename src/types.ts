@@ -53,7 +53,12 @@ export class ParseError extends Error {
 export type Stmt =
   | { tag: "type"; binding: TypeBinding; type: TypeExpr }
   | { tag: "enum"; binding: TypeBinding; cases: EnumCase[] }
-  | { tag: "struct"; binding: TypeBinding; fields: StructFieldType[] }
+  | {
+      tag: "struct";
+      binding: TypeBinding;
+      fields: StructFieldType[];
+      isTuple: boolean;
+    }
   | { tag: "let"; binding: Binding; type: TypeExpr | null; expr: Expr }
   | { tag: "while"; expr: Expr; block: Stmt[] }
   | { tag: "return"; expr: Expr | null }
@@ -67,7 +72,11 @@ export type Stmt =
     }
   | { tag: "expr"; expr: Expr };
 
-export type EnumCase = { tagName: string; fields: StructFieldType[] };
+export type EnumCase = {
+  tagName: string;
+  fields: StructFieldType[];
+  isTuple: boolean;
+};
 
 export type StructFieldType = { fieldName: string; type: TypeExpr };
 export type StructFieldValue = { fieldName: string; expr: Expr };
@@ -75,7 +84,11 @@ export type StructFieldBinding = { fieldName: string; binding: Binding };
 
 export type Expr =
   | { tag: "identifier"; value: string }
-  | { tag: "typeConstructor"; value: string; fields: StructFieldValue[] }
+  | {
+      tag: "typeConstructor";
+      value: string;
+      fields: StructFieldValue[];
+    }
   | { tag: "tuple"; fields: StructFieldValue[] }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }

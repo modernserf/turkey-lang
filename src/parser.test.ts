@@ -605,6 +605,7 @@ Array [
     "cases": Array [
       Object {
         "fields": Array [],
+        "isTuple": false,
         "tagName": "None",
       },
       Object {
@@ -618,6 +619,7 @@ Array [
             },
           },
         ],
+        "isTuple": true,
         "tagName": "Some",
       },
     ],
@@ -738,6 +740,7 @@ Array [
             },
           },
         ],
+        "isTuple": false,
         "tagName": "AddExpr",
       },
       Object {
@@ -751,6 +754,7 @@ Array [
             },
           },
         ],
+        "isTuple": false,
         "tagName": "IntExpr",
       },
     ],
@@ -958,10 +962,12 @@ Array [
             },
           },
         ],
+        "isTuple": true,
         "tagName": "Cons",
       },
       Object {
         "fields": Array [],
+        "isTuple": false,
         "tagName": "Nil",
       },
     ],
@@ -1051,6 +1057,7 @@ Array [
       "value": "Foo",
     },
     "fields": Array [],
+    "isTuple": false,
     "tag": "struct",
   },
 ]

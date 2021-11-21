@@ -299,13 +299,15 @@ function enumCase(state: IParseState): EnumCase {
 
 function typeBody(state: IParseState): TypeStruct {
   switch (state.token().type) {
-    case "{":
+    case "{": {
       state.advance();
       const fields = commasUntil(state, structField, "}");
       return { tag: "record", fields };
-    case "(":
+    }
+    case "(": {
       const args = commasUntil(state, typeExpr, ")");
       return { tag: "tuple", args };
+    }
     default:
       throw new NoMatch();
   }
@@ -587,7 +589,7 @@ function infixRight(
   nextParser: Parser<Expr>,
   operators: string[]
 ): Expr {
-  let left = nextParser(state);
+  const left = nextParser(state);
   const operator = state.token().value;
   if (!operators.includes(operator)) return left;
   state.advance();

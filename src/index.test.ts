@@ -651,70 +651,92 @@ it("destructures function parameters", () => {
   expect(run(code)).toEqual(["1"]);
 });
 
-// it("has tuple structs", () => {
-//   const code = `
-//     struct Point (Int, Int)
+it("has tuple structs", () => {
+  const code = `
+    struct Point (Int, Int)
 
-//     func abs (x: Int): Int {
-//       if (x > 0) { x } else { -x }
-//     }
+    func abs (x: Int): Int {
+      if (x > 0) { x } else { -x }
+    }
 
-//     func manhattan_distance (from: Point, to: Point): Int {
-//       abs(to:0 - from:0) + abs(to:1 - from:1)
-//     }
+    func manhattan_distance (from: Point, to: Point): Int {
+      abs(to:0 - from:0) + abs(to:1 - from:1)
+    }
 
-//     print(manhattan_distance(Point(1,1), Point(2,0)))
-//   `;
-//   expect(run(code)).toEqual(["2"]);
-// });
+    print(manhattan_distance(Point(1,1), Point(2,0)))
+  `;
+  expect(run(code)).toEqual(["2"]);
+});
 
-// it("has tagged variants", () => {
-//   const code = `
-//     enum IntOption {
-//       None,
-//       Some(Int),
-//     }
+it("destructures tuple structs", () => {
+  const code = `
+    struct Point (Int, Int)
 
-//     func print_int_option(val: IntOption): Void {
-//       match (val) {
-//         None => {
-//           print("None")
-//         },
-//         Some(x) => {
-//           print("Some")
-//         },
-//       }
-//     }
+    let (x, y) = Point(10,20)
 
-//     print_int_option(None)
-//     print_int_option(Some(5))
-//   `;
-//   expect(run(code)).toEqual(["None", "Some"]);
-// });
+    print(x + y)
+  `;
+  expect(run(code)).toEqual(["30"]);
+});
 
-// it("destructures tagged variant values", () => {
-//   const code = `
-//     enum IntOption {
-//       None,
-//       Some(Int),
-//     }
+it("rejects incomplete tuple destructuring", () => {
+  const code = `
+    struct Point (Int, Int)
 
-//     func print_int_option(val: IntOption): Void {
-//       match (val) {
-//         None => {
-//           print("None")
-//         },
-//         Some(x) => {
-//           print(x)
-//         },
-//       }
-//     }
+    let (x) = Point(10,20)
 
-//     print_int_option(None)
-//     print_int_option(Some(5))
-//   `;
-//   expect(run(code)).toEqual(["None", "5"]);
-// });
+    print(x)
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("has tagged variants", () => {
+  const code = `
+    enum IntOption {
+      None,
+      Some(Int),
+    }
+
+    func print_int_option(val: IntOption): Void {
+      match (val) {
+        None => {
+          print("None")
+        },
+        Some(x) => {
+          print("Some")
+        },
+      }
+    }
+
+    print_int_option(None)
+    print_int_option(Some(5))
+  `;
+  expect(run(code)).toEqual(["None", "Some"]);
+});
+
+it("destructures tagged variant values", () => {
+  const code = `
+    enum IntOption {
+      None,
+      Some(Int),
+    }
+
+    func print_int_option(val: IntOption): Void {
+      match (val) {
+        None => {
+          print("None")
+        },
+        Some(x) => {
+          print(x)
+        },
+      }
+    }
+
+    print_int_option(None)
+    print_int_option(Some(5))
+  `;
+  expect(run(code)).toEqual(["None", "5"]);
+});
 
 // it("has recursive types", () => {
 //   const code = `
