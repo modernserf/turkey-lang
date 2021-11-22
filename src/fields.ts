@@ -16,6 +16,18 @@ type FieldInfo = { compileIndex: number; type: Type };
 
 type FieldResult = { type: Type; index: number };
 
+export class ArityName {
+  constructor(private prefix: string) {}
+  private map: Map<number, symbol> = new Map();
+  use(num: number): symbol {
+    const res = this.map.get(num);
+    if (res) return res;
+    const sym = Symbol(`${this.prefix}(${num})`);
+    this.map.set(num, sym);
+    return sym;
+  }
+}
+
 export class Case {
   private fields: Scope<string, FieldInfo> = new Scope();
   private size = 0;
@@ -98,6 +110,7 @@ export class Case {
 
 export class StructFields {
   private structFields: Scope<symbol, Case> = new Scope();
+  private tupleNames = new ArityName("tuple");
   initStruct(
     name: string,
     matchTypes: Type[],
@@ -133,6 +146,32 @@ export class StructFields {
     }
     return { type, casesMap };
   }
+  initTuple(fields: Type[]): ValueType {
+    const type = TypeChecker.createValue(
+      this.tupleNames.use(fields.length),
+      fields,
+      []
+    );
+
+    if (!this.structFields.has(type.name)) {
+      const abstractFields = fields.map((_, i) =>
+        TypeChecker.createVar(`TupleField${i}`)
+      );
+      const abstractType = TypeChecker.createValue(
+        type.name,
+        abstractFields,
+        []
+      );
+      const tupleCase = new Case(abstractType, true);
+      for (const [i, field] of abstractFields.entries()) {
+        tupleCase.addConcreteField(String(i), field);
+      }
+      this.structFields.init(type.name, tupleCase);
+    }
+
+    return type;
+  }
+
   get(type: Type): Case {
     return this.structFields.get(type.name);
   }

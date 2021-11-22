@@ -17,7 +17,7 @@ import {
   CheckedMatchCase,
 } from "./types";
 import { noMatch } from "./utils";
-import { StructFields, Case } from "./fields";
+import { StructFields, Case, ArityName } from "./fields";
 
 const primitive = (name: string, ...traits: Trait[]) =>
   TypeChecker.createValue(Symbol(name), [], traits);
@@ -32,17 +32,6 @@ const floatType = primitive("Float", numTrait, debugTrait, eqTrait);
 const stringType = primitive("String", debugTrait, eqTrait);
 const boolType = primitive("Bool", eqTrait);
 
-class ArityName {
-  private map: Map<number, symbol> = new Map();
-  use(num: number): symbol {
-    const res = this.map.get(num);
-    if (res) return res;
-    const sym = Symbol(num);
-    this.map.set(num, sym);
-    return sym;
-  }
-}
-
 export function check(program: Stmt[]): CheckedStmt[] {
   return Thing.checkProgram(program);
 }
@@ -52,8 +41,7 @@ export class Thing {
   private types: Scope<string, Type>;
   private typeConstructors: Scope<string, Case>;
   private currentFunc = new CurrentFuncState<Type>();
-  private funcTypes = new ArityName();
-  private tupleTypes = new ArityName();
+  private funcTypes = new ArityName("func");
   private structFields = new StructFields();
   static checkProgram(program: Stmt[]): CheckedStmt[] {
     return new Thing().checkBlock(program).block;
@@ -228,8 +216,15 @@ export class Thing {
         this.currentFunc.checkUpvalue(this.vars, expr.value, type);
         return { tag: "identifier", value: expr.value, type };
       }
-      case "tuple":
-        throw new Error("todo");
+      case "tuple": {
+        const fields = expr.fields.map((field) =>
+          this.checkExpr(field.expr, null)
+        );
+        const type = this.structFields.initTuple(
+          fields.map((expr) => expr.type)
+        );
+        return { tag: "struct", type, fields };
+      }
       case "do": {
         const { block, type } = this.checkBlock(expr.block);
         return { tag: "do", block, type };
@@ -531,9 +526,10 @@ export class Thing {
           typeExpr.parameters,
           typeExpr.returnType
         );
-
       case "tuple":
-        throw new Error("not yet implemented");
+        return this.structFields.initTuple(
+          typeExpr.typeArgs.map((arg) => this.checkTypeExpr(arg))
+        );
     }
   }
   private inScope<T>(fn: () => T): T {

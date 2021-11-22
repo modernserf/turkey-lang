@@ -965,20 +965,20 @@ it("has methods without arguments", () => {
   expect(run(code)).toEqual(["foo", "bar"]);
 });
 
-// it("has tuple literals", () => {
-//   const code = `
-//     let (x, y) = (1, "foo")
-//     print(x)
-//     print(y)
-//   `;
-//   expect(run(code)).toEqual(["1", "foo"]);
-// });
+it("has tuple literals", () => {
+  const code = `
+    let (x, y) = (1, "foo")
+    print(x)
+    print(y)
+  `;
+  expect(run(code)).toEqual(["1", "foo"]);
+});
 
-// it("has tuple type literals", () => {
-//   const code = `
-//     let pair: (Int, String) = (1, "foo")
-//     print(pair:0)
-//     print(pair:1)
-//   `;
-//   expect(run(code)).toEqual(["1", "foo"]);
-// });
+it("has tuple type literals", () => {
+  const code = `
+    let pair: (Int, String) = (1, "foo")
+    print(pair:0)
+    print(pair:1)
+  `;
+  expect(run(code)).toEqual(["1", "foo"]);
+});
