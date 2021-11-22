@@ -35,6 +35,8 @@ export type Token =
   | { tag: ")" }
   | { tag: "{" }
   | { tag: "}" }
+  | { tag: "[" }
+  | { tag: "]" }
   | { tag: ":" }
   | { tag: "," }
   | { tag: "|" }
@@ -90,6 +92,7 @@ export type Expr =
       fields: StructFieldValue[];
     }
   | { tag: "tuple"; fields: StructFieldValue[] }
+  | { tag: "list"; items: Expr[] }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "string"; value: string }

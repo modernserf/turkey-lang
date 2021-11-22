@@ -1071,3 +1071,29 @@ it("cannot reference underscore identifiers", () => {
   `;
   expect(() => run(code)).toThrow();
 });
+
+it("has list literals", () => {
+  const code = `    
+    func foldl<Item, Acc> (
+      list: List<Item>,
+      acc: Acc,
+      fn: func (Acc, Item): Acc
+    ): Acc {
+      match (list) {
+        Cons(h, t) => t.foldl(fn(acc, h), fn),
+        Nil => acc,
+      }
+    }
+
+    func add (acc: Int, value: Int): Int {
+      acc + value
+    }
+
+    let xs = [1, 2, 3]
+    let ys = []
+
+    print(xs.foldl(0, add))
+    print(ys.foldl(0, add))
+  `;
+  expect(run(code)).toEqual(["6", "0"]);
+});

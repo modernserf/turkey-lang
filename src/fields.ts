@@ -44,11 +44,12 @@ export class Case {
       this.size = 1;
     }
   }
-  addConcreteField(name: string, type: Type) {
+  addConcreteField(name: string, type: Type): this {
     this.fields.init(name, {
       type,
       compileIndex: this.size++,
     });
+    return this;
   }
   getField(name: string, target: Type): FieldResult {
     const info = this.fields.get(name);

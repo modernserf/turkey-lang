@@ -32,6 +32,13 @@ const floatType = primitive("Float", numTrait, debugTrait, eqTrait);
 const stringType = primitive("String", debugTrait, eqTrait);
 const boolType = primitive("Bool", eqTrait);
 
+const listItemVar = TypeChecker.createVar("ListItem");
+const listType = TypeChecker.createValue(Symbol("List"), [listItemVar], []);
+const listNil = new Case(listType, true, 0);
+const listCons = new Case(listType, true, 1)
+  .addConcreteField("0", listItemVar)
+  .addConcreteField("1", listType);
+
 export function check(program: Stmt[]): CheckedStmt[] {
   return Thing.checkProgram(program);
 }
@@ -55,10 +62,13 @@ export class Thing {
       .init("Int", intType)
       .init("Float", floatType)
       .init("String", stringType)
-      .init("Bool", boolType);
+      .init("Bool", boolType)
+      .init("List", listType);
     this.typeConstructors
       .init("False", new Case(boolType, false, 0))
-      .init("True", new Case(boolType, false, 1));
+      .init("True", new Case(boolType, false, 1))
+      .init("Nil", listNil)
+      .init("Cons", listCons);
   }
   private checkBlock(block: Stmt[]): { block: CheckedStmt[]; type: Type } {
     const checkedBlock: CheckedStmt[] = [];
@@ -224,6 +234,33 @@ export class Thing {
           fields.map((expr) => expr.type)
         );
         return { tag: "struct", type, fields };
+      }
+      case "list": {
+        type T = Expr & { tag: "typeConstructor" };
+        const ast = expr.items.reduceRight(
+          (acc: T, expr) => {
+            return {
+              tag: "typeConstructor",
+              value: "Cons",
+              fields: [
+                { fieldName: "0", expr },
+                { fieldName: "1", expr: acc },
+              ],
+            };
+          },
+          { tag: "typeConstructor", value: "Nil", fields: [] }
+        );
+
+        if (ast.value === "Nil") {
+          // istanbul ignore next
+          return listNil.construct([], (expr, fwd) =>
+            this.checkExpr(expr, fwd)
+          );
+        } else {
+          return listCons.construct(ast.fields, (expr, fwd) =>
+            this.checkExpr(expr, fwd)
+          );
+        }
       }
       case "do": {
         const { block, type } = this.checkBlock(expr.block);

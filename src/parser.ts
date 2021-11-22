@@ -204,6 +204,12 @@ const parseBaseExpr: Parser<Expr | null> = (state) => {
         return expr;
       }
     }
+    case "[": {
+      state.advance();
+      const items = commaList(state, checkExpr);
+      match(state, "]");
+      return { tag: "list", items };
+    }
     case "typeIdentifier": {
       state.advance();
       const { fields } = matchStructFieldValueList(state);
