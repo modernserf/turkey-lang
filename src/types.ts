@@ -167,6 +167,7 @@ export type CheckedExpr =
       type: Type;
     }
   | { tag: "field"; expr: CheckedExpr; index: number; type: Type }
+  | { tag: "assign"; target: CheckedExpr; value: CheckedExpr; type: Type }
   | { tag: "callBuiltIn"; opcode: Opcode; args: CheckedExpr[]; type: Type }
   | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: Type }
   | { tag: "do"; block: CheckedStmt[]; type: Type }

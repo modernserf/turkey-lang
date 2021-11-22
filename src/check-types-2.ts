@@ -39,6 +39,10 @@ const listCons = new Case(listType, true, 1)
   .addConcreteField("0", listItemVar)
   .addConcreteField("1", listType);
 
+const refVar = TypeChecker.createVar("RefItem");
+const refType = TypeChecker.createValue(Symbol("Ref"), [refVar], []);
+const refCase = new Case(refType, true).addConcreteField("0", refVar);
+
 export function check(program: Stmt[]): CheckedStmt[] {
   return Thing.checkProgram(program);
 }
@@ -63,12 +67,15 @@ export class Thing {
       .init("Float", floatType)
       .init("String", stringType)
       .init("Bool", boolType)
-      .init("List", listType);
+      .init("List", listType)
+      .init("Ref", refType);
     this.typeConstructors
       .init("False", new Case(boolType, false, 0))
       .init("True", new Case(boolType, false, 1))
       .init("Nil", listNil)
-      .init("Cons", listCons);
+      .init("Cons", listCons)
+      .init("Ref", refCase);
+    this.structFields.addBuiltIn(refCase);
   }
   private checkBlock(block: Stmt[]): { block: CheckedStmt[]; type: Type } {
     const checkedBlock: CheckedStmt[] = [];
@@ -357,6 +364,9 @@ export class Thing {
         if (expr.expr.tag === "identifier" && expr.expr.value === "print") {
           return this.print(expr.args);
         }
+        if (expr.expr.tag === "identifier" && expr.expr.value === "set") {
+          return this.setRef(expr.args);
+        }
 
         const callee = this.checkExpr(expr.expr, null);
         const checker = new TypeChecker();
@@ -471,7 +481,15 @@ export class Thing {
         throw new Error("cannot print");
     }
   }
-
+  private setRef(args: Expr[]): CheckedExpr {
+    if (args.length !== 2) throw new Error();
+    const checker = new TypeChecker();
+    const ref = this.checkExpr(args[0], null);
+    const nextValue = this.checkExpr(args[1], null);
+    checker.unify(ref.type, refType);
+    checker.unify(refVar, nextValue.type);
+    return { tag: "assign", target: ref, value: nextValue, type: ref.type };
+  }
   private arithmeticOp(
     left: CheckedExpr,
     right: CheckedExpr,

@@ -384,6 +384,12 @@ class Compiler {
         this.asm.getHeap(expr.index);
         return;
       }
+      case "assign": {
+        this.compileExpr(expr.target);
+        this.compileExpr(expr.value);
+        this.asm.setHeap(0);
+        return;
+      }
       // istanbul ignore next
       default:
         noMatch(expr);

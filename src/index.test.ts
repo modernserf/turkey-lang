@@ -1109,3 +1109,13 @@ it("has for-in loops", () => {
   `;
   expect(run(code)).toEqual(["2", "4", "6"]);
 });
+
+it("has mutable refs", () => {
+  const code = `
+    let counter = Ref(0)
+    print(counter:0)
+    counter.set(1)
+    print(counter:0)
+  `;
+  expect(run(code)).toEqual(["0", "1"]);
+});

@@ -112,6 +112,10 @@ export class Case {
 export class StructFields {
   private structFields: Scope<symbol, Case> = new Scope();
   private tupleNames = new ArityName("tuple");
+  addBuiltIn(structCase: Case): this {
+    this.structFields.init(structCase.type.name, structCase);
+    return this;
+  }
   initStruct(
     name: string,
     matchTypes: Type[],
