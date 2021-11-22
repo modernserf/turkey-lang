@@ -497,7 +497,9 @@ export class Thing {
   private initScopeBinding(binding: Binding, type: Type): CheckedBinding {
     switch (binding.tag) {
       case "identifier":
-        this.vars.init(binding.value, type);
+        if (!binding.value.startsWith("_")) {
+          this.vars.init(binding.value, type);
+        }
         return binding;
       case "struct": {
         const fields = this.structFields

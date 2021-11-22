@@ -81,6 +81,9 @@ class LocalsState {
   }
   init(name: Label): void {
     const index = this.locals.size;
+    if (typeof name === "string" && name.startsWith("_")) {
+      name = Symbol(name);
+    }
     this.locals.set(name, index);
   }
   get(name: Label): void {

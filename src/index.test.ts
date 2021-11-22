@@ -748,7 +748,7 @@ it("has tagged variants", () => {
         None => {
           print("None")
         },
-        Some(x) => {
+        Some(_) => {
           print("Some")
         },
       }
@@ -1042,4 +1042,32 @@ it("has tuple type literals", () => {
     print(pair:1)
   `;
   expect(run(code)).toEqual(["1", "foo"]);
+});
+
+it("rejects destructuring tuples with the wrong number of args", () => {
+  const code = `
+    let (x) = (1, "foo")
+    print(x)
+  `;
+  expect(() => run(code)).toThrow();
+});
+
+it("does not bind identifiers starting with underscore", () => {
+  const code = `
+    let _ = 1
+    let _ = 2
+    
+    func foo (_arg: Int, _arg: Int): Void {}
+
+    foo(1, 2)
+  `;
+  expect(run(code)).toEqual([]);
+});
+
+it("cannot reference underscore identifiers", () => {
+  const code = `
+    let _ = 1
+    print(_)
+  `;
+  expect(() => run(code)).toThrow();
 });
