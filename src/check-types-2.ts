@@ -17,7 +17,7 @@ import {
   CheckedMatchCase,
 } from "./types";
 import { noMatch } from "./utils";
-import { StructFields, EnumFields, Case } from "./fields";
+import { StructFields, Case } from "./fields";
 
 const primitive = (name: string, ...traits: Trait[]) =>
   TypeChecker.createValue(Symbol(name), [], traits);
@@ -55,7 +55,6 @@ export class Thing {
   private funcTypes = new ArityName();
   private tupleTypes = new ArityName();
   private structFields = new StructFields();
-  private enumFields = new EnumFields();
   static checkProgram(program: Stmt[]): CheckedStmt[] {
     return new Thing().checkBlock(program).block;
   }
@@ -109,7 +108,7 @@ export class Thing {
           const { type, casesMap } = this.withTypeParams(
             stmt.binding.typeParameters,
             (typeParams) => {
-              return this.enumFields.init(
+              return this.structFields.initEnum(
                 stmt.binding.value,
                 typeParams,
                 stmt.cases.map((c) => ({
@@ -137,7 +136,7 @@ export class Thing {
           const structCase = this.withTypeParams(
             stmt.binding.typeParameters,
             (typeParams) => {
-              return this.structFields.init(
+              return this.structFields.initStruct(
                 stmt.binding.value,
                 typeParams,
                 stmt.fields.map((field) => ({

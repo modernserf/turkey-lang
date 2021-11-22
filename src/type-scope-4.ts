@@ -37,6 +37,7 @@ export class TypeChecker {
   unify(left: Type, right: Type): void {
     left = this.deref(left);
     right = this.deref(right);
+    if (left === right) return;
     if (left.tag === "var") {
       this.unifyTraits(left.traits, right.traits);
       this.scope.init(left.name, right);
@@ -82,8 +83,8 @@ export class TypeChecker {
     const visited = new Set<Type>();
     while (type.tag === "var") {
       if (visited.has(type)) {
-        // return type;
-        throw new Error("loop in type definition");
+        return type;
+        // throw new Error("loop in type definition");
       }
 
       visited.add(type);

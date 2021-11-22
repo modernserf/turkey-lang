@@ -98,7 +98,7 @@ export class Case {
 
 export class StructFields {
   private structFields: Scope<symbol, Case> = new Scope();
-  init(
+  initStruct(
     name: string,
     matchTypes: Type[],
     fields: Array<{ fieldName: string; type: Type }>,
@@ -112,14 +112,7 @@ export class StructFields {
     this.structFields.init(type.name, structCase);
     return structCase;
   }
-  get(type: Type): Case {
-    return this.structFields.get(type.name);
-  }
-}
-
-export class EnumFields {
-  private enumFields: Scope<symbol, Scope<string, Case>> = new Scope();
-  init(
+  initEnum(
     name: string,
     matchTypes: Type[],
     enumCases: Array<{
@@ -138,7 +131,9 @@ export class EnumFields {
       }
       casesMap.init(tagName, enumCase);
     }
-    this.enumFields.init(type.name, casesMap);
     return { type, casesMap };
+  }
+  get(type: Type): Case {
+    return this.structFields.get(type.name);
   }
 }
