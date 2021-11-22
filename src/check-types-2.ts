@@ -83,12 +83,11 @@ export class Thing {
   private checkStmt(stmt: Stmt): CheckedStmt | null {
     switch (stmt.tag) {
       case "type": {
-        if (stmt.binding.typeParameters.length) {
-          throw new Error("todo: type params");
-        }
-        this.initType(stmt.binding.value, () => {
-          return this.checkTypeExpr(stmt.type);
-        });
+        this.initType(stmt.binding.value, () =>
+          this.withTypeParams(stmt.binding.typeParameters, () =>
+            this.checkTypeExpr(stmt.type)
+          )
+        );
         return null;
       }
       case "enum": {
@@ -199,6 +198,7 @@ export class Thing {
           ...this.checkFunc(rawParams, type.matchTypes[0], stmt.block),
         };
       }
+      // istanbul ignore next
       default:
         noMatch(stmt);
     }
@@ -307,34 +307,7 @@ export class Thing {
       }
       case "call": {
         if (expr.expr.tag === "identifier" && expr.expr.value === "print") {
-          if (expr.args.length !== 1) throw new Error();
-          const checkedArg = this.checkExpr(expr.args[0], null);
-          const checker = new TypeChecker();
-          checker.unify(
-            checkedArg.type,
-            TypeChecker.createVar("Printable", debugTrait)
-          );
-          const resolvedType = checker.resolve(checkedArg.type);
-
-          switch (resolvedType.name) {
-            case stringType.name:
-              return {
-                tag: "callBuiltIn",
-                opcode: Opcode.PrintStr,
-                args: [checkedArg],
-                type: voidType,
-              };
-            case intType.name:
-            case floatType.name:
-              return {
-                tag: "callBuiltIn",
-                opcode: Opcode.PrintNum,
-                args: [checkedArg],
-                type: voidType,
-              };
-            default:
-              throw new Error("cannot print");
-          }
+          return this.print(expr.args);
         }
 
         const callee = this.checkExpr(expr.expr, null);
@@ -419,6 +392,38 @@ export class Thing {
       }
     }
   }
+  private print(args: Expr[]): CheckedExpr {
+    if (args.length !== 1) throw new Error();
+    const checkedArg = this.checkExpr(args[0], null);
+    const checker = new TypeChecker();
+    checker.unify(
+      checkedArg.type,
+      TypeChecker.createVar("Printable", debugTrait)
+    );
+    const resolvedType = checker.resolve(checkedArg.type);
+
+    switch (resolvedType.name) {
+      case stringType.name:
+        return {
+          tag: "callBuiltIn",
+          opcode: Opcode.PrintStr,
+          args: [checkedArg],
+          type: voidType,
+        };
+      case intType.name:
+      case floatType.name:
+        return {
+          tag: "callBuiltIn",
+          opcode: Opcode.PrintNum,
+          args: [checkedArg],
+          type: voidType,
+        };
+      // istanbul ignore next
+      default:
+        throw new Error("cannot print");
+    }
+  }
+
   private arithmeticOp(
     left: CheckedExpr,
     right: CheckedExpr,

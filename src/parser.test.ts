@@ -2,6 +2,31 @@ import { parse } from "./parser";
 import { lex } from "./lexer";
 import { ParseError } from "./types";
 
+it("gets error tokens when input is totally malformed", () => {
+  const code = `
+    print(™
+  `;
+  const tokens = lex(code);
+  expect(tokens).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "tag": "identifier",
+    "value": "print",
+  },
+  Object {
+    "tag": "(",
+  },
+  Object {
+    "tag": "error",
+    "value": "™",
+  },
+]
+`);
+  expect(() => {
+    parse(tokens);
+  }).toThrowError(ParseError);
+});
+
 it("parses print, let, numbers", () => {
   const code = `
     print(0 + 123)   // add ints

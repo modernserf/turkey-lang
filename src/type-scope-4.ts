@@ -65,7 +65,10 @@ export class TypeChecker {
     type = this.deref(type);
     if (type.tag === "var") return type;
     const prev = visited.get(type);
-    if (prev) return prev;
+    // istanbul ignore next
+    if (prev) {
+      throw new Error("loop in resolution; maybe this is fine?");
+    }
     const nextType: Type = {
       tag: "value",
       name: type.name,

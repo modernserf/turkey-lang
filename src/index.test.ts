@@ -24,6 +24,26 @@ it("typechecks math", () => {
   }).toThrow();
 });
 
+it("rejects math operations on non-numbers", () => {
+  expect(() => {
+    run(`print("foo" + "bar")`);
+  }).toThrow();
+});
+
+it("rejects calling print with the wrong number of args", () => {
+  expect(() => {
+    run(`print()`);
+  }).toThrow();
+});
+
+it("rejects printing non-printable values", () => {
+  const code = `
+    func foo (): Void {}
+    print(foo)
+  `;
+  expect(() => run(code)).toThrow();
+});
+
 it("references variables", () => {
   const code = `
     let x = 1
@@ -90,8 +110,10 @@ it("theoretically uses loops", () => {
     while (!True) {
       print(1)
     }
-    while (!!False) {
-      3
+    func forever (): Void {
+      while (!False) {
+        3
+      }
     }
     print(2)
   `;
@@ -133,6 +155,29 @@ it("calls closures", () => {
   expect(run(code)).toEqual(["1.5"]);
 });
 
+it("calls nested closures", () => {
+  const code = `
+    let x = 1.5
+    func get_get_x (): func (): Float {
+      func get_x(): Float {
+        x
+      }
+      return get_x
+    }
+
+    print(get_get_x()())
+  `;
+  expect(run(code)).toEqual(["1.5"]);
+});
+
+it("errors when calling non-functions", () => {
+  const code = `
+    let foo = 1
+    foo()
+  `;
+  expect(() => run(code)).toThrow();
+});
+
 it("forbids returning from top level", () => {
   const code = `
     return 1
@@ -164,9 +209,10 @@ it("uses strings", () => {
     }
 
     print_twice("hello")
+    print_twice("hello")
   `;
 
-  expect(run(code)).toEqual(["hello", "hello"]);
+  expect(run(code)).toEqual(["hello", "hello", "hello", "hello"]);
 });
 
 it("supports recursion", () => {
@@ -788,6 +834,21 @@ it("has generic struct params", () => {
     print(y:current)
   `;
   expect(run(code)).toEqual(["1", "hello"]);
+});
+
+it("has parameterized type aliases", () => {
+  const code = `
+    struct Cell <T> {
+      current: T
+    }
+
+    type CellAlias<T> = Cell<T>
+
+    let x: CellAlias<Int> = Cell { current: 1 }
+    
+    print(x:current)
+  `;
+  expect(run(code)).toEqual(["1"]);
 });
 
 it("destructures generic struct params", () => {

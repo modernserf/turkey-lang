@@ -9,6 +9,7 @@ export const tap = <T>(value: T) => {
   return value;
 };
 
+// istanbul ignore next
 export function mapMap<K, V, V2>(
   map: Map<K, V>,
   fn: (value: V, key: K, index: number) => V2
