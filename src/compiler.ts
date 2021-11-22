@@ -89,6 +89,9 @@ class LocalsState {
   get(name: Label): void {
     this.writer.loadLocal(this.locals.get(name));
   }
+  set(name: Label): void {
+    this.writer.setLocal(this.locals.get(name));
+  }
   inScope(fn: () => void) {
     this.locals = this.locals.push();
     fn();
@@ -234,6 +237,35 @@ class Compiler {
           this.asm.drop();
         }
 
+        this.labels.jump(loopBegin);
+        this.labels.create(loopEnd);
+        return;
+      }
+      case "for": {
+        const loopBegin = Symbol("loop_begin");
+        const loopEnd = Symbol("loop_end");
+        const loopValue = Symbol("loop_value");
+        this.compileExpr(stmt.expr);
+        this.locals.init(loopValue);
+
+        this.labels.create(loopBegin);
+        this.locals.get(loopValue); // will be 0 for nil list
+        this.labels.jumpIfZero(loopEnd);
+
+        this.locals.inScope(() => {
+          this.locals.get(loopValue);
+          this.asm.getHeap(1); // head
+          this.compileBinding(stmt.binding);
+          this.compileBlock(stmt.block);
+          if (hasValue(stmt.block)) {
+            this.asm.drop();
+          }
+        });
+        this.asm.drop();
+
+        this.locals.get(loopValue);
+        this.asm.getHeap(2); // tail
+        this.locals.set(loopValue);
         this.labels.jump(loopBegin);
         this.labels.create(loopEnd);
         return;

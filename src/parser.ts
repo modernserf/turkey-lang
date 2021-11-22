@@ -36,14 +36,14 @@ class ParseState implements IParseState {
 }
 
 export function parse(input: Token[]): Stmt[] {
-  return parseProgram(new ParseState(input));
+  return matchProgram(new ParseState(input));
 }
 
-const parseProgram: Parser<Stmt[]> = (state) => {
-  return parseUntil(state, parseStatement, parseEndOfInput);
+const matchProgram: Parser<Stmt[]> = (state) => {
+  return parseUntil(state, matchStatement, checkEndOfInput);
 };
 
-const parseStatement: Parser<Stmt> = (state) => {
+const matchStatement: Parser<Stmt> = (state) => {
   const token = state.token();
   switch (token.tag) {
     case "type": {
@@ -84,8 +84,18 @@ const parseStatement: Parser<Stmt> = (state) => {
       match(state, "(");
       const expr = matchExpr(state);
       match(state, ")");
-      const block = parseBlock(state);
+      const block = matchBlock(state);
       return { tag: "while", expr, block };
+    }
+    case "for": {
+      state.advance();
+      match(state, "(");
+      const binding = matchBinding(state);
+      match(state, "in");
+      const expr = matchExpr(state);
+      match(state, ")");
+      const block = matchBlock(state);
+      return { tag: "for", binding, expr, block };
     }
     case "return": {
       state.advance();
@@ -102,7 +112,7 @@ const parseStatement: Parser<Stmt> = (state) => {
       match(state, ")");
       match(state, ":");
       const returnType = matchType(state);
-      const block = parseBlock(state);
+      const block = matchBlock(state);
       return {
         tag: "func",
         name,
@@ -122,30 +132,30 @@ const matchExpr: Parser<Expr> = (state) => {
 };
 
 const checkExpr: Parser<Expr | null> = (state) => {
-  return infixLeft(state, parseAddExpr, ["==", "!=", ">", "<", "<=", ">="]);
+  return infixLeft(state, checkAddExpr, ["==", "!=", ">", "<", "<=", ">="]);
 };
 
-const parseAddExpr: Parser<Expr | null> = (state) => {
-  return infixLeft(state, parseMulExpr, ["+", "-"]);
+const checkAddExpr: Parser<Expr | null> = (state) => {
+  return infixLeft(state, checkMulExpr, ["+", "-"]);
 };
 
-const parseMulExpr: Parser<Expr | null> = (state) => {
-  return infixLeft(state, parsePrefixExpr, ["*", "/", "%"]);
+const checkMulExpr: Parser<Expr | null> = (state) => {
+  return infixLeft(state, checkPrefixExpr, ["*", "/", "%"]);
 };
 
-const parsePrefixExpr: Parser<Expr | null> = (state) => {
+const checkPrefixExpr: Parser<Expr | null> = (state) => {
   const tok = state.token();
   if (tok.tag === "!" || tok.tag === "-") {
     state.advance();
-    const expr = assert(state, "expression", parsePrefixExpr(state));
+    const expr = assert(state, "expression", checkPrefixExpr(state));
     return { tag: "unaryOp", operator: tok.tag, expr };
   } else {
-    return parsePostfixExpr(state);
+    return checkPostfixExpr(state);
   }
 };
 
-const parsePostfixExpr: Parser<Expr | null> = (state) => {
-  let expr = parseBaseExpr(state);
+const checkPostfixExpr: Parser<Expr | null> = (state) => {
+  let expr = checkBaseExpr(state);
   if (!expr) return null;
 
   while (true) {
@@ -183,7 +193,7 @@ const parsePostfixExpr: Parser<Expr | null> = (state) => {
   }
 };
 
-const parseBaseExpr: Parser<Expr | null> = (state) => {
+const checkBaseExpr: Parser<Expr | null> = (state) => {
   const token = state.token();
   switch (token.tag) {
     case "(": {
@@ -231,12 +241,12 @@ const parseBaseExpr: Parser<Expr | null> = (state) => {
       state.advance();
       const parameters = commaList(state, checkBinding);
       match(state, "|");
-      const block = parseBlock(state);
+      const block = matchBlock(state);
       return { tag: "closure", parameters, block };
     }
     case "do":
       state.advance();
-      return { tag: "do", block: parseBlock(state) };
+      return { tag: "do", block: matchBlock(state) };
     case "if": {
       state.advance();
       const cases: IfCase[] = [];
@@ -244,11 +254,11 @@ const parseBaseExpr: Parser<Expr | null> = (state) => {
         match(state, "(");
         const predicate = matchExpr(state);
         match(state, ")");
-        const block = parseBlock(state);
+        const block = matchBlock(state);
         cases.push({ tag: "cond", predicate, block });
         if (check(state, "else")) {
           if (check(state, "if")) continue;
-          const elseBlock = parseBlock(state);
+          const elseBlock = matchBlock(state);
           return { tag: "if", cases, elseBlock };
         } else {
           return { tag: "if", cases, elseBlock: [] };
@@ -282,7 +292,7 @@ const checkMatchCase: Parser<MatchCase | null> = (state) => {
     fields,
   };
   if (state.token().tag === "{") {
-    const block = parseBlock(state);
+    const block = matchBlock(state);
     return { binding, block };
   } else {
     const expr = matchExpr(state);
@@ -489,7 +499,7 @@ const checkFuncParam: Parser<{ binding: Binding; type: TypeExpr } | null> = (
   return { binding, type };
 };
 
-const parseEndOfInput: Parser<boolean> = (state) => {
+const checkEndOfInput: Parser<boolean> = (state) => {
   return !!check(state, "endOfInput");
 };
 
@@ -524,9 +534,9 @@ function match<Tag extends Token["tag"]>(
 function checkEndBrace(state: IParseState): boolean {
   return !!check(state, "}");
 }
-const parseBlock: Parser<Stmt[]> = (state) => {
+const matchBlock: Parser<Stmt[]> = (state) => {
   match(state, "{");
-  return parseUntil(state, parseStatement, checkEndBrace);
+  return parseUntil(state, matchStatement, checkEndBrace);
 };
 
 function parseUntil<T>(

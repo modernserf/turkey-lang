@@ -188,6 +188,17 @@ export class Thing {
         const { block } = this.checkBlock(stmt.block);
         return { tag: "while", expr: predicate, block };
       }
+      case "for": {
+        const list = this.checkExpr(stmt.expr, null);
+        const checker = new TypeChecker();
+        checker.unify(list.type, listType);
+        const itemType = checker.resolve(listType.matchTypes[0]);
+        return this.inScope(() => {
+          const binding = this.initScopeBinding(stmt.binding, itemType);
+          const { block } = this.checkBlock(stmt.block);
+          return { tag: "for", expr: list, binding, block };
+        });
+      }
       case "func": {
         const type = this.funcType(
           stmt.typeParameters,

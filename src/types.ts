@@ -5,6 +5,8 @@ export type Token =
   | { tag: "do" }
   | { tag: "if" }
   | { tag: "else" }
+  | { tag: "for" }
+  | { tag: "in" }
   | { tag: "while" }
   | { tag: "func" }
   | { tag: "return" }
@@ -63,6 +65,7 @@ export type Stmt =
     }
   | { tag: "let"; binding: Binding; type: TypeExpr | null; expr: Expr }
   | { tag: "while"; expr: Expr; block: Stmt[] }
+  | { tag: "for"; binding: Binding; expr: Expr; block: Stmt[] }
   | { tag: "return"; expr: Expr | null }
   | {
       tag: "func";
@@ -198,6 +201,12 @@ export type CheckedStmt =
       type: Type;
     }
   | { tag: "while"; expr: CheckedExpr; block: CheckedStmt[] }
+  | {
+      tag: "for";
+      binding: CheckedBinding;
+      expr: CheckedExpr;
+      block: CheckedStmt[];
+    }
   | { tag: "expr"; expr: CheckedExpr; hasValue: boolean };
 
 export type CheckedBinding =

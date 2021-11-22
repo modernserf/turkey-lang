@@ -1097,3 +1097,15 @@ it("has list literals", () => {
   `;
   expect(run(code)).toEqual(["6", "0"]);
 });
+
+it("has for-in loops", () => {
+  const code = `
+    // TODO: why isn't list type inferred here?
+    let list: List<Int> = [2, 4, 6]
+
+    for (item in list) {
+      print(item)
+    }
+  `;
+  expect(run(code)).toEqual(["2", "4", "6"]);
+});

@@ -22,6 +22,8 @@ export function lex(string: string): Token[] {
         case "do":
         case "if":
         case "else":
+        case "for":
+        case "in":
         case "while":
         case "func":
         case "return":
