@@ -189,3 +189,151 @@ it("rejects mismatches in param types", () => {
   `;
   expect(() => check(code)).toThrow();
 });
+
+it("allows funcs as parameters and return values", () => {
+  const code = `
+    func k<T> (value: T): func (): T {
+      func get_value(): T {
+        return value
+      }
+      return get_value
+    }
+
+    let get = k(1)
+    print_int(get())
+  `;
+
+  expect(check(code)).toBe(true);
+});
+
+it("allows parameterized funcs as parameters and return values", () => {
+  const code = `
+    func k<T> (value: T): func <U> (U): T {
+      func get_value<U> (drop: U): T {
+        return value
+      }
+      return get_value
+    }
+
+    let get = k(1)
+    print_int(get("dropped"))
+  `;
+
+  expect(check(code)).toBe(true);
+});
+
+it("has simple type constructors", () => {
+  const code = `
+    let foo = !!True
+    let bar: Bool = False
+    
+    func baz (): Void {
+      return Void
+    }
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("has structs", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,  
+    }
+    let p = Point { x: 1, y: 2 }
+    print_int(p:x)
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("has parameterized structs", () => {
+  const code = `
+    struct Point<T> {
+      x: T,
+      y: T,  
+    }
+    let p = Point { x: 1.5, y: 2.5 }
+    print_float(p:x)
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("progagates struct parameters in func calls", () => {
+  const code = `
+    struct Point<T> {
+      x: T,
+      y: T,  
+    }
+
+    func get_x<T> (p: Point<T>): T {
+      return p:x
+    } 
+
+    let p = Point { x: 1.5, y: 2.5 }
+    print_float(get_x(p))
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("rejects incomplete struct constructions", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,  
+    }
+    let p = Point { x: 1 }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects duplicate fields in struct constructions", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,  
+    }
+    let p = Point { x: 1, x: 2, y: 3 }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects unknown fields in struct constructions", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,  
+    }
+    let p = Point { x: 1, y: 2, z: 3 }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects type mismatches in structs", () => {
+  const code = `
+    struct Point<T> {
+      x: T,
+      y: T,  
+    }
+    let p = Point { x: 1, y: 1.5 }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects accessing unknown fields", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,  
+    }
+    let p = Point { x: 1, y: 2 }
+    p:z
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects accessing fields on non-structs", () => {
+  const code = `
+    "foo":y
+  `;
+  expect(() => check(code)).toThrow();
+});

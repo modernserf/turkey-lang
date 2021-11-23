@@ -1,6 +1,7 @@
 import { Scope } from "./scope";
 import { Binding, Expr, Opcode, Stmt, TypeExpr, TypeParam } from "./types";
 import { CurrentFuncState, FuncFields } from "./current-func-2";
+import { noMatch } from "./utils";
 
 type TypeName = symbol;
 type TraitName = TypeName;
@@ -10,9 +11,7 @@ type TypeVar = { tag: "var"; name: symbol; traits: BoundType[] };
 type BoundType = { tag: "type"; name: TypeName; parameters: Type[] };
 type Type = TypeVar | BoundType;
 
-type FieldMap =
-  | { tag: "record"; fields: Map<string, Type> }
-  | { tag: "tuple"; fields: Type[] };
+type FieldMap = Scope<string, { type: Type; index: number }>;
 
 type FuncTypeNames = Map<number, TypeName>;
 type TupleTypeNames = Map<number, TypeName>;
@@ -97,7 +96,9 @@ class Checker {
         }
       }
     } else {
-      throw new Error("TODO: unifying traits on vars");
+      if (binding.traits.length) {
+        throw new Error("TODO: unifying traits on vars");
+      }
     }
 
     this.state.set(binding.name, tv);
@@ -205,17 +206,23 @@ export function check(program: Stmt[]): CheckedStmt[] {
   return new ASTChecker().checkProgram(program);
 }
 
+type TypeConstructor =
+  | { tag: "struct"; type: Type; fields: FieldMap }
+  | { tag: "enum"; index: number; type: Type; fields: FieldMap };
+
 class ASTChecker {
   private vars: Scope<string, BoundType> = new Scope();
   private types: Scope<string, Type> = new Scope();
   private builtins: Scope<string, BuiltIn> = new Scope();
   private funcTypeNames: FuncTypeNames = new Map();
   private tupleTypeNames: TupleTypeNames = new Map();
-  private structFields: Map<TypeName, FieldMap> = new Map();
+  private structFields: Map<TypeName, { type: BoundType; fields: FieldMap }> =
+    new Map();
   private enumFields: Map<TypeName, Map<EnumTag, FieldMap>> = new Map();
+  private typeConstructors: Scope<string, TypeConstructor> = new Scope();
   private traitImpls = new TraitImpls();
   private currentFunc = new CurrentFuncState<BoundType, Expr, CheckedExpr>();
-  checkProgram(program: Stmt[]): CheckedStmt[] {
+  public checkProgram(program: Stmt[]): CheckedStmt[] {
     this.initPrelude();
     return this.checkBlock(program).block;
   }
@@ -259,15 +266,9 @@ class ASTChecker {
           for (const param of stmt.typeParameters) {
             this.types.init(param.value, typeVar(param.value));
           }
-          const funcParams = stmt.parameters.map((p) => ({
-            binding: p.binding,
-            type: this.checkTypeExpr(p.type),
-          }));
-          const returnType = this.checkTypeExpr(stmt.returnType);
-
           return this.funcType(
-            funcParams.map((p) => p.type),
-            returnType
+            stmt.parameters.map((p) => this.checkTypeExpr(p.type)),
+            this.checkTypeExpr(stmt.returnType)
           );
         });
         this.vars.init(stmt.name, type);
@@ -293,6 +294,36 @@ class ASTChecker {
       }
       case "return":
         return { tag: "return", expr: this.currentFunc.checkReturn(stmt.expr) };
+      case "struct": {
+        const name = stmt.binding.value;
+        const { type, fields } = this.inScope(() => {
+          const type: BoundType = {
+            tag: "type",
+            name: Symbol(name),
+            parameters: stmt.binding.typeParameters.map((param) => {
+              const t = typeVar(param.value);
+              this.types.init(param.value, t);
+              return t;
+            }),
+          };
+          this.types.init(name, type);
+
+          const fields: FieldMap = new Scope();
+          stmt.fields.forEach((field, index) => {
+            fields.init(field.fieldName, {
+              index,
+              type: this.checkTypeExpr(field.type),
+            });
+          });
+
+          return { type, fields };
+        });
+        this.structFields.set(type.name, { type, fields });
+        this.typeConstructors.init(name, { tag: "struct", type, fields });
+        this.types.init(name, type);
+        return null;
+      }
+
       default:
         throw new Error("todo");
     }
@@ -335,19 +366,114 @@ class ASTChecker {
           expr.args,
           ctx
         );
+      case "typeConstructor": {
+        const ctor = this.typeConstructors.get(expr.value);
+        const checker = ctx?.checker ?? new Checker(this.traitImpls);
+
+        // check types of fields & for correct overlap between types
+        const concreteMap = new Scope<string, CheckedExpr>();
+        for (const field of expr.fields) {
+          const { type: ctorFieldType } = ctor.fields.get(field.fieldName);
+          concreteMap.init(
+            field.fieldName,
+            this.checkExpr(field.expr, { checker, type: ctorFieldType })
+          );
+        }
+        const checkedFields = Array.from(ctor.fields).map(([key]) =>
+          concreteMap.get(key)
+        );
+
+        const type = checker.mustResolve(ctor.type);
+        switch (ctor.tag) {
+          case "struct":
+            return { tag: "struct", fields: checkedFields, type };
+          case "enum":
+            return {
+              tag: "enum",
+              index: ctor.index,
+              fields: checkedFields,
+              type,
+            };
+          // istanbul ignore next
+          default:
+            return noMatch(ctor);
+        }
+      }
+      case "field": {
+        const checker = ctx?.checker ?? new Checker(this.traitImpls);
+        const target = this.checkExpr(expr.expr, null);
+        const fieldInfo = this.structFields.get(target.type.name);
+        if (!fieldInfo) throw new Error("invalid field access");
+        checker.unify(fieldInfo.type, target.type);
+        const fieldData = fieldInfo.fields.get(expr.fieldName);
+        const type = checker.mustResolve(fieldData.type);
+        return { tag: "field", index: fieldData.index, expr: target, type };
+      }
       default:
+        throw new Error("todo");
+    }
+  }
+  private checkTypeExpr(typeExpr: TypeExpr): Type {
+    switch (typeExpr.tag) {
+      case "identifier": {
+        const baseType = this.types.get(typeExpr.value);
+        if (!typeExpr.typeArgs.length) return baseType;
+        const parameters = typeExpr.typeArgs.map((expr) =>
+          this.checkTypeExpr(expr)
+        );
+        return { tag: "type", name: baseType.name, parameters };
+      }
+      case "func":
+        return this.inScope(() => {
+          for (const param of typeExpr.typeParameters) {
+            this.types.init(param.value, typeVar(param.value));
+          }
+          return this.funcType(
+            typeExpr.parameters.map((p) => this.checkTypeExpr(p)),
+            this.checkTypeExpr(typeExpr.returnType)
+          );
+        });
+      default:
+        throw new Error("todo");
+    }
+  }
+  private bindVars(binding: Binding, type: BoundType): CheckedBinding {
+    switch (binding.tag) {
+      case "identifier":
+        this.vars.set(binding.value, type);
+        return binding;
+      case "struct":
         throw new Error("todo");
     }
   }
   private initPrelude(): void {
     this.types
-      .set("Int", intType)
-      .set("Float", floatType)
-      .set("String", stringType)
-      .set("Bool", boolType)
-      .set("Void", voidType);
+      .init("Int", intType)
+      .init("Float", floatType)
+      .init("String", stringType)
+      .init("Bool", boolType)
+      .init("Void", voidType);
     // empty tuple is same type as void
     this.tupleTypeNames.set(0, voidType.name);
+
+    this.typeConstructors
+      .init("Void", {
+        tag: "struct",
+        fields: new Scope(),
+        type: voidType,
+      })
+      .init("False", {
+        tag: "enum",
+        index: 0,
+        fields: new Scope(),
+        type: boolType,
+      })
+      .init("True", {
+        tag: "enum",
+        index: 1,
+        fields: new Scope(),
+        type: boolType,
+      });
 
     this.traitImpls
       .init(intType.name, numTrait.name, { tag: "impl" })
@@ -427,29 +553,6 @@ class ASTChecker {
     } finally {
       this.vars = this.vars.pop();
       this.types = this.types.pop();
-    }
-  }
-  private checkTypeExpr(typeExpr: TypeExpr): Type {
-    switch (typeExpr.tag) {
-      case "identifier": {
-        const baseType = this.types.get(typeExpr.value);
-        if (!typeExpr.typeArgs.length) return baseType;
-        const parameters = typeExpr.typeArgs.map((expr) =>
-          this.checkTypeExpr(expr)
-        );
-        return { tag: "type", name: baseType.name, parameters };
-      }
-      default:
-        throw new Error("todo");
-    }
-  }
-  private bindVars(binding: Binding, type: BoundType): CheckedBinding {
-    switch (binding.tag) {
-      case "identifier":
-        this.vars.set(binding.value, type);
-        return binding;
-      case "struct":
-        throw new Error("todo");
     }
   }
   private checkFunc(
