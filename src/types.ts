@@ -151,8 +151,6 @@ export type ValueType = {
 };
 export type Type = { tag: "var"; name: symbol; traits: Trait[] } | ValueType;
 
-export type CheckedStructFieldType = { type: Type; index: number };
-
 export type CheckedExpr =
   | { tag: "primitive"; value: number; type: Type }
   | { tag: "string"; value: string; type: Type }
