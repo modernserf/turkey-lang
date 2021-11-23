@@ -377,7 +377,7 @@ We have enough information to figure out this lambda's type:
 - now we can unify the next type parameter, resulting in `{ T => Int, U => Int }`
 - and the resolved return type is `List<Int>`
 
-Unfortunately, this disrupts the straightforward flow of typechecking -- instead of a clean bottom-up check, we now need information from the parent (and, in some cases sibling) nodes in order to typecheck the lambda.
+Unfortunately, this disrupts the straightforward flow of typechecking -- instead of a clean bottom-up check, we now need information from the parent (and, in some cases, sibling) nodes in order to typecheck the lambda.
 
 So when typechecking an expression, need to also pass in context for the parent expression:
 

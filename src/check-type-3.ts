@@ -212,7 +212,7 @@ type TypeConstructor =
 
 class ASTChecker {
   private vars: Scope<string, BoundType> = new Scope();
-  private types: Scope<string, Type> = new Scope();
+  private types: Scope<string, BoundType> = new Scope();
   private builtins: Scope<string, BuiltIn> = new Scope();
   private funcTypeNames: FuncTypeNames = new Map();
   private tupleTypeNames: TupleTypeNames = new Map();
@@ -262,13 +262,14 @@ class ASTChecker {
         return { tag: "let", expr, binding };
       }
       case "func": {
+        const typeVars = new Scope<string, TypeVar>();
         const type = this.inScope(() => {
           for (const param of stmt.typeParameters) {
-            this.types.init(param.value, typeVar(param.value));
+            typeVars.init(param.value, typeVar(param.value));
           }
           return this.funcType(
-            stmt.parameters.map((p) => this.checkTypeExpr(p.type)),
-            this.checkTypeExpr(stmt.returnType)
+            stmt.parameters.map((p) => this.checkTypeExpr(p.type, typeVars)),
+            this.checkTypeExpr(stmt.returnType, typeVars)
           );
         });
         this.vars.init(stmt.name, type);
@@ -296,31 +297,30 @@ class ASTChecker {
         return { tag: "return", expr: this.currentFunc.checkReturn(stmt.expr) };
       case "struct": {
         const name = stmt.binding.value;
-        const { type, fields } = this.inScope(() => {
-          const type: BoundType = {
-            tag: "type",
-            name: Symbol(name),
-            parameters: stmt.binding.typeParameters.map((param) => {
-              const t = typeVar(param.value);
-              this.types.init(param.value, t);
-              return t;
-            }),
-          };
-          this.types.init(name, type);
+        const typeVars = new Scope<string, TypeVar>();
 
-          const fields: FieldMap = new Scope();
-          stmt.fields.forEach((field, index) => {
-            fields.init(field.fieldName, {
-              index,
-              type: this.checkTypeExpr(field.type),
-            });
+        const type: BoundType = {
+          tag: "type",
+          name: Symbol(name),
+          parameters: stmt.binding.typeParameters.map((param) => {
+            const t = typeVar(param.value);
+            typeVars.init(param.value, t);
+            return t;
+          }),
+        };
+        this.types.init(name, type);
+
+        const fields: FieldMap = new Scope();
+        stmt.fields.forEach((field, index) => {
+          fields.init(field.fieldName, {
+            index,
+            type: this.checkTypeExpr(field.type, typeVars),
           });
-
-          return { type, fields };
         });
+
         this.structFields.set(type.name, { type, fields });
         this.typeConstructors.init(name, { tag: "struct", type, fields });
-        this.types.init(name, type);
+
         return null;
       }
 
@@ -417,26 +417,31 @@ class ASTChecker {
         throw new Error("todo");
     }
   }
-  private checkTypeExpr(typeExpr: TypeExpr): Type {
+  private checkTypeExpr(
+    typeExpr: TypeExpr,
+    vars: Scope<string, TypeVar> = new Scope()
+  ): Type {
     switch (typeExpr.tag) {
       case "identifier": {
-        const baseType = this.types.get(typeExpr.value);
+        const baseType = vars.has(typeExpr.value)
+          ? vars.get(typeExpr.value)
+          : this.types.get(typeExpr.value);
         if (!typeExpr.typeArgs.length) return baseType;
         const parameters = typeExpr.typeArgs.map((expr) =>
-          this.checkTypeExpr(expr)
+          this.checkTypeExpr(expr, vars)
         );
         return { tag: "type", name: baseType.name, parameters };
       }
-      case "func":
-        return this.inScope(() => {
-          for (const param of typeExpr.typeParameters) {
-            this.types.init(param.value, typeVar(param.value));
-          }
-          return this.funcType(
-            typeExpr.parameters.map((p) => this.checkTypeExpr(p)),
-            this.checkTypeExpr(typeExpr.returnType)
-          );
-        });
+      case "func": {
+        vars = vars.push();
+        for (const param of typeExpr.typeParameters) {
+          vars.init(param.value, typeVar(param.value));
+        }
+        return this.funcType(
+          typeExpr.parameters.map((p) => this.checkTypeExpr(p, vars)),
+          this.checkTypeExpr(typeExpr.returnType, vars)
+        );
+      }
       default:
         throw new Error("todo");
     }
