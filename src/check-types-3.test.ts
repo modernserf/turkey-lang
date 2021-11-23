@@ -337,3 +337,41 @@ it("rejects accessing fields on non-structs", () => {
   `;
   expect(() => check(code)).toThrow();
 });
+
+it("has func literals", () => {
+  const code = `
+    struct Cell<T> {
+      value: T,
+    }
+
+    func map<T, U> (cell: Cell<T>, mapper: func (T): U): Cell<U> {
+      let prev = cell:value
+      let next = mapper(prev)
+      return Cell { value: next } 
+    }
+    
+    let cell = Cell { value: 1 }
+    let mapped = map(cell, |x| { x < 10 })
+    let result = mapped:value
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("is order-dependent when inferring func literal types", () => {
+  const code = `
+    struct Cell<T> {
+      value: T,
+    }
+
+    func map<T, U> (mapper: func (T): U, cell: Cell<T>): Cell<U> {
+      let prev = cell:value
+      let next = mapper(prev)
+      return Cell { value: next } 
+    }
+    
+    let cell = Cell { value: 1 }
+    let mapped = map(|x| { x < 10 }, cell)
+    let result = mapped:value
+  `;
+  expect(() => check(code)).toThrow();
+});

@@ -200,7 +200,7 @@ const stringType = primitive("String");
 const voidType = primitive("Void");
 const boolType = primitive("Bool");
 const numTrait = trait("Num");
-const eqTrait = trait("Eq");
+// const eqTrait = trait("Eq");
 
 export function check(program: Stmt[]): CheckedStmt[] {
   return new ASTChecker().checkProgram(program);
@@ -409,6 +409,10 @@ class ASTChecker {
         const type = checker.mustResolve(fieldData.type);
         return { tag: "field", index: fieldData.index, expr: target, type };
       }
+      case "closure": {
+        if (!ctx) throw new Error("missing context");
+        return this.checkClosure(ctx, expr.parameters, expr.block);
+      }
       default:
         throw new Error("todo");
     }
@@ -515,7 +519,7 @@ class ASTChecker {
     ctx: ForwardTypeContext | null
   ): CheckedExpr {
     const checker = ctx?.checker ?? new Checker(this.traitImpls);
-    this.checkFuncArity(callee, args.length);
+    this.checkFuncArity(callee.type, args.length);
     const checkedArgs = args.map((arg, i) => {
       return this.checkExpr(arg, {
         checker,
@@ -527,9 +531,11 @@ class ASTChecker {
 
     return { tag: "call", callee, args: checkedArgs, type: returnType };
   }
-  private checkFuncArity(callee: CheckedExpr, arity: number) {
+  private checkFuncArity(type: Type, arity: number): BoundType {
     // the arity should already exist, because the callee has already been evaluated
-    if (callee.type.name === this.funcTypeNames.get(arity)) return;
+    if (type.tag === "type" && type.name === this.funcTypeNames.get(arity)) {
+      return type;
+    }
     throw new Error("Invalid func call");
   }
   private funcType(parameters: Type[], returnType: Type): BoundType {
@@ -554,6 +560,59 @@ class ASTChecker {
       this.vars = this.vars.pop();
       this.types = this.types.pop();
     }
+  }
+  private checkClosure(
+    ctx: ForwardTypeContext,
+    parameters: Binding[],
+    block: Stmt[]
+  ): CheckedExpr {
+    const funcType = this.checkFuncArity(ctx.type, parameters.length);
+    return this.inScope(() => {
+      const outerScope = this.vars.pop();
+      const returnTypeVar = typeVar("Return");
+      const checkReturnType = (expr: Expr | null) => {
+        if (!expr) {
+          ctx.checker.unify(returnTypeVar, voidType);
+          return null;
+        }
+        return this.checkExpr(expr, {
+          checker: ctx.checker,
+          type: returnTypeVar,
+        });
+      };
+
+      const {
+        upvalues,
+        payload: { checkedBlock, checkedParams },
+      } = this.currentFunc.withFunc(checkReturnType, outerScope, () => {
+        // add parameters to scope
+        const checkedParams = parameters.map((param, i) => {
+          // Dubious of this bit here
+          const type = ctx.checker.mustResolve(funcType.parameters[i + 1]);
+          const binding = this.bindVars(param, type);
+          return { type, binding };
+        });
+
+        const { block: checkedBlock } = this.checkBlock(block);
+        this.handleReturns(ctx.checker, checkedBlock, returnTypeVar);
+
+        const outType = this.funcType(
+          checkedParams.map((p) => p.type),
+          returnTypeVar
+        );
+
+        ctx.checker.unify(funcType, outType);
+        return { checkedBlock, checkedParams };
+      });
+
+      return {
+        tag: "closure",
+        parameters: checkedParams,
+        upvalues,
+        block: checkedBlock,
+        type: ctx.checker.mustResolve(funcType),
+      };
+    });
   }
   private checkFunc(
     typeParameters: TypeParam[],
@@ -593,35 +652,37 @@ class ASTChecker {
           return { type, binding };
         });
 
-        // check function body
         const { block } = this.checkBlock(rawBlock);
-
-        // handle explicit returns
         checker.unify(returnTypeVar, this.checkTypeExpr(returnType));
-
-        // handle implicit returns
-        const lastStmt = block.pop() ?? { tag: "noop" };
-        switch (lastStmt.tag) {
-          case "return":
-            block.push(lastStmt);
-            break;
-          case "expr":
-            checker.unify(returnTypeVar, lastStmt.expr.type);
-            block.push({ tag: "return", expr: lastStmt.expr });
-            break;
-          case "noop":
-            checker.unify(returnTypeVar, voidType);
-            block.push({ tag: "return", expr: null });
-            break;
-          default:
-            checker.unify(returnTypeVar, voidType);
-            block.push(lastStmt);
-            block.push({ tag: "return", expr: null });
-            break;
-        }
+        this.handleReturns(checker, block, returnTypeVar);
 
         return { parameters: checkedParams, block };
       });
     });
+  }
+  private handleReturns(
+    checker: Checker,
+    block: CheckedStmt[],
+    returnTypeVar: TypeVar
+  ) {
+    const lastStmt = block.pop() ?? { tag: "noop" };
+    switch (lastStmt.tag) {
+      case "return":
+        block.push(lastStmt);
+        break;
+      case "expr":
+        checker.unify(returnTypeVar, lastStmt.expr.type);
+        block.push({ tag: "return", expr: lastStmt.expr });
+        break;
+      case "noop":
+        checker.unify(returnTypeVar, voidType);
+        block.push({ tag: "return", expr: null });
+        break;
+      default:
+        checker.unify(returnTypeVar, voidType);
+        block.push(lastStmt);
+        block.push({ tag: "return", expr: null });
+        break;
+    }
   }
 }
