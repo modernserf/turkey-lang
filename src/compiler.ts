@@ -290,29 +290,13 @@ class Compiler {
       case "string":
         this.asm.loadPointer(this.strings.use(expr.value));
         return;
-      case "enum":
-        if (expr.fields.length === 0) {
-          this.asm.loadPrimitive(expr.index);
-          return;
-        }
-        this.asm
-          .newObject(expr.fields.length + 1)
-          .dup()
-          .loadPrimitive(expr.index)
-          .setHeap(0);
-        for (const [i, value] of expr.fields.entries()) {
-          this.asm.dup();
-          this.compileExpr(value);
-          this.asm.setHeap(i + 1);
-        }
-        return;
-      case "struct":
+      case "object":
         this.asm.newObject(expr.fields.length);
-        for (const [i, value] of expr.fields.entries()) {
+        expr.fields.forEach((value, i) => {
           this.asm.dup();
           this.compileExpr(value);
           this.asm.setHeap(i);
-        }
+        });
         return;
       case "closure": {
         this.compileFuncHeader(null, Symbol("closure"), expr);
@@ -347,13 +331,13 @@ class Compiler {
         const predicateRef = Symbol("predicate");
         this.locals.init(predicateRef);
         this.asm.dup();
-        const labels = this.labels.jumpTable(expr.cases.size);
-        for (const { index, bindings, block } of expr.cases.values()) {
+        const labels = this.labels.jumpTable(expr.cases.length);
+        expr.cases.forEach(({ block, bindings }, index) => {
           this.labels.create(labels[index]);
           this.locals.inScope(() => {
             for (const { fieldIndex, binding } of bindings) {
               this.locals.get(predicateRef);
-              this.asm.getHeap(fieldIndex);
+              this.asm.getHeap(fieldIndex + 1);
               this.compileBinding(binding);
             }
             this.flushBindingQueue();
@@ -361,34 +345,29 @@ class Compiler {
             this.compileBlock(block);
           });
           this.labels.jump(condEnd);
-        }
+        });
         this.panic("pattern match with no branch taken");
         this.labels.create(condEnd);
         return;
       }
-      case "callBuiltIn":
-        for (const arg of expr.args) {
-          this.compileExpr(arg);
-        }
-        this.asm.writeOpcode(expr.opcode);
-        return;
       case "call":
         for (const arg of expr.args) {
           this.compileExpr(arg);
         }
-        this.compileExpr(expr.callee);
-        this.asm.callClosure(expr.args.length);
+        if (expr.callee.tag === "builtIn") {
+          this.asm.writeOpcode(expr.callee.opcode);
+        } else {
+          this.compileExpr(expr.callee);
+          this.asm.callClosure(expr.args.length);
+        }
         return;
       case "field": {
         this.compileExpr(expr.expr);
         this.asm.getHeap(expr.index);
         return;
       }
-      case "assign": {
-        this.compileExpr(expr.target);
-        this.compileExpr(expr.value);
-        this.asm.setHeap(0);
-        return;
+      case "builtIn": {
+        throw Error("TODO: wrap builtins in funcs");
       }
       // istanbul ignore next
       default:

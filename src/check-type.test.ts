@@ -1,4 +1,4 @@
-import { check as checkInner } from "./check-type-3";
+import { check as checkInner } from "./check-type";
 import { lex } from "./lexer";
 import { parse } from "./parser";
 
@@ -351,8 +351,25 @@ it("has func literals", () => {
     }
     
     let cell = Cell { value: 1 }
-    let mapped = map(cell, |x| { x < 10 })
+    let mapped = map(cell, |x| { return x < 10 })
     let result = mapped:value
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("has void func literals", () => {
+  const code = `
+    struct Pair(Int, Int)
+
+    func each(item: Pair, fn: func (Int): Void): Void {
+      fn(item:0)
+      fn(item:1)
+    }
+
+    Pair(1, 2).each(|x| { 
+      print_int(x)
+      return 
+    })
   `;
   expect(check(code)).toBe(true);
 });
@@ -526,7 +543,7 @@ it("rejects type mismatches in pattern match results", () => {
   expect(() => check(code)).toThrow();
 });
 
-it.skip("has complex enums & pattern matching", () => {
+it("has complex enums & pattern matching", () => {
   const code = `
     enum List<T> {
       Nil,
@@ -539,10 +556,42 @@ it.skip("has complex enums & pattern matching", () => {
         Cons(head, tail) => Cons(mapper(head), tail.map(mapper)),
       }
     }
-  
-    let list = Cons(1, Cons(2, Cons(3, Nil)))
 
-    list.map(|x| { x + 1 })
+    let list = Cons(1, Cons(2, Cons(3, Nil)))
+    list.map(|x| { 1.5 }).map(|x| { "hello" })
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("handles func calls with multiple structs of the same shape but different types", () => {
+  const code = `
+    struct Cell <T> { value: T }
+    struct Pair <A, B> { left: A, right: B }
+
+    func pair<T, U> (left: Cell<T>, right: Cell<U>): Pair<T, U> {
+      Pair { left: left:value, right: right:value }
+    }
+
+    pair(
+      Cell { value: 1 }, 
+      Cell { value: "hello" }
+    )
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("makes generic args concrete at call time", () => {
+  const code = `
+    struct Cell<Value> {
+      current: Value
+    }
+
+    func current<U> (cell: Cell<U>): U {
+      cell:current
+    }
+
+    let x = current(Cell { current: 1 })
+    print_int(x)
   `;
   expect(check(code)).toBe(true);
 });

@@ -8,21 +8,26 @@ import {
   TypeBinding,
   TypeExpr,
   TypeParam,
+  Type,
+  TypeVar,
+  BoundType,
+  CheckedStmt,
+  CheckedExpr,
+  CheckedBinding,
+  CheckedMatchCase,
+  CheckedParam,
+  CheckedStructFieldBinding,
 } from "./types";
 import { CurrentFuncState, FuncFields } from "./current-func-2";
 import { noMatch } from "./utils";
+import { Checker, makeType, primitive, trait, typeVar } from "./checker";
+import { TraitImpls } from "./trait";
 
 type TypeName = symbol;
-type TraitName = TypeName;
 type EnumTag = string;
-
-type TypeVar = { tag: "var"; name: symbol; traits: BoundType[] };
-type BoundType = { tag: "type"; name: TypeName; parameters: Type[] };
-type Type = TypeVar | BoundType;
-
+type CheckedBlock = { block: CheckedStmt[]; type: BoundType };
+type BuiltIn = { tag: "builtIn"; opcode: Opcode; type: BoundType };
 type FieldMap = Scope<string, { type: Type; index: number }>;
-
-type Impl = { tag: "impl" };
 
 export class ArityName {
   constructor(private prefix: string) {}
@@ -39,184 +44,12 @@ export class ArityName {
   }
 }
 
-class TraitImpls {
-  private map: Map<TypeName, Map<TraitName, Impl>> = new Map();
-  get(typeName: TypeName, traitName: TraitName): Impl | null {
-    const traitMap = this.map.get(typeName);
-    if (!traitMap) return null;
-    return traitMap.get(traitName) ?? null;
-  }
-  init(typeName: TypeName, traitName: TraitName, impl: Impl): this {
-    let traitMap = this.map.get(typeName);
-    if (!traitMap) {
-      traitMap = new Map<TraitName, Impl>();
-      this.map.set(typeName, traitMap);
-    }
-    if (traitMap.has(traitName)) throw new Error("Duplicate trait impl");
-    traitMap.set(traitName, impl);
-    return this;
-  }
-}
-
-class TypeCheckError extends Error {
-  constructor(public left: BoundType, public right: BoundType) {
-    super(
-      `TypeCheckError: expected ${left.name.description}, received ${right.name.description}`
-    );
-  }
-}
-
-function typeVar(name: string, ...traits: BoundType[]): TypeVar {
-  return { tag: "var", name: Symbol(name), traits };
-}
-
-function primitive(name: string): BoundType {
-  return { tag: "type", name: Symbol(name), parameters: [] };
-}
-
-function makeType(name: symbol, parameters: Type[]): BoundType {
-  return { tag: "type", name: name, parameters };
-}
-
-function trait(name: string): BoundType {
-  const self = typeVar("Self");
-  return { tag: "type", name: Symbol(name), parameters: [self] };
-}
-
-class Checker {
-  private state: Map<symbol, Type> = new Map();
-  constructor(private traitImpls: TraitImpls) {}
-  unify(left: Type, right: Type): void {
-    left = this.deref(left);
-    right = this.deref(right);
-    if (left.tag === "var") return this.assign(left, right);
-    if (right.tag === "var") return this.assign(right, left);
-
-    if (left.name !== right.name) throw new TypeCheckError(left, right);
-    const rightParams = right.parameters;
-    left.parameters.forEach((param, i) => this.unify(param, rightParams[i]));
-  }
-  mustResolve(tv: Type): BoundType {
-    const res = this.resolve(tv);
-    if (res.tag === "var") throw new Error("not resolved");
-    return res;
-  }
-  resolve(tv: Type): Type {
-    tv = this.deref(tv);
-    if (tv.tag === "var") return tv;
-    return makeType(
-      tv.name,
-      tv.parameters.map((param) => this.resolve(param))
-    );
-  }
-  private assign(binding: TypeVar, tv: Type): void {
-    // prevent a variable from assigning to itself
-    if (tv.name === binding.name) return;
-    // check traits
-    if (tv.tag === "type") {
-      for (const trait of binding.traits) {
-        if (!this.traitImpls.get(tv.name, trait.name)) {
-          throw new Error("Trait mismatch");
-        }
-      }
-    } else {
-      if (binding.traits.length) {
-        throw new Error("TODO: unifying traits on vars");
-      }
-    }
-
-    this.state.set(binding.name, tv);
-  }
-  private deref(tv: Type): Type {
-    while (tv.tag === "var") {
-      const next = this.state.get(tv.name);
-      if (next) {
-        tv = next;
-      } else {
-        return tv;
-      }
-    }
-    return tv;
-  }
-}
-
 type ForwardTypeContext = { checker: Checker; type: Type };
 // used for cases where forward type does not need to be propagated
 function checkContext(context: ForwardTypeContext | null, exprType: Type) {
   if (!context) return;
   context.checker.unify(context.type, exprType);
 }
-type CheckedExpr =
-  | { tag: "primitive"; value: number; type: BoundType }
-  | { tag: "string"; value: string; type: BoundType }
-  | { tag: "enum"; index: number; fields: CheckedExpr[]; type: BoundType }
-  | { tag: "struct"; fields: CheckedExpr[]; type: BoundType }
-  | { tag: "identifier"; value: string; type: BoundType }
-  | {
-      tag: "closure";
-      parameters: CheckedParam[];
-      upvalues: CheckedUpvalue[];
-      block: CheckedStmt[];
-      type: BoundType;
-    }
-  | { tag: "field"; expr: CheckedExpr; index: number; type: BoundType }
-  | { tag: "assign"; target: CheckedExpr; value: CheckedExpr; type: BoundType }
-  | { tag: "builtIn"; opcode: Opcode; type: BoundType }
-  | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: BoundType }
-  | { tag: "do"; block: CheckedStmt[]; type: BoundType }
-  | {
-      tag: "if";
-      cases: Array<{ predicate: CheckedExpr; block: CheckedStmt[] }>;
-      elseBlock: CheckedStmt[];
-      type: BoundType;
-    }
-  | {
-      tag: "match";
-      expr: CheckedExpr;
-      cases: Map<string, CheckedMatchCase>;
-      type: BoundType;
-    };
-
-type CheckedMatchCase = {
-  index: number;
-  bindings: CheckedStructFieldBinding[];
-  block: CheckedStmt[];
-};
-
-type CheckedStmt =
-  | { tag: "let"; binding: CheckedBinding; expr: CheckedExpr }
-  | { tag: "return"; expr: CheckedExpr | null }
-  | {
-      tag: "func";
-      name: string;
-      parameters: CheckedParam[];
-      upvalues: CheckedUpvalue[];
-      block: CheckedStmt[];
-      type: BoundType;
-    }
-  | { tag: "while"; expr: CheckedExpr; block: CheckedStmt[] }
-  | {
-      tag: "for";
-      binding: CheckedBinding;
-      expr: CheckedExpr;
-      block: CheckedStmt[];
-    }
-  | { tag: "expr"; expr: CheckedExpr; hasValue: boolean };
-
-type CheckedBinding =
-  | { tag: "identifier"; value: string }
-  | { tag: "struct"; fields: CheckedStructFieldBinding[] };
-
-type CheckedStructFieldBinding = {
-  fieldIndex: number;
-  binding: CheckedBinding;
-};
-
-type CheckedParam = { binding: CheckedBinding; type: BoundType };
-type CheckedUpvalue = { name: string; type: BoundType };
-type CheckedBlock = { block: CheckedStmt[]; type: BoundType };
-
-type BuiltIn = { tag: "builtIn"; opcode: Opcode; type: BoundType };
 
 const intType = primitive("Int");
 const floatType = primitive("Float");
@@ -224,7 +57,7 @@ const stringType = primitive("String");
 const voidType = primitive("Void");
 const boolType = primitive("Bool");
 const numTrait = trait("Num");
-// const eqTrait = trait("Eq");
+const eqTrait = trait("Eq");
 
 export function check(program: Stmt[]): CheckedStmt[] {
   return new ASTChecker().checkProgram(program);
@@ -356,9 +189,27 @@ class ASTChecker {
 
         return null;
       }
+      case "type": {
+        const name = stmt.binding.value;
+        const typeVars = new Scope<string, TypeVar>();
 
-      default:
+        stmt.binding.typeParameters.map((param) => {
+          const t = typeVar(param.value);
+          typeVars.init(param.value, t);
+        });
+        const type = this.checkTypeExpr(stmt.type, typeVars);
+        if (type.tag === "var") throw new Error("invalid type definition");
+
+        this.types.init(name, type);
+        return null;
+      }
+
+      case "while":
+      case "for":
         throw new Error("todo");
+      // istanbul ignore next
+      default:
+        return noMatch(stmt);
     }
   }
   private checkExpr(expr: Expr, ctx: ForwardTypeContext | null): CheckedExpr {
@@ -401,7 +252,7 @@ class ASTChecker {
         );
       case "typeConstructor": {
         const ctor = this.typeConstructors.get(expr.value);
-        const checker = this.getChecker(ctx);
+        const checker = this.getChecker(null);
 
         // check types of fields & for correct overlap between types
         const concreteMap = new Scope<string, CheckedExpr>();
@@ -417,16 +268,23 @@ class ASTChecker {
         );
 
         const type = checker.mustResolve(ctor.type);
+        checkContext(ctx, type);
         switch (ctor.tag) {
           case "struct":
-            return { tag: "struct", fields: checkedFields, type };
+            return { tag: "object", fields: checkedFields, type };
           case "enum":
-            return {
-              tag: "enum",
-              index: ctor.index,
-              fields: checkedFields,
-              type,
-            };
+            if (checkedFields.length) {
+              return {
+                tag: "object",
+                fields: [
+                  { tag: "primitive", value: ctor.index, type: intType },
+                  ...checkedFields,
+                ],
+                type,
+              };
+            } else {
+              return { tag: "primitive", value: ctor.index, type };
+            }
           // istanbul ignore next
           default:
             return noMatch(ctor);
@@ -457,7 +315,7 @@ class ASTChecker {
         });
 
         return {
-          tag: "struct",
+          tag: "object",
           type: checker.mustResolve(abstractType),
           fields,
         };
@@ -481,7 +339,14 @@ class ASTChecker {
 
         const resultType = typeVar("Result");
 
-        const checkedCases = new Map<string, CheckedMatchCase>();
+        const checkedCases = new Map<
+          string,
+          {
+            index: number;
+            block: CheckedStmt[];
+            bindings: CheckedStructFieldBinding[];
+          }
+        >();
         for (const matchCase of expr.cases) {
           if (checkedCases.has(matchCase.binding.value)) {
             throw new Error("duplicate case");
@@ -509,20 +374,58 @@ class ASTChecker {
           });
         }
 
-        // TODO: should match cases be in array, in jump-table order?
+        const cases: CheckedMatchCase[] = [];
         for (const [key] of enumFields.cases) {
-          if (!checkedCases.has(key)) throw new Error("missing case");
+          const checkedCase = checkedCases.get(key);
+          if (!checkedCase) throw new Error("missing case");
+          cases[checkedCase.index] = {
+            block: checkedCase.block,
+            bindings: checkedCase.bindings,
+          };
         }
+
+        const type = checker.mustResolve(resultType);
+        checkContext(ctx, type);
 
         return {
           tag: "match",
-          type: checker.mustResolve(resultType),
+          type,
           expr: target,
-          cases: checkedCases,
+          cases,
         };
       }
-      default:
+      case "if": {
+        const checker = this.getChecker(ctx);
+        const resultType = typeVar("Result");
+
+        const checkedCases = expr.cases.map((ifCase) => {
+          const predicate = this.checkExpr(ifCase.predicate, null);
+          checker.unify(predicate.type, boolType);
+
+          const { block, type } = this.checkBlock(ifCase.block);
+          checker.unify(resultType, type);
+          return { predicate, block };
+        });
+
+        const { block: elseBlock, type: elseType } = this.checkBlock(
+          expr.elseBlock
+        );
+        checker.unify(resultType, elseType);
+        const type = checker.mustResolve(resultType);
+        checkContext(ctx, type);
+
+        return {
+          tag: "if",
+          cases: checkedCases,
+          elseBlock,
+          type,
+        };
+      }
+      case "list":
         throw new Error("todo");
+      // istanbul ignore next
+      default:
+        return noMatch(expr);
     }
   }
   private checkTypeExpr(
@@ -609,7 +512,10 @@ class ASTChecker {
 
     this.traitImpls
       .init(intType.name, numTrait.name, { tag: "impl" })
-      .init(floatType.name, numTrait.name, { tag: "impl" });
+      .init(floatType.name, numTrait.name, { tag: "impl" })
+      .init(intType.name, eqTrait.name, { tag: "impl" })
+      .init(floatType.name, eqTrait.name, { tag: "impl" })
+      .init(boolType.name, eqTrait.name, { tag: "impl" });
 
     // print(x), a == b go through traits system
     // though if the types can be determined statically, there is no "cost" for this
@@ -622,14 +528,22 @@ class ASTChecker {
       .initBuiltin("!", Opcode.Not, [boolType], boolType);
 
     // arithmetic operators use traits for typechecking but are implemented as builtins directly
-    const negT = typeVar("T", numTrait);
-    this.initBuiltin("neg", Opcode.Neg, [negT], negT);
-    const addT = typeVar("T", numTrait);
-    this.initBuiltin("+", Opcode.Add, [addT, addT], addT);
-    const subT = typeVar("T", numTrait);
-    this.initBuiltin("-", Opcode.Sub, [subT, subT], subT);
-    const ltT = typeVar("T", numTrait);
-    this.initBuiltin("<", Opcode.Lt, [ltT, ltT], boolType);
+    const numT = typeVar("T", numTrait);
+    this.initBuiltin("neg", Opcode.Neg, [numT], numT)
+      .initBuiltin("+", Opcode.Add, [numT, numT], numT)
+      .initBuiltin("-", Opcode.Sub, [numT, numT], numT)
+      .initBuiltin("*", Opcode.Mul, [numT, numT], numT)
+      .initBuiltin("%", Opcode.Mod, [numT, numT], numT)
+      .initBuiltin("/", Opcode.Div, [numT, numT], floatType)
+      .initBuiltin("<", Opcode.Lt, [numT, numT], boolType)
+      .initBuiltin(">", Opcode.Gt, [numT, numT], boolType)
+      .initBuiltin("<=", Opcode.Lte, [numT, numT], boolType)
+      .initBuiltin(">=", Opcode.Gte, [numT, numT], boolType);
+
+    // TODO: check impls of Eq trait instead of using builtin
+    const eqT = typeVar("T", eqTrait);
+    this.initBuiltin("==", Opcode.Eq, [eqT, eqT], boolType) //
+      .initBuiltin("!=", Opcode.Neq, [eqT, eqT], boolType);
   }
   private initBuiltin(
     name: string,
@@ -648,14 +562,15 @@ class ASTChecker {
   ): CheckedExpr {
     const checker = this.getChecker(ctx);
     this.checkFuncArity(callee.type, args.length);
+    const calleeType = this.freshTypeVars(callee.type) as BoundType;
     const checkedArgs = args.map((arg, i) => {
       return this.checkExpr(arg, {
         checker,
-        type: callee.type.parameters[i + 1],
+        type: calleeType.parameters[i + 1],
       });
     });
-    checkContext(ctx, callee.type.parameters[0]);
-    const returnType = checker.mustResolve(callee.type.parameters[0]);
+    checkContext(ctx, calleeType.parameters[0]);
+    const returnType = checker.mustResolve(calleeType.parameters[0]);
 
     return { tag: "call", callee, args: checkedArgs, type: returnType };
   }
@@ -672,12 +587,10 @@ class ASTChecker {
   private inScope<T>(fn: () => T): T {
     this.vars = this.vars.push();
     this.types = this.types.push();
-    try {
-      return fn();
-    } finally {
-      this.vars = this.vars.pop();
-      this.types = this.types.pop();
-    }
+    const res = fn();
+    this.vars = this.vars.pop();
+    this.types = this.types.pop();
+    return res;
   }
   private checkClosure(
     ctx: ForwardTypeContext,
@@ -754,10 +667,11 @@ class ASTChecker {
       };
 
       return this.currentFunc.withFunc(checkReturnType, outerScope, () => {
-        // bind tracer types to type params
+        // bind a tracer type to type params
         // to ensure that they are not unified with anything else
+        // they can, however, bind to each other (?)
+        const type = primitive(`Trace`);
         for (const param of typeParameters) {
-          const type = primitive(`Trace(${param.value})`);
           this.types.init(param.value, type);
         }
 
@@ -803,6 +717,7 @@ class ASTChecker {
         break;
     }
   }
+  // TODO: it seems likely that _most_ of the time, we should pass `null` in here
   private getChecker(ctx: ForwardTypeContext | null): Checker {
     return ctx?.checker ?? new Checker(this.traitImpls);
   }
@@ -856,5 +771,22 @@ class ASTChecker {
       });
     });
     return fields;
+  }
+  // TODO: I think instead of this, I need to apply some concept of "scope" to type vars
+  private freshTypeVars(type: Type, map = new Map<symbol, TypeVar>()): Type {
+    switch (type.tag) {
+      case "var": {
+        const found = map.get(type.name);
+        if (found) return found;
+        const newType = typeVar(type.name.description ?? "", ...type.traits);
+        map.set(type.name, newType);
+        return newType;
+      }
+      case "type":
+        return makeType(
+          type.name,
+          type.parameters.map((t) => this.freshTypeVars(t, map))
+        );
+    }
   }
 }

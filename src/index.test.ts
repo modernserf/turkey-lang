@@ -6,42 +6,16 @@ it("evaluates an empty program", () => {
 
 it("prints", () => {
   const code = `
-    print(123.45) // a number
-    print(0)      // another one
-    print(6789)   // the last number
+    print_float(123.45) // a number
+    print_int(0)      // another one
+    print_int(6789)   // the last number
   `;
   expect(run(code)).toEqual(["123.45", "0", "6789"]);
 });
 
 it("adds", () => {
-  expect(run(`print(123456 + 1)`)).toEqual(["123457"]);
-  expect(run(`print(1.5 + -2.0)`)).toEqual(["-0.5"]);
-});
-
-it("typechecks math", () => {
-  expect(() => {
-    run(`print(1.5 + 2)`);
-  }).toThrow();
-});
-
-it("rejects math operations on non-numbers", () => {
-  expect(() => {
-    run(`print("foo" + "bar")`);
-  }).toThrow();
-});
-
-it("rejects calling print with the wrong number of args", () => {
-  expect(() => {
-    run(`print()`);
-  }).toThrow();
-});
-
-it("rejects printing non-printable values", () => {
-  const code = `
-    func foo (): Void {}
-    print(foo)
-  `;
-  expect(() => run(code)).toThrow();
+  expect(run(`print_int(123456 + 1)`)).toEqual(["123457"]);
+  expect(run(`print_float(1.5 + -2.0)`)).toEqual(["-0.5"]);
 });
 
 it("references variables", () => {
@@ -49,7 +23,7 @@ it("references variables", () => {
     let x = 1
     let y : Int = 2 + 3
     x - y
-    print(x + y + 4)
+    print_int(x + y + 4)
   `;
   expect(run(code)).toEqual(["10"]);
 });
@@ -59,11 +33,11 @@ it("uses do blocks", () => {
     let res = do {
       let x = 1
       let y = 2
-      print(x)
-      print(y)
+      print_int(x)
+      print_int(y)
       x + y
     }
-    print(res)
+    print_int(res)
   `;
   expect(run(code)).toEqual(["1", "2", "3"]);
 });
@@ -77,54 +51,41 @@ it("uses conditionals", () => {
     } else {
       2
     }
-    print(x)
+    print_int(x)
   `;
   expect(run(code)).toEqual(["1"]);
-});
-
-it("enforces type matching between conditional branches", () => {
-  const code = `
-    let x = if (True) {
-      1
-    } else {
-      1.0
-    }
-    print(x)
-  `;
-
-  expect(() => run(code)).toThrow();
 });
 
 it("uses conditional statements", () => {
   const code = `
     if (True) {
-      print(1)
+      print_int(1)
     }
-    print(2)
+    print_int(2)
   `;
   expect(run(code)).toEqual(["1", "2"]);
 });
 
-it("theoretically uses loops", () => {
-  const code = `
-    while (!True) {
-      print(1)
-    }
-    func forever (): Void {
-      while (!False) {
-        3
-      }
-    }
-    print(2)
-  `;
-  expect(run(code)).toEqual(["2"]);
-});
+// it("theoretically uses loops", () => {
+//   const code = `
+//     while (!True) {
+//       print_int(1)
+//     }
+//     func forever (): Void {
+//       while (!False) {
+//         3
+//       }
+//     }
+//     print_int(2)
+//   `;
+//   expect(run(code)).toEqual(["2"]);
+// });
 
 it("drops expressions called for their side effects", () => {
   const code = `
     let x = 1
     x + 2
-    print(x + 3)
+    print_int(x + 3)
   `;
   expect(run(code)).toEqual(["4"]);
 });
@@ -132,8 +93,8 @@ it("drops expressions called for their side effects", () => {
 it("calls functions", () => {
   const code = `
     func print_twice (x: Int): Void {
-      print(x)
-      print(x)
+      print_int(x)
+      print_int(x)
       return
     }
 
@@ -149,7 +110,7 @@ it("calls closures", () => {
       return x
     }
 
-    print(get_x())
+    print_float(get_x())
   `;
 
   expect(run(code)).toEqual(["1.5"]);
@@ -165,33 +126,9 @@ it("calls nested closures", () => {
       return get_x
     }
 
-    print(get_get_x()())
+    print_float(get_get_x()())
   `;
   expect(run(code)).toEqual(["1.5"]);
-});
-
-it("errors when calling non-functions", () => {
-  const code = `
-    let foo = 1
-    foo()
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("forbids returning from top level", () => {
-  const code = `
-    return 1
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("forbids unknown types", () => {
-  const code = `
-    func get_x (): Nope {
-      return 1
-    }
-  `;
-  expect(() => run(code)).toThrow();
 });
 
 it("treats void as a value", () => {
@@ -204,8 +141,8 @@ it("treats void as a value", () => {
 it("uses strings", () => {
   const code = `
     func print_twice (val: String): Void {
-      print(val)
-      print(val)
+      print_string(val)
+      print_string(val)
     }
 
     print_twice("hello")
@@ -218,7 +155,7 @@ it("uses strings", () => {
 it("supports recursion", () => {
   const code = `
     func count (from: Int): Void {
-      print(from)
+      print_int(from)
       if (from > 0) {
         count(from - 1)
       }
@@ -248,13 +185,13 @@ it("runs fizzbuzz", () => {
       if (from > to) { return }
 
       if (from % 15 == 0) {
-        print("FizzBuzz")
+        print_string("FizzBuzz")
       } else if (from % 3 == 0) {
-        print("Fizz")
+        print_string("Fizz")
       } else if (from % 5 == 0) {
-        print("Buzz")
+        print_string("Buzz")
       } else {
-        print(from)
+        print_int(from)
       }
 
       fizzbuzz(from + 1, to)
@@ -374,9 +311,9 @@ it("handles dropping scope values correctly", () => {
     if (True) {
       let x = get_three()
       get_three()
-      print(x)
+      print_int(x)
     } else {
-      print(0)
+      print_int(0)
     }
   `;
   expect(run(code)).toEqual(["3"]);
@@ -390,7 +327,7 @@ it("accepts functions as parameters", () => {
     func double (value: Int): Int {
       return value + value
     }
-    print(map(10, double))
+    print_int(map(10, double))
   `;
 
   expect(run(code)).toEqual(["20"]);
@@ -405,18 +342,10 @@ it("accepts functions as return values", () => {
       return add_right
     }
 
-    print(add_curried(1)(2))
+    print_int(add_curried(1)(2))
   `;
 
   expect(run(code)).toEqual(["3"]);
-});
-
-it("rejects invalid function types", () => {
-  const code = `
-    func foo (x: Int): Void {}
-    let bar: func (Int, Int): Void = foo
-  `;
-  expect(() => run(code)).toThrow();
 });
 
 it("has anonymous function literals", () => {
@@ -424,72 +353,20 @@ it("has anonymous function literals", () => {
     func map (value: Int, fn: func (Int): Int): Int {
       fn(value)
     }
-    print(map(10, |x| { x + x }))
+    print_int(map(10, |x| { x + x }))
   `;
 
   expect(run(code)).toEqual(["20"]);
-});
-
-it("rejects anonymous functions without inferred types", () => {
-  const code = `
-    let fn = |x| { x + x }
-    print(fn(1))
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("rejects anonymous functions type mismatches", () => {
-  const code = `
-    func map (value: Int, fn: func (Int): Int): Int {
-
-      fn(value)
-    }
-    print(map(10, |x, y| { x + y }))
-  `;
-  expect(() => run(code)).toThrow();
 });
 
 it("has type aliases", () => {
   const code = `
     type Mapper = func (Int): Int
     let fn: Mapper = |x| { x + x }
-    print(fn(1))
+    print_int(fn(1))
   `;
 
   expect(run(code)).toEqual(["2"]);
-});
-
-it("has simple enums", () => {
-  const code = `
-    enum Version { V1, V2 }
-    func print_version(v: Version): Void {
-      if (v == V1) {
-        print("V1")
-      } else {
-        print("V2")
-      }
-    }
-    print_version(V2)
-  `;
-  expect(run(code)).toEqual(["V2"]);
-});
-
-it("rejects duplicate tags in enums", () => {
-  const code = `
-    enum Version { V1, V1 }
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("rejects enun type mismatches", () => {
-  const code = `
-    enum Foo { Foo }
-    enum Bar { Bar }
-    func foo(value: Foo): Void {}
-
-    foo(Bar)
-  `;
-  expect(() => run(code)).toThrow();
 });
 
 it("has pattern matching", () => {
@@ -498,73 +375,14 @@ it("has pattern matching", () => {
 
     match (V1) {
       V1 => {
-        print(1)
+        print_int(1)
       },
       V2 => {
-        print(2)
+        print_int(2)
       }
     }
   `;
   expect(run(code)).toEqual(["1"]);
-});
-
-it("rejects pattern matching on non-enums", () => {
-  const code = `
-    match ("hello") {
-      True => {
-        print("hello")
-      },
-      False => {
-        print("goodbye")
-      }
-    }
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("rejects incomplete cases", () => {
-  const code = `
-    match (True) {
-      True => {
-        print("hello")
-      },
-    }
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("rejects duplicate cases", () => {
-  const code = `
-    match (True) {
-      True => {
-        print("hello")
-      },
-      True => {
-        print("hello")
-      },
-      False => {
-        print("goodbye")
-      },
-    }
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("rejects invalid branches", () => {
-  const code = `
-    match (True) {
-      True => {
-        print("hello")
-      },
-      False => {
-        print("goodbye")
-      },
-      Other => {
-        print("hmmm")
-      },
-    }
-  `;
-  expect(() => run(code)).toThrow();
 });
 
 it("has structs", () => {
@@ -582,7 +400,7 @@ it("has structs", () => {
       abs(to:x - from:x) + abs(to:y - from:y)
     }
 
-    print(manhattan_distance(Point { x: 1, y: 1 }, Point { x: 2, y: 0 }))
+    print_int(manhattan_distance(Point { x: 1, y: 1 }, Point { x: 2, y: 0 }))
   `;
   expect(run(code)).toEqual(["2"]);
 });
@@ -597,53 +415,9 @@ it("puns struct fields in construction", () => {
     let x = 1
     let y = 2
     let point = Point { x, y }
-    print(point:x)
+    print_int(point:x)
   `;
   expect(run(code)).toEqual(["1"]);
-});
-
-it("rejects duplicate fields in struct definitions", () => {
-  const code = `
-    struct Point { x: Int, x: Int }
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("rejects duplicate fields in struct constructors", () => {
-  const code = `
-    struct Val { x: Int }
-    let val = Val { x: 1, x: 2 }
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("rejects missing fields in struct constructors", () => {
-  const code = `
-    struct Point { x: Int, y: Int }
-    let point = Point { x: 1 }
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("rejects unknown fields in struct constructors", () => {
-  const code = `
-    struct Point { x: Int, y: Int }
-    let point = Point { x: 1, y: 1, z: 2 }
-  `;
-  expect(() => run(code)).toThrow();
-});
-
-it("rejects field access on non-structs", () => {
-  expect(() => run(`"foo":0`)).toThrow();
-});
-
-it("rejects invalid field access", () => {
-  const code = `
-    struct Point { x: Int, y: Int }
-    let point = Point { x: 1, y: 1 }
-    print(point:z)
-  `;
-  expect(() => run(code)).toThrow();
 });
 
 it("has destructuring", () => {
@@ -655,16 +429,9 @@ it("has destructuring", () => {
 
   let point = Point { x: 1, y: 2 }
   let { x: x } = point
-  print(x)
+  print_int(x)
   `;
   expect(run(code)).toEqual(["1"]);
-});
-
-it("rejects destructuring of non-structs", () => {
-  const code = `
-    let { x, y } = 1
-  `;
-  expect(() => run(code)).toThrow();
 });
 
 it("puns struct fields in destructuring", () => {
@@ -676,7 +443,7 @@ it("puns struct fields in destructuring", () => {
 
     let point = Point { x: 1, y: 2 }
     let { x } = point
-    print(x)
+    print_int(x)
   `;
   expect(run(code)).toEqual(["1"]);
 });
@@ -692,7 +459,7 @@ it("destructures function parameters", () => {
       x
     }
 
-    print(get_x(Point { x: 1, y: 2 }))
+    print_int(get_x(Point { x: 1, y: 2 }))
   `;
   expect(run(code)).toEqual(["1"]);
 });
@@ -709,7 +476,7 @@ it("has tuple structs", () => {
       abs(to:0 - from:0) + abs(to:1 - from:1)
     }
 
-    print(manhattan_distance(Point(1,1), Point(2,0)))
+    print_int(manhattan_distance(Point(1,1), Point(2,0)))
   `;
   expect(run(code)).toEqual(["2"]);
 });
@@ -720,18 +487,18 @@ it("destructures tuple structs", () => {
 
     let (x, y) = Point(10,20)
 
-    print(x + y)
+    print_int(x + y)
   `;
   expect(run(code)).toEqual(["30"]);
 });
 
-it("rejects incomplete tuple destructuring", () => {
+it.skip("rejects incomplete tuple destructuring", () => {
   const code = `
     struct Point (Int, Int)
 
     let (x) = Point(10,20)
 
-    print(x)
+    print_int(x)
   `;
   expect(() => run(code)).toThrow();
 });
@@ -746,10 +513,10 @@ it("has tagged variants", () => {
     func print_int_option(val: IntOption): Void {
       match (val) {
         None => {
-          print("None")
+          print_string("None")
         },
         Some(_) => {
-          print("Some")
+          print_string("Some")
         },
       }
     }
@@ -770,10 +537,10 @@ it("destructures tagged variant values", () => {
     func print_int_option(val: IntOption): Void {
       match (val) {
         None => {
-          print("None")
+          print_string("None")
         },
         Some(x) => {
-          print(x)
+          print_int(x)
         },
       }
     }
@@ -804,7 +571,7 @@ it("has recursive types", () => {
 
     let list = Cons(1, Cons(2, Cons(3, Nil)))
     let sum  = foldl(list, 0, |acc, value| { acc + value })
-    print(sum)
+    print_int(sum)
   `;
   expect(run(code)).toEqual(["6"]);
 });
@@ -815,8 +582,8 @@ it("has generic function params", () => {
       value
     }
 
-    print(id(1))
-    print(id("hello"))
+    print_int(id(1))
+    print_string(id("hello"))
   `;
   expect(run(code)).toEqual(["1", "hello"]);
 });
@@ -830,8 +597,8 @@ it("has generic struct params", () => {
     let x = Cell { current: 1 }
     let y: Cell<String> = Cell { current: "hello" }
 
-    print(x:current)
-    print(y:current)
+    print_int(x:current)
+    print_string(y:current)
   `;
   expect(run(code)).toEqual(["1", "hello"]);
 });
@@ -845,8 +612,8 @@ it("has parameterized type aliases", () => {
     type CellAlias<T> = Cell<T>
 
     let x: CellAlias<Int> = Cell { current: 1 }
-    
-    print(x:current)
+
+    print_int(x:current)
   `;
   expect(run(code)).toEqual(["1"]);
 });
@@ -858,20 +625,9 @@ it("destructures generic struct params", () => {
     }
 
     let { current } = Cell { current: "hello" }
-    print(current)
+    print_string(current)
   `;
   expect(run(code)).toEqual(["hello"]);
-});
-
-it("rejects mismatched params in type declarations", () => {
-  const code = `
-    struct Cell <T> {
-      current: T
-    }
-
-    let x: Cell<Int> = Cell { current: "hello" }
-  `;
-  expect(() => run(code)).toThrow();
 });
 
 it("accepts concrete parameterized types in function bindings", () => {
@@ -885,7 +641,7 @@ it("accepts concrete parameterized types in function bindings", () => {
     }
 
     let x = current(Cell { current: 1 })
-    print(x)
+    print_int(x)
   `;
   expect(run(code)).toEqual(["1"]);
 });
@@ -901,7 +657,7 @@ it("propagates generic args", () => {
     }
 
     let x = current(Cell { current: 1 })
-    print(x:current)
+    print_int(x:current)
   `;
   expect(run(code)).toEqual(["1"]);
 });
@@ -917,7 +673,7 @@ it("makes generic args concrete at call time", () => {
     }
 
     let x = current(Cell { current: 1 })
-    print(x)
+    print_int(x)
   `;
   expect(run(code)).toEqual(["1"]);
 });
@@ -938,8 +694,8 @@ it("has generic enum params", () => {
 
     let list1 = Cons(1, Cons(2, Cons(3, Nil)))
     let list2 = Cons("foo", Cons("bar", Nil))
-    print(length(list1))
-    print(length(list2))
+    print_int(length(list1))
+    print_int(length(list2))
   `;
   expect(run(code)).toEqual(["3", "2"]);
 });
@@ -958,34 +714,10 @@ it("unifies types across if branches", () => {
     }
 
     match (res) {
-      Left(x) => print("left"),
-      Right(x) => print("right"),
+      Left(x) => print_string("left"),
+      Right(x) => print_string("right"),
     }
   `;
-  expect(run(code)).toEqual(["left"]);
-});
-
-it("allows unbound & unused type parameters", () => {
-  const code = `
-    enum Either<L, R> {
-      Left(L),
-      Right(R),
-    }
-
-    let res = Left(1)
-
-    func print_left_int<T>(x: Either<Int, T>): Void {
-      match (res) {
-        Left(x) => {
-          print("left")
-        },
-        Right(x) => {},
-      }
-    }
-
-    print_left_int(res)
-`;
-
   expect(run(code)).toEqual(["left"]);
 });
 
@@ -1013,15 +745,15 @@ it("has method syntax", () => {
 
     let list: List<Int> = Cons(1, Cons(2, Cons(3, Nil)))
     let sum = list.foldl(0, add)
-    print(sum)
+    print_int(sum)
   `;
   expect(run(code)).toEqual(["6"]);
 });
 
 it("has methods without arguments", () => {
   const code = `
-    "foo".print
-    "bar".print()  
+    "foo".print_string
+    "bar".print_string()
   `;
   expect(run(code)).toEqual(["foo", "bar"]);
 });
@@ -1029,8 +761,8 @@ it("has methods without arguments", () => {
 it("has tuple literals", () => {
   const code = `
     let (x, y) = (1, "foo")
-    print(x)
-    print(y)
+    print_int(x)
+    print_string(y)
   `;
   expect(run(code)).toEqual(["1", "foo"]);
 });
@@ -1038,25 +770,25 @@ it("has tuple literals", () => {
 it("has tuple type literals", () => {
   const code = `
     let pair: (Int, String) = (1, "foo")
-    print(pair:0)
-    print(pair:1)
+    print_int(pair:0)
+    print_string(pair:1)
   `;
   expect(run(code)).toEqual(["1", "foo"]);
 });
 
-it("rejects destructuring tuples with the wrong number of args", () => {
+it.skip("rejects destructuring tuples with the wrong number of args", () => {
   const code = `
     let (x) = (1, "foo")
-    print(x)
+    print_int(x)
   `;
   expect(() => run(code)).toThrow();
 });
 
-it("does not bind identifiers starting with underscore", () => {
+it.skip("does not bind identifiers starting with underscore", () => {
   const code = `
     let _ = 1
     let _ = 2
-    
+
     func foo (_arg: Int, _arg: Int): Void {}
 
     foo(1, 2)
@@ -1064,16 +796,16 @@ it("does not bind identifiers starting with underscore", () => {
   expect(run(code)).toEqual([]);
 });
 
-it("cannot reference underscore identifiers", () => {
+it.skip("cannot reference underscore identifiers", () => {
   const code = `
     let _ = 1
-    print(_)
+    print_int(_)
   `;
   expect(() => run(code)).toThrow();
 });
 
-it("has list literals", () => {
-  const code = `    
+it.skip("has list literals", () => {
+  const code = `
     func foldl<Item, Acc> (
       list: List<Item>,
       acc: Acc,
@@ -1092,35 +824,35 @@ it("has list literals", () => {
     let xs = [1, 2, 3]
     let ys = []
 
-    print(xs.foldl(0, add))
-    print(ys.foldl(0, add))
+    print_int(xs.foldl(0, add))
+    print_int(ys.foldl(0, add))
   `;
   expect(run(code)).toEqual(["6", "0"]);
 });
 
-it("has for-in loops", () => {
+it.skip("has for-in loops", () => {
   const code = `
     // TODO: why isn't list type inferred here?
     let list: List<Int> = [2, 4, 6]
 
     for (item in list) {
-      print(item)
+      print_int(item)
     }
   `;
   expect(run(code)).toEqual(["2", "4", "6"]);
 });
 
-it("has mutable refs", () => {
+it.skip("has mutable refs", () => {
   const code = `
     let counter = Ref(0)
-    print(counter:0)
+    print_int(counter:0)
     counter.set(1)
-    print(counter:0)
+    print_int(counter:0)
   `;
   expect(run(code)).toEqual(["0", "1"]);
 });
 
-it("runs a while loop", () => {
+it.skip("runs a while loop", () => {
   const code = `
     let counter = Ref(0)
     while(1 > counter:0) {
