@@ -393,3 +393,23 @@ it("rejects accessing nonexistent tuple fields", () => {
   `;
   expect(() => check(code)).toThrow();
 });
+
+it("destructures struct bindings", () => {
+  const code = `
+    struct Point { x: Int, y: Int }
+    let point = Point { x: 1, y: 2 }
+    let { x } = point
+    print_int(x) 
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("destructures tuples", () => {
+  const code = `
+    let pair = (1, "hello")
+    let (num, word) = pair
+    print_int(num)
+    print_string(word)
+  `;
+  expect(check(code)).toBe(true);
+});

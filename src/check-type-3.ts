@@ -65,6 +65,10 @@ function primitive(name: string): BoundType {
   return { tag: "type", name: Symbol(name), parameters: [] };
 }
 
+function makeType(name: symbol, parameters: Type[]): BoundType {
+  return { tag: "type", name: name, parameters };
+}
+
 function trait(name: string): BoundType {
   const self = typeVar("Self");
   return { tag: "type", name: Symbol(name), parameters: [self] };
@@ -91,11 +95,10 @@ class Checker {
   resolve(tv: Type): Type {
     tv = this.deref(tv);
     if (tv.tag === "var") return tv;
-    return {
-      tag: "type",
-      name: tv.name,
-      parameters: tv.parameters.map((param) => this.resolve(param)),
-    };
+    return makeType(
+      tv.name,
+      tv.parameters.map((param) => this.resolve(param))
+    );
   }
   private assign(binding: TypeVar, tv: Type): void {
     // prevent a variable from assigning to itself
@@ -311,15 +314,14 @@ class ASTChecker {
         const name = stmt.binding.value;
         const typeVars = new Scope<string, TypeVar>();
 
-        const type: BoundType = {
-          tag: "type",
-          name: Symbol(name),
-          parameters: stmt.binding.typeParameters.map((param) => {
+        const type = makeType(
+          Symbol(name),
+          stmt.binding.typeParameters.map((param) => {
             const t = typeVar(param.value);
             typeVars.init(param.value, t);
             return t;
-          }),
-        };
+          })
+        );
         this.types.init(name, type);
 
         const fields: FieldMap = new Scope();
@@ -380,7 +382,7 @@ class ASTChecker {
         );
       case "typeConstructor": {
         const ctor = this.typeConstructors.get(expr.value);
-        const checker = ctx?.checker ?? new Checker(this.traitImpls);
+        const checker = this.getChecker(ctx);
 
         // check types of fields & for correct overlap between types
         const concreteMap = new Scope<string, CheckedExpr>();
@@ -412,38 +414,20 @@ class ASTChecker {
         }
       }
       case "field": {
-        const checker = ctx?.checker ?? new Checker(this.traitImpls);
         const target = this.checkExpr(expr.expr, null);
-        const isTuple =
-          target.type.name ===
-          this.tupleTypeNames.use(target.type.parameters.length);
-
-        if (isTuple) {
-          const index = Number(expr.fieldName);
-          const type = target.type.parameters[index];
-          if (!type) throw new Error("invalid field access");
-          return {
-            tag: "field",
-            index,
-            expr: target,
-            type: checker.mustResolve(type),
-          };
-        }
-
-        const fieldInfo = this.structFields.get(target.type.name);
-        if (!fieldInfo) throw new Error("invalid field access");
-        checker.unify(fieldInfo.type, target.type);
-        const fieldData = fieldInfo.fields.get(expr.fieldName);
-        const type = checker.mustResolve(fieldData.type);
-        return { tag: "field", index: fieldData.index, expr: target, type };
+        const { index, type } = this.getField(
+          this.getChecker(ctx),
+          target.type,
+          expr.fieldName
+        );
+        return { tag: "field", index, expr: target, type };
       }
       case "tuple": {
-        const checker = ctx?.checker ?? new Checker(this.traitImpls);
-        const abstractType: Type = {
-          tag: "type",
-          name: this.tupleTypeNames.use(expr.fields.length),
-          parameters: expr.fields.map((field, i) => typeVar(String(i))),
-        };
+        const checker = this.getChecker(ctx);
+        const abstractType = makeType(
+          this.tupleTypeNames.use(expr.fields.length),
+          expr.fields.map((_, i) => typeVar(String(i)))
+        );
         checkContext(ctx, abstractType);
 
         const fields = expr.fields.map((field, i) => {
@@ -481,7 +465,7 @@ class ASTChecker {
         const parameters = typeExpr.typeArgs.map((expr) =>
           this.checkTypeExpr(expr, vars)
         );
-        return { tag: "type", name: baseType.name, parameters };
+        return makeType(baseType.name, parameters);
       }
       case "func": {
         vars = vars.push();
@@ -494,11 +478,10 @@ class ASTChecker {
         );
       }
       case "tuple":
-        return {
-          tag: "type",
-          name: this.tupleTypeNames.use(typeExpr.typeArgs.length),
-          parameters: typeExpr.typeArgs.map((t) => this.checkTypeExpr(t)),
-        };
+        return makeType(
+          this.tupleTypeNames.use(typeExpr.typeArgs.length),
+          typeExpr.typeArgs.map((t) => this.checkTypeExpr(t))
+        );
     }
   }
   private bindVars(binding: Binding, type: BoundType): CheckedBinding {
@@ -506,8 +489,20 @@ class ASTChecker {
       case "identifier":
         this.vars.set(binding.value, type);
         return binding;
-      case "struct":
-        throw new Error("todo");
+      case "struct": {
+        // TODO: check for complete tuples
+        const checker = this.getChecker(null);
+        const fields = binding.fields.map((b) => {
+          const fieldInfo = this.getField(checker, type, b.fieldName);
+          const binding = this.bindVars(b.binding, fieldInfo.type);
+          return {
+            fieldName: b.fieldName,
+            fieldIndex: fieldInfo.index,
+            binding,
+          };
+        });
+        return { tag: "struct", fields };
+      }
     }
   }
   private initPrelude(): void {
@@ -578,7 +573,7 @@ class ASTChecker {
     args: Expr[],
     ctx: ForwardTypeContext | null
   ): CheckedExpr {
-    const checker = ctx?.checker ?? new Checker(this.traitImpls);
+    const checker = this.getChecker(ctx);
     this.checkFuncArity(callee.type, args.length);
     const checkedArgs = args.map((arg, i) => {
       return this.checkExpr(arg, {
@@ -599,12 +594,7 @@ class ASTChecker {
   }
   private funcType(parameters: Type[], returnType: Type): BoundType {
     const arity = parameters.length;
-    const typeName = this.funcTypeNames.use(arity);
-    return {
-      tag: "type",
-      name: typeName,
-      parameters: [returnType, ...parameters],
-    };
+    return makeType(this.funcTypeNames.use(arity), [returnType, ...parameters]);
   }
   private inScope<T>(fn: () => T): T {
     this.vars = this.vars.push();
@@ -739,5 +729,31 @@ class ASTChecker {
         block.push({ tag: "return", expr: null });
         break;
     }
+  }
+  private getChecker(ctx: ForwardTypeContext | null): Checker {
+    return ctx?.checker ?? new Checker(this.traitImpls);
+  }
+  private getField(
+    checker: Checker,
+    targetType: BoundType,
+    fieldName: string
+  ): { index: number; type: BoundType } {
+    // const checker = this.getChecker(ctx);
+    const isTuple =
+      targetType.name === this.tupleTypeNames.use(targetType.parameters.length);
+
+    if (isTuple) {
+      const index = Number(fieldName);
+      const type = targetType.parameters[index];
+      if (!type) throw new Error("invalid field access");
+      return { index, type: checker.mustResolve(type) };
+    }
+
+    const fieldInfo = this.structFields.get(targetType.name);
+    if (!fieldInfo) throw new Error("invalid field access");
+    checker.unify(fieldInfo.type, targetType);
+    const fieldData = fieldInfo.fields.get(fieldName);
+    const type = checker.mustResolve(fieldData.type);
+    return { index: fieldData.index, type };
   }
 }
