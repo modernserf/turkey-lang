@@ -1,5 +1,14 @@
 import { Scope } from "./scope";
-import { Binding, Expr, Opcode, Stmt, TypeExpr, TypeParam } from "./types";
+import {
+  Binding,
+  Expr,
+  Opcode,
+  Stmt,
+  StructFieldType,
+  TypeBinding,
+  TypeExpr,
+  TypeParam,
+} from "./types";
 import { CurrentFuncState, FuncFields } from "./current-func-2";
 import { noMatch } from "./utils";
 
@@ -233,7 +242,13 @@ class ASTChecker {
   private tupleTypeNames = new ArityName("Tuple");
   private structFields: Map<TypeName, { type: BoundType; fields: FieldMap }> =
     new Map();
-  private enumFields: Map<TypeName, Map<EnumTag, FieldMap>> = new Map();
+  private enumFields: Map<
+    TypeName,
+    {
+      type: BoundType;
+      cases: Map<EnumTag, { index: number; fields: FieldMap }>;
+    }
+  > = new Map();
   private typeConstructors: Scope<string, TypeConstructor> = new Scope();
   private traitImpls = new TraitImpls();
   private currentFunc = new CurrentFuncState<BoundType, Expr, CheckedExpr>();
@@ -311,29 +326,33 @@ class ASTChecker {
       case "return":
         return { tag: "return", expr: this.currentFunc.checkReturn(stmt.expr) };
       case "struct": {
-        const name = stmt.binding.value;
-        const typeVars = new Scope<string, TypeVar>();
-
-        const type = makeType(
-          Symbol(name),
-          stmt.binding.typeParameters.map((param) => {
-            const t = typeVar(param.value);
-            typeVars.init(param.value, t);
-            return t;
-          })
-        );
-        this.types.init(name, type);
-
-        const fields: FieldMap = new Scope();
-        stmt.fields.forEach((field, index) => {
-          fields.init(field.fieldName, {
-            index,
-            type: this.checkTypeExpr(field.type, typeVars),
-          });
+        const { type, typeVars } = this.initComplexType(stmt.binding);
+        const fields = this.buildFieldsMap(stmt.fields, typeVars);
+        this.structFields.set(type.name, { type, fields });
+        this.typeConstructors.init(stmt.binding.value, {
+          tag: "struct",
+          type,
+          fields,
         });
 
-        this.structFields.set(type.name, { type, fields });
-        this.typeConstructors.init(name, { tag: "struct", type, fields });
+        return null;
+      }
+      case "enum": {
+        const { type, typeVars } = this.initComplexType(stmt.binding);
+        const cases: Map<EnumTag, { index: number; fields: FieldMap }> =
+          new Map();
+        stmt.cases.forEach((enumCase, index) => {
+          if (cases.has(enumCase.tagName)) throw new Error("duplicate tag");
+          const fields = this.buildFieldsMap(enumCase.fields, typeVars);
+          this.typeConstructors.init(enumCase.tagName, {
+            tag: "enum",
+            index,
+            type,
+            fields,
+          });
+          cases.set(enumCase.tagName, { index, fields });
+        });
+        this.enumFields.set(type.name, { type, cases });
 
         return null;
       }
@@ -443,10 +462,64 @@ class ASTChecker {
           fields,
         };
       }
-
       case "closure": {
         if (!ctx) throw new Error("missing context");
         return this.checkClosure(ctx, expr.parameters, expr.block);
+      }
+      case "do": {
+        const { block, type } = this.checkBlock(expr.block);
+        checkContext(ctx, type);
+        return { tag: "do", block, type };
+      }
+      case "match": {
+        const target = this.checkExpr(expr.expr, null);
+        const enumFields = this.enumFields.get(target.type.name);
+        if (!enumFields) throw new Error("target is not an enum");
+
+        const checker = this.getChecker(ctx);
+        checker.unify(target.type, enumFields.type);
+
+        const resultType = typeVar("Result");
+
+        const checkedCases = new Map<string, CheckedMatchCase>();
+        for (const matchCase of expr.cases) {
+          if (checkedCases.has(matchCase.binding.value)) {
+            throw new Error("duplicate case");
+          }
+
+          const caseInfo = enumFields.cases.get(matchCase.binding.value);
+          if (!caseInfo) throw new Error("tag does not match enum");
+          this.inScope(() => {
+            const bindings = matchCase.binding.fields.map((bindField) => {
+              const fieldInfo = caseInfo.fields.get(bindField.fieldName);
+              const binding = this.bindVars(
+                bindField.binding,
+                checker.mustResolve(fieldInfo.type)
+              );
+              return { fieldIndex: fieldInfo.index, binding };
+            });
+
+            const { block, type } = this.checkBlock(matchCase.block);
+            checker.unify(type, resultType);
+            checkedCases.set(matchCase.binding.value, {
+              index: caseInfo.index,
+              block,
+              bindings,
+            });
+          });
+        }
+
+        // TODO: should match cases be in array, in jump-table order?
+        for (const [key] of enumFields.cases) {
+          if (!checkedCases.has(key)) throw new Error("missing case");
+        }
+
+        return {
+          tag: "match",
+          type: checker.mustResolve(resultType),
+          expr: target,
+          cases: checkedCases,
+        };
       }
       default:
         throw new Error("todo");
@@ -755,5 +828,33 @@ class ASTChecker {
     const fieldData = fieldInfo.fields.get(fieldName);
     const type = checker.mustResolve(fieldData.type);
     return { index: fieldData.index, type };
+  }
+  private initComplexType(binding: TypeBinding) {
+    const name = binding.value;
+    const typeVars = new Scope<string, TypeVar>();
+
+    const type = makeType(
+      Symbol(name),
+      binding.typeParameters.map((param) => {
+        const t = typeVar(param.value);
+        typeVars.init(param.value, t);
+        return t;
+      })
+    );
+    this.types.init(name, type);
+    return { type, typeVars };
+  }
+  private buildFieldsMap(
+    structFields: StructFieldType[],
+    typeVars: Scope<string, TypeVar>
+  ): FieldMap {
+    const fields: FieldMap = new Scope();
+    structFields.forEach((field, index) => {
+      fields.init(field.fieldName, {
+        index,
+        type: this.checkTypeExpr(field.type, typeVars),
+      });
+    });
+    return fields;
   }
 }

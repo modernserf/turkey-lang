@@ -413,3 +413,136 @@ it("destructures tuples", () => {
   `;
   expect(check(code)).toBe(true);
 });
+
+it("has do blocks", () => {
+  const code = `
+    let x = do {
+      let a = 1
+      let b = 2
+      a + b
+    }
+    let y: Int = x
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("has simple enums", () => {
+  const code = `
+    enum AST {
+      Num(Int),
+      Add(AST, AST),
+      Sub(AST, AST),
+      Neg(AST),
+    }
+
+    func calc (ast: AST): Int {
+      match (ast) {
+        Num(value) => value,
+        Add(l, r) => calc(l) + calc(r),
+        Sub(l, r) => calc(l) - calc(r),
+        Neg(node) => -(calc(node)),
+      }
+    }
+
+    calc(Add(Num(3), Neg(Sub(Num(5), Num(2)))))
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("rejects duplicate branches in declarations", () => {
+  const code = `
+    enum Foo {
+      Bar,
+      Bar(Int)
+    }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects pattern matching on non-enums", () => {
+  const code = `
+    match (1) {
+      Bar(x) => x,
+      Baz(str) => 0,
+    }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects duplicate branches in pattern matches", () => {
+  const code = `
+    enum Foo {
+      Bar(Int),
+      Baz(String)
+    }
+    match (Bar(1)) {
+      Bar(x) => x,
+      Bar(x) => x + 1,
+      Baz(str) => 0,
+    }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects unknown branches in pattern matches", () => {
+  const code = `
+    enum Foo {
+      Bar(Int),
+      Baz(String)
+    }
+    match (Bar(1)) {
+      Bar(x) => x,
+      Baz(str) => 0,
+      Quux => 1,
+    }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects incomplete branches in pattern matches", () => {
+  const code = `
+    enum Foo {
+      Bar(Int),
+      Baz(String)
+    }
+    match (Bar(1)) {
+      Bar(x) => x,
+    }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects type mismatches in pattern match results", () => {
+  const code = `
+    enum Foo {
+      Bar(Int),
+      Baz(String)
+    }
+    match (Bar(Int)) {
+      Bar(x) => x,
+      Baz(str) => str,
+    }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it.skip("has complex enums & pattern matching", () => {
+  const code = `
+    enum List<T> {
+      Nil,
+      Cons(T, List<T>)
+    }
+
+    func map<T, U> (list: List<T>, mapper: func (T): U): List<U> {
+      match (list) {
+        Nil => Nil,
+        Cons(head, tail) => Cons(mapper(head), tail.map(mapper)),
+      }
+    }
+  
+    let list = Cons(1, Cons(2, Cons(3, Nil)))
+
+    list.map(|x| { x + 1 })
+  `;
+  expect(check(code)).toBe(true);
+});
