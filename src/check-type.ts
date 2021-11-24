@@ -26,7 +26,7 @@ import { TraitImpls } from "./trait";
 type TypeName = symbol;
 type EnumTag = string;
 type CheckedBlock = { block: CheckedStmt[]; type: BoundType };
-type BuiltIn = { tag: "builtIn"; opcode: Opcode; type: BoundType };
+type BuiltIn = { tag: "builtIn"; opcode: Opcode[]; type: BoundType };
 type FieldMap = Scope<string, { type: Type; index: number }>;
 
 export class ArityName {
@@ -203,8 +203,12 @@ class ASTChecker {
         this.types.init(name, type);
         return null;
       }
-
-      case "while":
+      case "while": {
+        const expr = this.checkExpr(stmt.expr, null);
+        this.getChecker(null).unify(boolType, expr.type);
+        const { block } = this.checkBlock(stmt.block);
+        return { tag: "while", expr, block };
+      }
       case "for":
         throw new Error("todo");
       // istanbul ignore next
@@ -491,6 +495,16 @@ class ASTChecker {
     // empty tuple is same type as void
     this.tupleTypeNames.set(0, voidType.name);
 
+    const refT = typeVar("T");
+    const refType = makeType(Symbol("Ref"), [refT]);
+    const refFields = new Scope<string, { type: Type; index: number }>().init(
+      "0",
+      {
+        type: refT,
+        index: 0,
+      }
+    );
+
     this.typeConstructors
       .init("Void", {
         tag: "struct",
@@ -508,7 +522,14 @@ class ASTChecker {
         index: 1,
         fields: new Scope(),
         type: boolType,
+      })
+      .init("Ref", {
+        tag: "struct",
+        fields: refFields,
+        type: refType,
       });
+
+    this.structFields.set(refType.name, { type: refType, fields: refFields });
 
     this.traitImpls
       .init(intType.name, numTrait.name, { tag: "impl" })
@@ -544,14 +565,22 @@ class ASTChecker {
     const eqT = typeVar("T", eqTrait);
     this.initBuiltin("==", Opcode.Eq, [eqT, eqT], boolType) //
       .initBuiltin("!=", Opcode.Neq, [eqT, eqT], boolType);
+
+    this.initBuiltin(
+      "set",
+      [Opcode.StorePointerOffset, 0],
+      [refType, refT],
+      voidType
+    );
   }
   private initBuiltin(
     name: string,
-    opcode: Opcode,
+    opcode: Opcode | Opcode[],
     parameters: Type[],
     returnType: Type
   ): this {
     const type = this.funcType(parameters, returnType);
+    opcode = Array.isArray(opcode) ? opcode : [opcode];
     this.builtins.init(name, { tag: "builtIn", opcode, type });
     return this;
   }

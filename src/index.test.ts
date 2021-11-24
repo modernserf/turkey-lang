@@ -842,7 +842,7 @@ it.skip("has for-in loops", () => {
   expect(run(code)).toEqual(["2", "4", "6"]);
 });
 
-it.skip("has mutable refs", () => {
+it("has mutable refs", () => {
   const code = `
     let counter = Ref(0)
     print_int(counter:0)
@@ -852,14 +852,27 @@ it.skip("has mutable refs", () => {
   expect(run(code)).toEqual(["0", "1"]);
 });
 
-it.skip("runs a while loop", () => {
+it("runs a while loop", () => {
   const code = `
     let counter = Ref(0)
-    while(1 > counter:0) {
-      // load bearing type signature
-      let next: Int = counter:0
-      counter.set(next + 1)
+    while(counter:0 < 10) {
+      let value = counter:0
+      print_int(value)
+      counter.set(value + 1)
     }
   `;
-  expect(run(code)).toMatchInlineSnapshot(`Array []`);
+  expect(run(code)).toMatchInlineSnapshot(`
+Array [
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+]
+`);
 });

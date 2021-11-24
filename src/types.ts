@@ -158,7 +158,7 @@ export type CheckedExpr =
       type: BoundType;
     }
   | { tag: "field"; expr: CheckedExpr; index: number; type: BoundType }
-  | { tag: "builtIn"; opcode: Opcode; type: BoundType }
+  | { tag: "builtIn"; opcode: Opcode[]; type: BoundType }
   | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: BoundType }
   | { tag: "do"; block: CheckedStmt[]; type: BoundType }
   | {

@@ -338,6 +338,12 @@ class Interpreter {
         this.stack.push(Number(left > right) as StackValue);
         return;
       }
+      case Opcode.Lt: {
+        const right = this.stack.pop();
+        const left = this.stack.pop();
+        this.stack.push(Number(left < right) as StackValue);
+        return;
+      }
       case Opcode.Eq: {
         const right = this.stack.pop();
         const left = this.stack.pop();

@@ -355,7 +355,7 @@ class Compiler {
           this.compileExpr(arg);
         }
         if (expr.callee.tag === "builtIn") {
-          this.asm.writeOpcode(expr.callee.opcode);
+          expr.callee.opcode.forEach((op) => this.asm.writeOpcode(op));
         } else {
           this.compileExpr(expr.callee);
           this.asm.callClosure(expr.args.length);
