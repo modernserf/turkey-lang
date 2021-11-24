@@ -375,3 +375,21 @@ it("is order-dependent when inferring func literal types", () => {
   `;
   expect(() => check(code)).toThrow();
 });
+
+it("has tuples", () => {
+  const code = `
+    func foo (t: (Int, String)): String {
+      t:1
+    }
+    print_string(foo((1, "hello")))
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("rejects accessing nonexistent tuple fields", () => {
+  const code = `
+    let t = (1, "hello")
+    t:3
+  `;
+  expect(() => check(code)).toThrow();
+});

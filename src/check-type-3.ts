@@ -13,10 +13,22 @@ type Type = TypeVar | BoundType;
 
 type FieldMap = Scope<string, { type: Type; index: number }>;
 
-type FuncTypeNames = Map<number, TypeName>;
-type TupleTypeNames = Map<number, TypeName>;
-
 type Impl = { tag: "impl" };
+
+export class ArityName {
+  constructor(private prefix: string) {}
+  private map: Map<number, symbol> = new Map();
+  set(num: number, value: symbol) {
+    this.map.set(num, value);
+  }
+  use(num: number): symbol {
+    const res = this.map.get(num);
+    if (res) return res;
+    const sym = Symbol(`${this.prefix}(${num})`);
+    this.map.set(num, sym);
+    return sym;
+  }
+}
 
 class TraitImpls {
   private map: Map<TypeName, Map<TraitName, Impl>> = new Map();
@@ -214,8 +226,8 @@ class ASTChecker {
   private vars: Scope<string, BoundType> = new Scope();
   private types: Scope<string, BoundType> = new Scope();
   private builtins: Scope<string, BuiltIn> = new Scope();
-  private funcTypeNames: FuncTypeNames = new Map();
-  private tupleTypeNames: TupleTypeNames = new Map();
+  private funcTypeNames = new ArityName("Func");
+  private tupleTypeNames = new ArityName("Tuple");
   private structFields: Map<TypeName, { type: BoundType; fields: FieldMap }> =
     new Map();
   private enumFields: Map<TypeName, Map<EnumTag, FieldMap>> = new Map();
@@ -402,6 +414,22 @@ class ASTChecker {
       case "field": {
         const checker = ctx?.checker ?? new Checker(this.traitImpls);
         const target = this.checkExpr(expr.expr, null);
+        const isTuple =
+          target.type.name ===
+          this.tupleTypeNames.use(target.type.parameters.length);
+
+        if (isTuple) {
+          const index = Number(expr.fieldName);
+          const type = target.type.parameters[index];
+          if (!type) throw new Error("invalid field access");
+          return {
+            tag: "field",
+            index,
+            expr: target,
+            type: checker.mustResolve(type),
+          };
+        }
+
         const fieldInfo = this.structFields.get(target.type.name);
         if (!fieldInfo) throw new Error("invalid field access");
         checker.unify(fieldInfo.type, target.type);
@@ -409,6 +437,29 @@ class ASTChecker {
         const type = checker.mustResolve(fieldData.type);
         return { tag: "field", index: fieldData.index, expr: target, type };
       }
+      case "tuple": {
+        const checker = ctx?.checker ?? new Checker(this.traitImpls);
+        const abstractType: Type = {
+          tag: "type",
+          name: this.tupleTypeNames.use(expr.fields.length),
+          parameters: expr.fields.map((field, i) => typeVar(String(i))),
+        };
+        checkContext(ctx, abstractType);
+
+        const fields = expr.fields.map((field, i) => {
+          return this.checkExpr(field.expr, {
+            checker,
+            type: abstractType.parameters[i],
+          });
+        });
+
+        return {
+          tag: "struct",
+          type: checker.mustResolve(abstractType),
+          fields,
+        };
+      }
+
       case "closure": {
         if (!ctx) throw new Error("missing context");
         return this.checkClosure(ctx, expr.parameters, expr.block);
@@ -442,8 +493,12 @@ class ASTChecker {
           this.checkTypeExpr(typeExpr.returnType, vars)
         );
       }
-      default:
-        throw new Error("todo");
+      case "tuple":
+        return {
+          tag: "type",
+          name: this.tupleTypeNames.use(typeExpr.typeArgs.length),
+          parameters: typeExpr.typeArgs.map((t) => this.checkTypeExpr(t)),
+        };
     }
   }
   private bindVars(binding: Binding, type: BoundType): CheckedBinding {
@@ -537,19 +592,14 @@ class ASTChecker {
     return { tag: "call", callee, args: checkedArgs, type: returnType };
   }
   private checkFuncArity(type: Type, arity: number): BoundType {
-    // the arity should already exist, because the callee has already been evaluated
-    if (type.tag === "type" && type.name === this.funcTypeNames.get(arity)) {
+    if (type.tag === "type" && type.name === this.funcTypeNames.use(arity)) {
       return type;
     }
     throw new Error("Invalid func call");
   }
   private funcType(parameters: Type[], returnType: Type): BoundType {
     const arity = parameters.length;
-    let typeName = this.funcTypeNames.get(arity);
-    if (!typeName) {
-      typeName = Symbol(`Func(${arity})`);
-      this.funcTypeNames.set(arity, typeName);
-    }
+    const typeName = this.funcTypeNames.use(arity);
     return {
       tag: "type",
       name: typeName,
