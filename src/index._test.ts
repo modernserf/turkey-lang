@@ -876,3 +876,34 @@ Array [
 ]
 `);
 });
+
+it("does explicit typeclassish stuff", () => {
+  const code = `
+    struct ShowTrait<U> {
+      print: func (U): Void
+    }
+
+    func print_string_1 (value: String): Void {
+      print_string(value)
+    }
+
+    func print_int_1 (value: Int): Void {
+      print_int(value)
+    }
+
+    let stringImpl: ShowTrait<String> = ShowTrait {
+      print: print_string_1
+    }
+    let intImpl: ShowTrait<Int> = ShowTrait {
+      print: print_int_1
+    }
+
+    func print<V> (impl: ShowTrait<V>, value: V): Void {
+      impl:print(value)
+    }
+
+    print(stringImpl, "hello")
+    print(intImpl, 1)
+  `;
+  expect(run(code)).toEqual(["hello", "1"]);
+});

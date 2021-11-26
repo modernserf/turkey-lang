@@ -18,7 +18,7 @@ import {
   CheckedParam,
   CheckedStructFieldBinding,
 } from "./types";
-import { CurrentFuncState, FuncFields } from "./current-func-2";
+import { CurrentFuncState, FuncFields } from "./current-func";
 import { noMatch } from "./utils";
 import { Checker, makeType, primitive, trait, typeVar } from "./checker";
 import { TraitImpls } from "./trait";
