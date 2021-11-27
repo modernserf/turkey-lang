@@ -12,7 +12,6 @@ import {
   StructFieldValue,
   MatchCase,
   StructFieldBinding,
-  MatchBinding,
   TypeParam,
 } from "./types";
 

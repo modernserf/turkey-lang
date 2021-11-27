@@ -263,3 +263,58 @@ it("has void func literals", () => {
   `;
   expect(check(code)).toBe(true);
 });
+
+it("has tuples", () => {
+  const code = `
+    let pair = (1, "hello")
+
+    let (num, str) = pair
+    let other_num = pair:0
+    let typed : (Int, String) = pair
+
+    print(num + other_num)
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("rejects incomplete destructuring", () => {
+  const code = `
+    let pair = (1, "hello")
+
+    let (num) = pair
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects invalid destructuring", () => {
+  const code = `
+    let pair = (1, "hello")
+
+    let (num, str, other) = pair
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects invalid field access", () => {
+  const code = `
+    let pair = (1, "hello")
+
+    let other = pair:2
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects invalid type hints", () => {
+  const code = `
+    let pair: Int = (1, "hello")
+  `;
+  expect(() => check(code)).toThrow();
+  const code2 = `
+    let pair: (Int, String, Float) = (1, "hello")
+  `;
+  expect(() => check(code2)).toThrow();
+  const code3 = `
+    let pair: (Int, Int) = (1, "hello")
+  `;
+  expect(() => check(code3)).toThrow();
+});

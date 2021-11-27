@@ -19,6 +19,7 @@ import {
   stringType,
   boolType,
   funcType,
+  tupleType,
 } from "./types";
 
 import { noMatch } from "../utils";
@@ -211,9 +212,7 @@ export class TreeWalker implements ITreeWalker {
         );
       }
       case "tuple":
-        return this.obj.tupleType(
-          typeExpr.typeArgs.map((t) => this.typeExpr(t, vars))
-        );
+        return tupleType(typeExpr.typeArgs.map((t) => this.typeExpr(t, vars)));
       // istanbul ignore next
       default:
         noMatch(typeExpr);

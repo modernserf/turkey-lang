@@ -62,6 +62,9 @@ export const stringType = createType(
 export const boolType = createType(Symbol("Bool"), [], [eqTrait]);
 
 export const tupleTypeName = Symbol("Tuple");
+export function tupleType(fields: Type[]): BoundType {
+  return createType(tupleTypeName, fields);
+}
 export const voidType = createType(tupleTypeName, [], []);
 export const funcTypeName = Symbol("Func");
 export function funcType(parameters: Type[], returnType: Type): BoundType {
@@ -195,7 +198,6 @@ export interface Func {
 }
 
 export interface Obj {
-  tupleType(type: Type[]): BoundType;
   createTuple(
     fields: StructFieldValue[],
     typeHint: BoundType | null
