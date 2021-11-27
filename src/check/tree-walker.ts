@@ -20,6 +20,9 @@ import {
   boolType,
   funcType,
   tupleType,
+  createVar,
+  Traits,
+  TypeParamScope,
 } from "./types";
 
 import { noMatch } from "../utils";
@@ -30,6 +33,7 @@ export class TreeWalker implements ITreeWalker {
   public op!: Op;
   public func!: Func;
   public obj!: Obj;
+  public traits!: Traits;
   public block(block: Stmt[]): CheckedBlock {
     return this.scope.inScope(() => {
       const checkedBlock = block
@@ -138,7 +142,7 @@ export class TreeWalker implements ITreeWalker {
       case "func": {
         return this.func.createFunc(
           stmt.name,
-          stmt.typeParameters,
+          this.getTypeParameters(stmt.typeParameters),
           stmt.parameters,
           stmt.returnType,
           stmt.block
@@ -148,10 +152,19 @@ export class TreeWalker implements ITreeWalker {
         return { tag: "return", expr: this.func.return(stmt.expr) };
 
       case "struct":
-        this.obj.declareStruct(stmt.binding, stmt.fields, stmt.isTuple);
+        this.obj.declareStruct(
+          stmt.binding.value,
+          this.getTypeParameters(stmt.binding.typeParameters),
+          stmt.fields,
+          stmt.isTuple
+        );
         return null;
       case "enum":
-        this.obj.declareEnum(stmt.binding, stmt.cases);
+        this.obj.declareEnum(
+          stmt.binding.value,
+          this.getTypeParameters(stmt.binding.typeParameters),
+          stmt.cases
+        );
         return null;
       case "let": {
         let typeHint: BoundType | null = null;
@@ -190,7 +203,7 @@ export class TreeWalker implements ITreeWalker {
   }
   public typeExpr(
     typeExpr: TypeExpr,
-    vars: Scope<string, TypeVar> = new Scope()
+    vars: TypeParamScope = new Scope()
   ): Type {
     switch (typeExpr.tag) {
       case "identifier": {
@@ -207,7 +220,10 @@ export class TreeWalker implements ITreeWalker {
         return created;
       }
       case "func": {
-        const nextVars = this.initVars(typeExpr.typeParameters, vars.push());
+        const nextVars = this.getTypeParameters(
+          typeExpr.typeParameters,
+          vars.push()
+        );
         return funcType(
           typeExpr.parameters.map((p) => this.typeExpr(p, nextVars)),
           this.typeExpr(typeExpr.returnType, nextVars)
@@ -220,19 +236,22 @@ export class TreeWalker implements ITreeWalker {
         noMatch(typeExpr);
     }
   }
-  private initVars(typeParameters: TypeParam[], vars: Scope<string, TypeVar>) {
-    for (const param of typeParameters) {
-      vars.init(param.value, {
-        tag: "var",
-        name: Symbol(param.value),
-        traits: [],
-      });
-    }
-    return vars;
-  }
   private checkPredicate(expr: Expr): CheckedExpr {
     const checked = this.expr(expr, null);
     unify(checked.type, boolType);
     return checked;
+  }
+  private getTypeParameters(
+    typeParameters: TypeParam[],
+    typeVars: TypeParamScope = new Scope()
+  ): TypeParamScope {
+    typeParameters.forEach((p) => {
+      const traits = p.traits.map((traitExpr) =>
+        this.traits.getTraitConstraint(traitExpr)
+      );
+      const typeVar = createVar(Symbol(p.value), traits);
+      typeVars.init(p.value, typeVar);
+    });
+    return typeVars;
   }
 }

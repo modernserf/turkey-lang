@@ -75,4 +75,8 @@ export class Scope<K, V> {
     if (this.parent) yield* this.parent;
     yield* this.map;
   }
+  *values(): IterableIterator<V> {
+    if (this.parent) yield* this.parent.values();
+    yield* this.map.values();
+  }
 }

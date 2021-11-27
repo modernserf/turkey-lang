@@ -5,7 +5,6 @@ import {
   MatchBinding,
   StructFieldType,
   StructFieldValue,
-  TypeBinding,
 } from "../types";
 import { resolveVar, unify } from "./checker";
 import {
@@ -20,12 +19,13 @@ import {
   Type,
   TypeVar,
   boolType,
-  createVar,
   createType,
   BlockScope,
   intType,
   CheckedMatchCase,
   listType,
+  Traits,
+  TypeParamScope,
 } from "./types";
 
 function createEnum(
@@ -54,6 +54,7 @@ type EnumCaseInfo = { index: number; fields: FieldMap; isTuple: boolean };
 export class Obj implements IObj {
   public treeWalker!: TreeWalker;
   public scope!: BlockScope;
+  public traits!: Traits;
   private typeConstructors = new Scope<string, TypeConstructor>();
   private structInfo = new Map<symbol, StructInfo>();
   private enumInfo = new Map<symbol, EnumInfo>();
@@ -233,20 +234,25 @@ export class Obj implements IObj {
     return iter;
   }
   declareStruct(
-    binding: TypeBinding,
+    name: string,
+    typeParameters: TypeParamScope,
     inFields: StructFieldType[],
     isTuple: boolean
   ): void {
-    const { type, typeVars } = this.bindTypeVars(binding);
-    this.scope.initTypeAlias(binding.value, type);
-    const fields = this.buildFieldsMap(inFields, typeVars);
+    const type = this.createType(name, typeParameters);
+    this.scope.initTypeAlias(name, type);
+    const fields = this.buildFieldsMap(inFields, typeParameters);
 
     this.structInfo.set(type.name, { type, fields, isTuple });
-    this.typeConstructors.init(binding.value, { tag: "struct", type, fields });
+    this.typeConstructors.init(name, { tag: "struct", type, fields });
   }
-  declareEnum(binding: TypeBinding, inCases: EnumCase[]): void {
-    const { type, typeVars } = this.bindTypeVars(binding);
-    this.scope.initTypeAlias(binding.value, type);
+  declareEnum(
+    name: string,
+    typeParameters: TypeParamScope,
+    inCases: EnumCase[]
+  ): void {
+    const type = this.createType(name, typeParameters);
+    this.scope.initTypeAlias(name, type);
     const cases = new Map<string, EnumCaseInfo>();
     inCases.forEach((enumCase, i) => {
       const index = i + 1; // leave space for tag
@@ -254,7 +260,7 @@ export class Obj implements IObj {
       if (cases.has(tagName)) {
         throw new Error("Duplicate enum case");
       }
-      const fields = this.buildFieldsMap(inFields, typeVars);
+      const fields = this.buildFieldsMap(inFields, typeParameters);
       cases.set(tagName, { fields, index, isTuple });
       this.typeConstructors.init(tagName, { tag: "enum", index, type, fields });
     });
@@ -309,15 +315,8 @@ export class Obj implements IObj {
 
     return hints;
   }
-  private bindTypeVars(binding: TypeBinding) {
-    const typeVars = new Scope<string, TypeVar>();
-    const parameters = binding.typeParameters.map((p) => {
-      const typeVar = createVar(Symbol(p.value), []);
-      typeVars.init(p.value, typeVar);
-      return typeVar;
-    });
-    const type = createType(Symbol(binding.value), parameters, []);
-    return { type, typeVars };
+  private createType(name: string, typeParams: TypeParamScope): BoundType {
+    return createType(Symbol(name), Array.from(typeParams.values()), []);
   }
   private buildFieldsMap(
     inFields: StructFieldType[],

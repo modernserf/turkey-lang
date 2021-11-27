@@ -8,9 +8,7 @@ import {
   StructFieldType,
   StructFieldValue,
   TypeExpr,
-  TypeParam,
   Opcode,
-  TypeBinding,
 } from "../types";
 
 // TODO: trait params
@@ -155,13 +153,14 @@ export type CheckedParam = { binding: CheckedBinding; type: BoundType };
 export type CheckedUpvalue = { name: string; type: BoundType };
 
 export type VarScope = Scope<string, BoundType>;
+export type TypeParamScope = Scope<string, TypeVar>;
 
 export type CheckedBlock = { block: CheckedStmt[]; type: BoundType };
 
 export interface TreeWalker {
   block(block: Stmt[]): CheckedBlock;
   expr(expr: Expr, typeHint: BoundType | null): CheckedExpr;
-  typeExpr(typeExpr: TypeExpr, vars?: Scope<string, TypeVar>): Type;
+  typeExpr(typeExpr: TypeExpr, vars?: TypeParamScope): Type;
 }
 
 export interface BlockScope {
@@ -186,7 +185,7 @@ export interface Checker {
 export interface Func {
   createFunc(
     name: string,
-    typeParameters: TypeParam[],
+    typeVars: TypeParamScope,
     parameters: Array<{ binding: Binding; type: TypeExpr }>,
     returnType: TypeExpr,
     block: Stmt[]
@@ -228,11 +227,12 @@ export interface Obj {
   checkMatchTarget(type: BoundType): Match;
   getIterator(target: Expr): { target: CheckedExpr; iter: BoundType };
   declareStruct(
-    binding: TypeBinding,
+    name: string,
+    typeVars: TypeParamScope,
     fields: StructFieldType[],
     isTuple: boolean
   ): void;
-  declareEnum(binding: Binding, cases: EnumCase[]): void;
+  declareEnum(name: string, typeVars: TypeParamScope, cases: EnumCase[]): void;
 }
 
 export interface Match {

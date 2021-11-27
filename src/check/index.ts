@@ -16,7 +16,6 @@ const treeWalker = new TreeWalker();
 
 blockScope.func = func;
 blockScope.obj = obj;
-func.traits = traits;
 func.treeWalker = treeWalker;
 func.scope = blockScope;
 obj.treeWalker = treeWalker;
@@ -25,6 +24,7 @@ treeWalker.scope = blockScope;
 treeWalker.func = func;
 treeWalker.obj = obj;
 treeWalker.op = op;
+treeWalker.traits = traits;
 
 export function check(program: Stmt[]): CheckedStmt[] {
   return treeWalker.block(program).block;
