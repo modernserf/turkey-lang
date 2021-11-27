@@ -147,10 +147,11 @@ export class TreeWalker implements ITreeWalker {
       case "return":
         return { tag: "return", expr: this.func.return(stmt.expr) };
       case "type": {
-        const vars = this.initVars(stmt.binding.typeParameters, new Scope());
-        const type = this.typeExpr(stmt.type, vars);
-        this.scope.initTypeAlias(stmt.binding.value, type);
-        return null;
+        throw new Error("todo");
+        // const vars = this.initVars(stmt.binding.typeParameters, new Scope());
+        // const type = this.typeExpr(stmt.type, vars);
+        // this.scope.initTypeAlias(stmt.binding.value, type);
+        // return null;
       }
       case "struct":
         this.obj.declareStruct(stmt.binding, stmt.fields, stmt.isTuple);
@@ -195,6 +196,7 @@ export class TreeWalker implements ITreeWalker {
   ): Type {
     switch (typeExpr.tag) {
       case "identifier": {
+        // TODO: if this is a type alias, need to resolve the alias
         const baseType = vars.has(typeExpr.value)
           ? vars.get(typeExpr.value)
           : this.scope.getType(typeExpr.value);
@@ -202,7 +204,9 @@ export class TreeWalker implements ITreeWalker {
         const parameters = typeExpr.typeArgs.map((expr) =>
           this.typeExpr(expr, vars)
         );
-        return createType(baseType.name, parameters, baseType.traits);
+
+        const created = createType(baseType.name, parameters, baseType.traits);
+        return created;
       }
       case "func": {
         const nextVars = this.initVars(typeExpr.typeParameters, vars.push());

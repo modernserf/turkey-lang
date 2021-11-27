@@ -67,6 +67,18 @@ it("rejects type mismatches in operators", () => {
   expect(() => check(`1 + 1.5`)).toThrow();
 });
 
+it("checks do blocks", () => {
+  const code = `
+    let a = do {
+      let x = 1
+      let y = 2
+      x + y
+    }
+    print(a + 1)
+  `;
+  expect(check(code)).toBe(true);
+});
+
 it("checks funcs", () => {
   const code = `
     func foo (a: Int, b: Float): Int {
@@ -215,6 +227,20 @@ it("has func literals", () => {
     if (mapped) {
       print("here")
     }
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("rejects func literals without type info", () => {
+  const code = `
+    let mapper = |x| x < 10
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("allows func literals with explicit type info", () => {
+  const code = `
+    let mapper: func (Int): Bool = |x| x > 10
   `;
   expect(check(code)).toBe(true);
 });
@@ -572,6 +598,25 @@ it("rejects iterating over non-lists", () => {
     for (x in "hello") {
       print(x + 1)
     }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("has while loops", () => {
+  const code = `
+    let x = 10
+    while (x > 10) {
+      print(x)
+    } 
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("rejects while loops with non-boolean predicates", () => {
+  const code = `
+    while ("hello") {
+      print(x)
+    } 
   `;
   expect(() => check(code)).toThrow();
 });
