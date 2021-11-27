@@ -71,6 +71,7 @@ export class BlockScope implements IBlockScope {
         this.obj.checkTupleFields(targetType, fields);
         return { tag: "struct", fields };
       }
+      // istanbul ignore next
       default:
         return noMatch(binding);
     }

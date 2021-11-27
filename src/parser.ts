@@ -13,6 +13,7 @@ import {
   MatchCase,
   StructFieldBinding,
   TypeParam,
+  TraitField,
 } from "./types";
 
 interface IParseState {
@@ -120,6 +121,21 @@ const matchStatement: Parser<Stmt> = (state) => {
         typeParameters,
         block,
       };
+    }
+    case "trait": {
+      state.advance();
+      const binding = matchTypeBinding(state);
+      const fields = matchTraitFields(state);
+      return { tag: "trait", binding, fields };
+    }
+    case "impl": {
+      state.advance();
+      const typeParameters = matchTypeParams(state);
+      const trait = matchType(state);
+      match(state, "for");
+      const target = matchType(state);
+      const block = matchBlock(state);
+      return { tag: "impl", typeParameters, trait, target, block };
     }
     default:
       return { tag: "expr", expr: matchExpr(state) };
@@ -397,6 +413,23 @@ const checkType: Parser<TypeExpr | null> = (state) => {
   }
 };
 
+const matchTraitFields: Parser<TraitField[]> = (state) => {
+  match(state, "{");
+  return parseUntil(state, matchTraitField, checkEndBrace);
+};
+
+const matchTraitField: Parser<TraitField> = (state) => {
+  match(state, "func");
+  const name = match(state, "identifier").value;
+  const typeParameters = matchTypeParams(state);
+  match(state, "(");
+  const parameters = commaList(state, checkType);
+  match(state, ")");
+  match(state, ":");
+  const returnType = matchType(state);
+  return { tag: "func", name, typeParameters, parameters, returnType };
+};
+
 const matchTypeArgs: Parser<TypeExpr[]> = (state) => {
   if (!check(state, "<")) return [];
   const typeArgs = commaList(state, checkType);
@@ -414,7 +447,14 @@ const matchTypeParams: Parser<TypeParam[]> = (state) => {
 const checkTypeParam: Parser<TypeParam | null> = (state) => {
   const param = check(state, "typeIdentifier");
   if (!param) return null;
-  return { tag: "identifier", value: param.value };
+  const traits: TypeExpr[] = [];
+  if (check(state, ":")) {
+    while (true) {
+      traits.push(matchType(state));
+      if (!check(state, "+")) break;
+    }
+  }
+  return { tag: "identifier", value: param.value, traits };
 };
 
 const checkEnumCase: Parser<EnumCase | null> = (state) => {

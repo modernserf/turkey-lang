@@ -146,13 +146,7 @@ export class TreeWalker implements ITreeWalker {
       }
       case "return":
         return { tag: "return", expr: this.func.return(stmt.expr) };
-      case "type": {
-        throw new Error("todo");
-        // const vars = this.initVars(stmt.binding.typeParameters, new Scope());
-        // const type = this.typeExpr(stmt.type, vars);
-        // this.scope.initTypeAlias(stmt.binding.value, type);
-        // return null;
-      }
+
       case "struct":
         this.obj.declareStruct(stmt.binding, stmt.fields, stmt.isTuple);
         return null;
@@ -185,6 +179,10 @@ export class TreeWalker implements ITreeWalker {
         const { block } = this.block(stmt.block);
         return { tag: "while", expr, block };
       }
+      case "type":
+      case "trait":
+      case "impl":
+        throw new Error("todo");
       // istanbul ignore next
       default:
         noMatch(stmt);

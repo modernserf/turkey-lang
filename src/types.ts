@@ -14,6 +14,8 @@ export type Token =
   | { tag: "enum" }
   | { tag: "struct" }
   | { tag: "match" }
+  | { tag: "trait" }
+  | { tag: "impl" }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "string"; value: string }
@@ -75,6 +77,14 @@ export type Stmt =
       returnType: TypeExpr;
       block: Stmt[];
     }
+  | { tag: "trait"; binding: TypeBinding; fields: TraitField[] }
+  | {
+      tag: "impl";
+      typeParameters: TypeParam[];
+      trait: TypeExpr;
+      target: TypeExpr;
+      block: Stmt[];
+    }
   | { tag: "expr"; expr: Expr };
 
 export type EnumCase = {
@@ -86,6 +96,14 @@ export type EnumCase = {
 export type StructFieldType = { fieldName: string; type: TypeExpr };
 export type StructFieldValue = { fieldName: string; expr: Expr };
 export type StructFieldBinding = { fieldName: string; binding: Binding };
+
+export type TraitField = {
+  tag: "func";
+  name: string;
+  typeParameters: TypeParam[];
+  parameters: TypeExpr[];
+  returnType: TypeExpr;
+};
 
 export type Expr =
   | { tag: "identifier"; value: string }
@@ -137,7 +155,11 @@ export type TypeBinding = {
   typeParameters: TypeParam[];
 };
 
-export type TypeParam = { tag: "identifier"; value: string };
+export type TypeParam = {
+  tag: "identifier";
+  value: string;
+  traits: TypeExpr[];
+};
 
 // typechecker -> compiler
 

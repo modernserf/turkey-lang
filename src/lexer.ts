@@ -31,6 +31,8 @@ export function lex(string: string): Token[] {
         case "enum":
         case "struct":
         case "match":
+        case "trait":
+        case "impl":
           tokens.push({ tag: result[2] });
           break;
         default:

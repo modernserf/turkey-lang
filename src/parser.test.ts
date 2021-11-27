@@ -956,6 +956,7 @@ Array [
       "typeParameters": Array [
         Object {
           "tag": "identifier",
+          "traits": Array [],
           "value": "T",
         },
       ],
@@ -1046,6 +1047,7 @@ Array [
           "typeParameters": Array [
             Object {
               "tag": "identifier",
+              "traits": Array [],
               "value": "U",
             },
           ],
@@ -1061,6 +1063,7 @@ Array [
     "typeParameters": Array [
       Object {
         "tag": "identifier",
+        "traits": Array [],
         "value": "T",
       },
     ],
@@ -1084,6 +1087,190 @@ Array [
     "fields": Array [],
     "isTuple": false,
     "tag": "struct",
+  },
+]
+`);
+});
+
+it("parses trait declarations and impls", () => {
+  const code = `
+    trait FooTrait<T> {
+      func bar(Self, T): Int
+    }
+    
+    impl <T> FooTrait<T> for String {
+      func bar(self: Self, arg: T): Int {
+        1
+      }
+    }
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [
+        Object {
+          "tag": "identifier",
+          "traits": Array [],
+          "value": "T",
+        },
+      ],
+      "value": "FooTrait",
+    },
+    "fields": Array [
+      Object {
+        "name": "bar",
+        "parameters": Array [
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "Self",
+          },
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "T",
+          },
+        ],
+        "returnType": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Int",
+        },
+        "tag": "func",
+        "typeParameters": Array [],
+      },
+    ],
+    "tag": "trait",
+  },
+  Object {
+    "block": Array [
+      Object {
+        "block": Array [
+          Object {
+            "expr": Object {
+              "tag": "integer",
+              "value": 1,
+            },
+            "tag": "expr",
+          },
+        ],
+        "name": "bar",
+        "parameters": Array [
+          Object {
+            "binding": Object {
+              "tag": "identifier",
+              "value": "self",
+            },
+            "type": Object {
+              "tag": "identifier",
+              "typeArgs": Array [],
+              "value": "Self",
+            },
+          },
+          Object {
+            "binding": Object {
+              "tag": "identifier",
+              "value": "arg",
+            },
+            "type": Object {
+              "tag": "identifier",
+              "typeArgs": Array [],
+              "value": "T",
+            },
+          },
+        ],
+        "returnType": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Int",
+        },
+        "tag": "func",
+        "typeParameters": Array [],
+      },
+    ],
+    "tag": "impl",
+    "target": Object {
+      "tag": "identifier",
+      "typeArgs": Array [],
+      "value": "String",
+    },
+    "trait": Object {
+      "tag": "identifier",
+      "typeArgs": Array [
+        Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "T",
+        },
+      ],
+      "value": "FooTrait",
+    },
+    "typeParameters": Array [
+      Object {
+        "tag": "identifier",
+        "traits": Array [],
+        "value": "T",
+      },
+    ],
+  },
+]
+`);
+});
+
+it("parses trait constraints", () => {
+  const code = `
+    func foo <T: FooTrait<Int> + Num> (arg: T): Void {} 
+  `;
+  expect(parse(lex(code))).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [],
+    "name": "foo",
+    "parameters": Array [
+      Object {
+        "binding": Object {
+          "tag": "identifier",
+          "value": "arg",
+        },
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "T",
+        },
+      },
+    ],
+    "returnType": Object {
+      "tag": "identifier",
+      "typeArgs": Array [],
+      "value": "Void",
+    },
+    "tag": "func",
+    "typeParameters": Array [
+      Object {
+        "tag": "identifier",
+        "traits": Array [
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [
+              Object {
+                "tag": "identifier",
+                "typeArgs": Array [],
+                "value": "Int",
+              },
+            ],
+            "value": "FooTrait",
+          },
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "Num",
+          },
+        ],
+        "value": "T",
+      },
+    ],
   },
 ]
 `);
