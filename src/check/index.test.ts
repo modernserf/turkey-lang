@@ -620,3 +620,24 @@ it("rejects while loops with non-boolean predicates", () => {
   `;
   expect(() => check(code)).toThrow();
 });
+
+it("has trait constraints on type parameters", () => {
+  const code = `
+    func double <T : Num> (arg: T): T {
+      arg + arg
+    }
+    double(1) + 1
+    double(1.0) + 1.0
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("rejects func calls with invalid traits", () => {
+  const code = `
+    func double <T : Num> (arg: T): T {
+      arg + arg
+    }
+    double("hello")
+  `;
+  expect(() => check(code)).toThrow();
+});

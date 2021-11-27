@@ -3,7 +3,7 @@ import { createTrait, createType, createVar, Type } from "./types";
 
 const numTrait = createTrait(Symbol("Num"));
 
-const voidType = createType(Symbol("Void"), []);
+const voidType = createType(Symbol("Void"), [], []);
 const intType = createType(Symbol("Int"), [], [numTrait]);
 const floatType = createType(Symbol("Float"), [], [numTrait]);
 
@@ -17,7 +17,7 @@ it("checks primitives", () => {
 });
 
 const tupleName = Symbol("Tuple");
-const tuple = (...types: Type[]) => createType(tupleName, types);
+const tuple = (...types: Type[]) => createType(tupleName, types, []);
 
 it("checks complex structures", () => {
   expect(unify(tuple(intType, intType), tuple(intType, intType))).toEqual(
@@ -44,14 +44,14 @@ it("checks complex structures", () => {
   }).toThrowError(TypeCheckError);
 
   expect(() => {
-    const otherPair = createType(Symbol("other"), [intType, intType]);
+    const otherPair = createType(Symbol("other"), [intType, intType], []);
     unify(tuple(intType, intType), otherPair);
   }).toThrowError(TypeCheckError);
 });
 
 it("merges parameterized structures", () => {
-  const varT = createVar(Symbol("T"));
-  const varU = createVar(Symbol("U"));
+  const varT = createVar(Symbol("T"), []);
+  const varU = createVar(Symbol("U"), []);
   expect(unify(tuple(intType, varT), tuple(intType, floatType))).toEqual(
     tuple(intType, floatType)
   );
@@ -86,8 +86,8 @@ it("merges parameterized structures", () => {
 });
 
 it("unifies params one by one", () => {
-  const varT = createVar(Symbol("T"));
-  const varU = createVar(Symbol("U"));
+  const varT = createVar(Symbol("T"), []);
+  const varU = createVar(Symbol("U"), []);
 
   expect(unifyParam(tuple(varT, varT), 0, intType)).toEqual(
     tuple(intType, intType)
@@ -105,7 +105,7 @@ it("unifies params one by one", () => {
 
 it("checks traits", () => {
   const numT = createVar(Symbol("T"), [numTrait]);
-  const varU = createVar(Symbol("U"));
+  const varU = createVar(Symbol("U"), []);
 
   expect(unify(tuple(intType, numT), tuple(intType, floatType))).toEqual(
     tuple(intType, floatType)

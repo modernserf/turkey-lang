@@ -212,7 +212,9 @@ export class Obj implements IObj {
       ? checked.map((c) => c.type).reduce((l, r) => unify(l, r))
       : iterTypeHint;
 
-    const type = iterType ? createType(listType.name, [iterType]) : listType;
+    const type = iterType
+      ? createType(listType.name, [iterType], listType.traits)
+      : listType;
     const nil: CheckedExpr = { tag: "primitive", value: 0, type };
     return checked.reduceRight((rest, expr) => {
       return { tag: "object", type, fields: [expr, rest] };
@@ -314,7 +316,7 @@ export class Obj implements IObj {
       typeVars.init(p.value, typeVar);
       return typeVar;
     });
-    const type = createType(Symbol(binding.value), parameters);
+    const type = createType(Symbol(binding.value), parameters, []);
     return { type, typeVars };
   }
   private buildFieldsMap(

@@ -29,14 +29,14 @@ export function createTrait(name: symbol): Trait {
   return { tag: "trait", name };
 }
 
-export function createVar(name: symbol, traits: Trait[] = []): TypeVar {
+export function createVar(name: symbol, traits: Trait[]): TypeVar {
   return { tag: "var", name, traits };
 }
 
 export function createType(
   name: symbol,
   parameters: Type[],
-  traits: Trait[] = []
+  traits: Trait[]
 ): BoundType {
   return { tag: "type", name, parameters, traits };
 }
@@ -64,15 +64,19 @@ export const boolType = createType(Symbol("Bool"), [], [eqTrait]);
 
 export const tupleTypeName = Symbol("Tuple");
 export function tupleType(fields: Type[]): BoundType {
-  return createType(tupleTypeName, fields);
+  return createType(tupleTypeName, fields, []);
 }
 export const voidType = createType(tupleTypeName, [], []);
 export const funcTypeName = Symbol("Func");
 export function funcType(parameters: Type[], returnType: Type): BoundType {
-  return createType(funcTypeName, [returnType, ...parameters]);
+  return createType(funcTypeName, [returnType, ...parameters], []);
 }
 
-export const listType = createType(Symbol("List"), [createVar(Symbol("T"))]);
+export const listType = createType(
+  Symbol("List"),
+  [createVar(Symbol("T"), [])],
+  []
+);
 
 export type CheckedExpr =
   | { tag: "primitive"; value: number; type: BoundType }
@@ -234,4 +238,8 @@ export interface Obj {
 export interface Match {
   matchBinding(binding: MatchBinding): CheckedStructFieldBinding[];
   sortCases(cases: CheckedMatchCase[]): CheckedMatchCase[];
+}
+
+export interface Traits {
+  getTraitConstraint(expr: TypeExpr): Trait;
 }

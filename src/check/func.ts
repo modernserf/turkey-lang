@@ -15,6 +15,7 @@ import {
   funcType,
   funcTypeName,
   createVar,
+  Traits,
 } from "./types";
 
 type VarScope = Scope<string, BoundType>;
@@ -35,6 +36,7 @@ function unifyMaybe(left: BoundType | null, right: BoundType | null) {
 export class Func implements IFunc {
   public treeWalker!: TreeWalker;
   public scope!: BlockScope;
+  public traits!: Traits;
   private currentFunc: CurrentFunc | null = null;
   createFunc(
     name: string,
@@ -45,24 +47,33 @@ export class Func implements IFunc {
   ): CheckedStmt {
     const typeVars = new Scope<string, TypeVar>();
     // Type as used in rest of program, with type parameters as vars
-    const type = this.scope.inScope(() => {
-      for (const param of typeParameters) {
-        typeVars.init(param.value, createVar(Symbol(param.value)));
-      }
-      return funcType(
+    const { type, paramsWithTraits } = this.scope.inScope(() => {
+      const paramsWithTraits = typeParameters.map((param) => {
+        const traits = param.traits.map((traitExpr) =>
+          this.traits.getTraitConstraint(traitExpr)
+        );
+        const typeVar = createVar(Symbol(param.value), traits);
+        typeVars.init(param.value, typeVar);
+        return { traits, name: param.value };
+      });
+      const type = funcType(
         inParams.map((p) => this.treeWalker.typeExpr(p.type, typeVars)),
         this.treeWalker.typeExpr(returnType, typeVars)
       );
+      return { type, paramsWithTraits };
     });
     this.scope.initVar({ tag: "identifier", value: name }, type);
 
     return this.scope.inScope((outerScope) => {
       // Type used while checking func, with type parameters as unique types
       // so they can't be bound to anything else
-      for (const param of typeParameters) {
-        // TODO: include traits here
-        const tracerType = createType(Symbol(`Trace_${param.value}`), []);
-        this.scope.initTypeAlias(param.value, tracerType);
+      for (const param of paramsWithTraits) {
+        const tracerType = createType(
+          Symbol(`Trace_${param.name}`),
+          [],
+          param.traits
+        );
+        this.scope.initTypeAlias(param.name, tracerType);
       }
 
       const parameters = inParams.map((param) => {
