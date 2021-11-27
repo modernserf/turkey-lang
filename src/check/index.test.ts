@@ -542,3 +542,36 @@ it("has complex enums & pattern matching", () => {
   `;
   expect(check(code)).toBe(true);
 });
+
+it("has built-in lists", () => {
+  const code = `
+    func map<T, U> (list: List<T>, mapper: func (T): U): List<U> {
+      match (list) {
+        Nil => [],
+        Cons(head, tail) => Cons(mapper(head), tail.map(mapper)),
+      }
+    }
+
+    let list = [1,2,3]
+    list.map(|x| { 1.5 }).map(|x| { "hello" })
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("has for in loops", () => {
+  const code = `
+    for (x in [1,2,3]) {
+      print(x + 1)
+    }
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("rejects iterating over non-lists", () => {
+  const code = `
+    for (x in "hello") {
+      print(x + 1)
+    }
+  `;
+  expect(() => check(code)).toThrow();
+});

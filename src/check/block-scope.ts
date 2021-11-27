@@ -16,6 +16,7 @@ import {
   createVar,
   funcType,
   showTrait,
+  listType,
 } from "./types";
 import { Scope } from "../scope";
 
@@ -33,7 +34,8 @@ export class BlockScope implements IBlockScope {
     .init("Float", floatType)
     .init("String", stringType)
     .init("Bool", boolType)
-    .init("Void", voidType);
+    .init("Void", voidType)
+    .init("List", listType);
   inScope<T>(fn: (outerScope: VarScope) => T): T {
     this.vars = this.vars.push();
     this.types = this.types.push();

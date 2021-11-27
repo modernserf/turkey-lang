@@ -25,6 +25,7 @@ import {
   BlockScope,
   intType,
   CheckedMatchCase,
+  listType,
 } from "./types";
 
 function createEnum(
@@ -66,6 +67,25 @@ export class Obj implements IObj {
       cases: new Map([
         ["False", falseVal],
         ["True", trueVal],
+      ]),
+    });
+    const nilVal = createEnum(0, listType);
+    const consVal = createEnum(
+      1,
+      listType,
+      new Map([
+        ["0", { type: listType.parameters[0], index: 0 }],
+        ["1", { type: listType, index: 1 }],
+      ]),
+      true
+    );
+    this.typeConstructors.init("Nil", nilVal);
+    this.typeConstructors.init("Cons", consVal);
+    this.enumInfo.set(listType.name, {
+      type: listType,
+      cases: new Map([
+        ["Nil", nilVal],
+        ["Cons", consVal],
       ]),
     });
   }
@@ -145,10 +165,18 @@ export class Obj implements IObj {
     });
 
     let size = typeConstructor.fields.size;
+    // enums without fields are compiled as integers
+    if (size === 0 && typeConstructor.tag === "enum") {
+      return {
+        tag: "primitive",
+        value: typeConstructor.index,
+        type: fieldResolver.type,
+      };
+    }
+
     if (typeConstructor.tag === "enum") {
       size = size + 1;
     }
-
     const orderedFields: CheckedExpr[] = Array(size).fill(null);
     if (typeConstructor.tag === "enum") {
       orderedFields[0] = {
@@ -163,6 +191,7 @@ export class Obj implements IObj {
       if (!expr) throw new Error("missing field");
       orderedFields[index] = expr;
     }
+
     return { tag: "object", type: fieldResolver.type, fields: orderedFields };
   }
 
@@ -171,11 +200,35 @@ export class Obj implements IObj {
     if (!enumInfo) throw new Error("invalid match target");
     return new Match(enumInfo, concreteType, this.scope);
   }
-  createList(_values: Expr[], _typeHint: BoundType | null): CheckedExpr {
-    throw new Error("todo");
+  createList(values: Expr[], typeHint: BoundType | null): CheckedExpr {
+    let iterTypeHint: BoundType | null = null;
+    if (typeHint) {
+      iterTypeHint = this.getIterType(typeHint);
+    }
+    const checked = values.map((expr) =>
+      this.treeWalker.expr(expr, iterTypeHint)
+    );
+    const iterType = checked.length
+      ? checked.map((c) => c.type).reduce((l, r) => unify(l, r))
+      : iterTypeHint;
+
+    const type = iterType ? createType(listType.name, [iterType]) : listType;
+    const nil: CheckedExpr = { tag: "primitive", value: 0, type };
+    return checked.reduceRight((rest, expr) => {
+      return { tag: "object", type, fields: [expr, rest] };
+    }, nil);
   }
-  getIterator(_target: Expr): { target: CheckedExpr; iter: BoundType } {
-    throw new Error("todo");
+  getIterator(target: Expr): { target: CheckedExpr; iter: BoundType } {
+    const checked = this.treeWalker.expr(target, null);
+    const iter = this.getIterType(checked.type);
+    if (!iter) throw new Error("unbound iterator");
+    return { target: checked, iter };
+  }
+  private getIterType(target: BoundType): BoundType | null {
+    if (target.name !== listType.name) throw new Error("Not iterable");
+    const iter = target.parameters[0];
+    if (iter.tag === "var") return null;
+    return iter;
   }
   declareStruct(
     binding: TypeBinding,

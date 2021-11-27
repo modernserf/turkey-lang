@@ -72,6 +72,8 @@ export function funcType(parameters: Type[], returnType: Type): BoundType {
   return createType(funcTypeName, [returnType, ...parameters]);
 }
 
+export const listType = createType(Symbol("List"), [createVar(Symbol("T"))]);
+
 export type CheckedExpr =
   | { tag: "primitive"; value: number; type: BoundType }
   | { tag: "string"; value: string; type: BoundType }
