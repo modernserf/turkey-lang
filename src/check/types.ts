@@ -102,6 +102,7 @@ export type CheckedExpr =
     };
 
 export type CheckedMatchCase = {
+  tag: string;
   bindings: CheckedStructFieldBinding[];
   block: CheckedStmt[];
 };

@@ -73,13 +73,13 @@ export class TreeWalker implements ITreeWalker {
         return { tag: "if", cases: checkedCases, elseBlock, type };
       }
       case "match": {
-        const target = this.expr(expr, null);
+        const target = this.expr(expr.expr, null);
         const matchTarget = this.obj.checkMatchTarget(target.type);
         const matchCases = expr.cases.map((matchCase) => {
           return this.scope.inScope(() => {
             const bindings = matchTarget.matchBinding(matchCase.binding);
             const { block, type } = this.block(matchCase.block);
-            return { bindings, block, type };
+            return { tag: matchCase.binding.value, bindings, block, type };
           });
         });
         const type = matchCases.length

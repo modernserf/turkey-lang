@@ -1,8 +1,8 @@
 import { Scope } from "../scope";
 import {
-  Binding,
   EnumCase,
   Expr,
+  MatchBinding,
   StructFieldType,
   StructFieldValue,
   TypeBinding,
@@ -10,10 +10,10 @@ import {
 import { resolveVar, unify } from "./checker";
 import {
   Obj as IObj,
+  Match as IMatch,
   BoundType,
   CheckedExpr,
   CheckedStructFieldBinding,
-  Match,
   TreeWalker,
   tupleTypeName,
   tupleType,
@@ -23,6 +23,8 @@ import {
   createVar,
   createType,
   BlockScope,
+  intType,
+  CheckedMatchCase,
 } from "./types";
 
 function createEnum(
@@ -113,34 +115,8 @@ export class Obj implements IObj {
     if (!info) throw new Error("Cannot get field");
     const field = info.fields.get(fieldName);
     if (!field) throw new Error("Invalid field");
-    const type = this.hydrateField(info.type, target, field.type);
+    const type = hydrateField(info.type, target, field.type);
     return { type, index: field.index };
-  }
-  declareStruct(
-    binding: TypeBinding,
-    inFields: StructFieldType[],
-    isTuple: boolean
-  ): void {
-    const typeVars = new Scope<string, TypeVar>();
-    const parameters = binding.typeParameters.map((p) => {
-      const typeVar = createVar(Symbol(p.value), []);
-      typeVars.init(p.value, typeVar);
-      return typeVar;
-    });
-    const type = createType(Symbol(binding.value), parameters);
-
-    const fields: FieldMap = new Map();
-    inFields.forEach((field, index) => {
-      if (fields.has(field.fieldName)) {
-        throw new Error("Duplicate field");
-      }
-      const type = this.treeWalker.typeExpr(field.type, typeVars);
-      fields.set(field.fieldName, { type, index });
-    });
-
-    this.structInfo.set(type.name, { type, fields, isTuple });
-    this.typeConstructors.init(binding.value, { tag: "struct", type, fields });
-    this.scope.initTypeAlias(binding.value, type);
   }
   createTagged(
     tag: string,
@@ -148,44 +124,52 @@ export class Obj implements IObj {
     typeHint: BoundType | null
   ): CheckedExpr {
     const typeConstructor = this.typeConstructors.get(tag);
-    if (typeConstructor.tag === "struct") {
-      const hints = this.structFieldHints(typeHint, typeConstructor);
+    const hints = this.fieldHints(typeHint, typeConstructor);
+    const fieldResolver = new FieldResolver(typeConstructor.type);
+    const matchedFields = new Map<string, CheckedExpr>();
 
-      const fieldResolver = new FieldResolver(typeConstructor.type);
-      const matchedFields = new Map<string, CheckedExpr>();
-
-      inFields.forEach((field) => {
-        if (matchedFields.has(field.fieldName)) {
-          throw new Error("Duplicate field");
-        }
-        const fieldInfo = typeConstructor.fields.get(field.fieldName);
-        if (!fieldInfo) {
-          throw new Error("Unknown field");
-        }
-        const expr = this.treeWalker.expr(
-          field.expr,
-          hints.get(field.fieldName) || null
-        );
-        matchedFields.set(field.fieldName, expr);
-        fieldResolver.resolveField(fieldInfo.type, expr.type);
-      });
-
-      const orderedFields: CheckedExpr[] = Array(
-        typeConstructor.fields.size
-      ).fill(null);
-      for (const [fieldName, { index }] of typeConstructor.fields) {
-        const expr = matchedFields.get(fieldName);
-        if (!expr) throw new Error("missing field");
-        orderedFields[index] = expr;
+    inFields.forEach((field) => {
+      if (matchedFields.has(field.fieldName)) {
+        throw new Error("Duplicate field");
       }
+      const fieldInfo = typeConstructor.fields.get(field.fieldName);
+      if (!fieldInfo) {
+        throw new Error("Unknown field");
+      }
+      const expr = this.treeWalker.expr(
+        field.expr,
+        hints.get(field.fieldName) || null
+      );
+      matchedFields.set(field.fieldName, expr);
+      fieldResolver.resolveField(fieldInfo.type, expr.type);
+    });
 
-      return { tag: "object", type: fieldResolver.type, fields: orderedFields };
+    let size = typeConstructor.fields.size;
+    if (typeConstructor.tag === "enum") {
+      size = size + 1;
     }
-    throw new Error("todo");
+
+    const orderedFields: CheckedExpr[] = Array(size).fill(null);
+    if (typeConstructor.tag === "enum") {
+      orderedFields[0] = {
+        tag: "primitive",
+        value: typeConstructor.index,
+        type: intType,
+      };
+    }
+
+    for (const [fieldName, { index }] of typeConstructor.fields) {
+      const expr = matchedFields.get(fieldName);
+      if (!expr) throw new Error("missing field");
+      orderedFields[index] = expr;
+    }
+    return { tag: "object", type: fieldResolver.type, fields: orderedFields };
   }
 
-  checkMatchTarget(_type: BoundType): Match {
-    throw new Error("todo");
+  checkMatchTarget(concreteType: BoundType): IMatch {
+    const enumInfo = this.enumInfo.get(concreteType.name);
+    if (!enumInfo) throw new Error("invalid match target");
+    return new Match(enumInfo, concreteType, this.scope);
   }
   createList(_values: Expr[], _typeHint: BoundType | null): CheckedExpr {
     throw new Error("todo");
@@ -193,9 +177,33 @@ export class Obj implements IObj {
   getIterator(_target: Expr): { target: CheckedExpr; iter: BoundType } {
     throw new Error("todo");
   }
+  declareStruct(
+    binding: TypeBinding,
+    inFields: StructFieldType[],
+    isTuple: boolean
+  ): void {
+    const { type, typeVars } = this.bindTypeVars(binding);
+    this.scope.initTypeAlias(binding.value, type);
+    const fields = this.buildFieldsMap(inFields, typeVars);
 
-  declareEnum(_binding: Binding, _cases: EnumCase[]): void {
-    throw new Error("todo");
+    this.structInfo.set(type.name, { type, fields, isTuple });
+    this.typeConstructors.init(binding.value, { tag: "struct", type, fields });
+  }
+  declareEnum(binding: TypeBinding, inCases: EnumCase[]): void {
+    const { type, typeVars } = this.bindTypeVars(binding);
+    this.scope.initTypeAlias(binding.value, type);
+    const cases = new Map<string, EnumCaseInfo>();
+    inCases.forEach((enumCase, i) => {
+      const index = i + 1; // leave space for tag
+      const { isTuple, tagName, fields: inFields } = enumCase;
+      if (cases.has(tagName)) {
+        throw new Error("Duplicate enum case");
+      }
+      const fields = this.buildFieldsMap(inFields, typeVars);
+      cases.set(tagName, { fields, index, isTuple });
+      this.typeConstructors.init(tagName, { tag: "enum", index, type, fields });
+    });
+    this.enumInfo.set(type.name, { type, cases });
   }
   private tupleFieldHints(
     typeHint: BoundType | null,
@@ -217,9 +225,9 @@ export class Obj implements IObj {
         return param;
       });
   }
-  private structFieldHints(
+  private fieldHints(
     typeHint: BoundType | null,
-    typeConstructor: { type: BoundType; fields: FieldMap }
+    typeConstructor: TypeConstructor
   ): Map<string, BoundType> {
     if (!typeHint) {
       return new Map();
@@ -246,18 +254,43 @@ export class Obj implements IObj {
 
     return hints;
   }
-  private hydrateField(
-    abstractType: BoundType,
-    concreteType: BoundType,
-    fieldType: Type
-  ): BoundType {
-    unify(abstractType, concreteType, (res) => {
-      if (res.tag !== "resolveLeft") return;
-      fieldType = resolveVar(fieldType, res.varName, res.value);
+  private bindTypeVars(binding: TypeBinding) {
+    const typeVars = new Scope<string, TypeVar>();
+    const parameters = binding.typeParameters.map((p) => {
+      const typeVar = createVar(Symbol(p.value), []);
+      typeVars.init(p.value, typeVar);
+      return typeVar;
     });
-    if (fieldType.tag === "var") throw new Error("unresolved field");
-    return fieldType;
+    const type = createType(Symbol(binding.value), parameters);
+    return { type, typeVars };
   }
+  private buildFieldsMap(
+    inFields: StructFieldType[],
+    typeVars: Scope<string, TypeVar>
+  ) {
+    const fields: FieldMap = new Map();
+    inFields.forEach((field, index) => {
+      if (fields.has(field.fieldName)) {
+        throw new Error("Duplicate field");
+      }
+      const type = this.treeWalker.typeExpr(field.type, typeVars);
+      fields.set(field.fieldName, { type, index });
+    });
+    return fields;
+  }
+}
+
+function hydrateField(
+  abstractType: BoundType,
+  concreteType: BoundType,
+  fieldType: Type
+): BoundType {
+  unify(abstractType, concreteType, (res) => {
+    if (res.tag !== "resolveLeft") return;
+    fieldType = resolveVar(fieldType, res.varName, res.value);
+  });
+  if (fieldType.tag === "var") throw new Error("unresolved field");
+  return fieldType;
 }
 
 // given an abstract type, an abstract fieldmap, and a concrete fieldmap
@@ -291,5 +324,48 @@ class FieldResolver {
     }
     this.resolvedVars.set(varName, value);
     return value;
+  }
+}
+
+class Match implements IMatch {
+  constructor(
+    private enumInfo: EnumInfo,
+    private concreteType: BoundType,
+    private scope: BlockScope
+  ) {}
+  matchBinding(matchBinding: MatchBinding): CheckedStructFieldBinding[] {
+    const enumCase = this.enumInfo.cases.get(matchBinding.value);
+    if (!enumCase) throw new Error("Unknown case");
+    return matchBinding.fields.map(({ binding, fieldName }) => {
+      const field = enumCase.fields.get(fieldName);
+      if (!field) throw new Error("Invalid field");
+      const type = hydrateField(
+        this.enumInfo.type,
+        this.concreteType,
+        field.type
+      );
+      const checkedBinding = this.scope.initVar(binding, type);
+      return { fieldIndex: field.index, binding: checkedBinding };
+    });
+  }
+  sortCases(cases: CheckedMatchCase[]): CheckedMatchCase[] {
+    const map = new Map<string, CheckedMatchCase>();
+    for (const matchCase of cases) {
+      if (map.has(matchCase.tag)) {
+        throw new Error("Duplicate case");
+      }
+      map.set(matchCase.tag, matchCase);
+    }
+    const orderedCases: CheckedMatchCase[] = Array(
+      this.enumInfo.cases.size
+    ).fill(null);
+    for (const [tag, enumCase] of this.enumInfo.cases) {
+      const found = map.get(tag);
+      if (!found) {
+        throw new Error("Missing case");
+      }
+      orderedCases[enumCase.index] = found;
+    }
+    return orderedCases;
   }
 }
