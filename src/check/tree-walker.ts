@@ -11,7 +11,6 @@ import {
   CheckedExpr,
   CheckedStmt,
   Type,
-  TypeVar,
   createType,
   voidType,
   intType,

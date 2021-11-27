@@ -17,8 +17,6 @@ import {
   tupleTypeName,
   tupleType,
   Type,
-  TypeVar,
-  boolType,
   createType,
   BlockScope,
   intType,
@@ -26,30 +24,12 @@ import {
   listType,
   Traits,
   TypeParamScope,
+  TypeConstructor,
+  StructInfo,
+  EnumInfo,
+  EnumCaseInfo,
+  FieldMap,
 } from "./types";
-
-function createEnum(
-  index: number,
-  type: BoundType,
-  fields: FieldMap = new Map(),
-  isTuple = false
-) {
-  return { tag: "enum", index, type, fields, isTuple } as const;
-}
-
-type FieldMap = Map<string, { type: Type; index: number }>;
-type TypeConstructor =
-  | { tag: "struct"; type: BoundType; fields: FieldMap }
-  | {
-      tag: "enum";
-      index: number;
-      type: BoundType;
-      fields: FieldMap;
-    };
-
-type StructInfo = { type: BoundType; fields: FieldMap; isTuple: boolean };
-type EnumInfo = { type: BoundType; cases: Map<string, EnumCaseInfo> };
-type EnumCaseInfo = { index: number; fields: FieldMap; isTuple: boolean };
 
 export class Obj implements IObj {
   public treeWalker!: TreeWalker;
@@ -58,36 +38,19 @@ export class Obj implements IObj {
   private typeConstructors = new Scope<string, TypeConstructor>();
   private structInfo = new Map<symbol, StructInfo>();
   private enumInfo = new Map<symbol, EnumInfo>();
-  constructor() {
-    const falseVal = createEnum(0, boolType);
-    const trueVal = createEnum(1, boolType);
-    this.typeConstructors.init("False", falseVal);
-    this.typeConstructors.init("True", trueVal);
-    this.enumInfo.set(boolType.name, {
-      type: boolType,
-      cases: new Map([
-        ["False", falseVal],
-        ["True", trueVal],
-      ]),
+  constructor(
+    typeConstructors: Array<[string, TypeConstructor]>,
+    enumInfo: Array<[BoundType, Array<[string, EnumCaseInfo]>]>
+  ) {
+    typeConstructors.forEach(([name, ctor]) => {
+      this.typeConstructors.init(name, ctor);
     });
-    const nilVal = createEnum(0, listType);
-    const consVal = createEnum(
-      1,
-      listType,
-      new Map([
-        ["0", { type: listType.parameters[0], index: 0 }],
-        ["1", { type: listType, index: 1 }],
-      ]),
-      true
-    );
-    this.typeConstructors.init("Nil", nilVal);
-    this.typeConstructors.init("Cons", consVal);
-    this.enumInfo.set(listType.name, {
-      type: listType,
-      cases: new Map([
-        ["Nil", nilVal],
-        ["Cons", consVal],
-      ]),
+    enumInfo.forEach(([type, rows]) => {
+      const enumInfo: EnumInfo = { type, cases: new Map() };
+      for (const [name, caseInfo] of rows) {
+        enumInfo.cases.set(name, caseInfo);
+      }
+      this.enumInfo.set(type.name, enumInfo);
     });
   }
   inScope<T>(fn: () => T): T {
@@ -320,7 +283,7 @@ export class Obj implements IObj {
   }
   private buildFieldsMap(
     inFields: StructFieldType[],
-    typeVars: Scope<string, TypeVar>
+    typeVars: TypeParamScope
   ) {
     const fields: FieldMap = new Map();
     inFields.forEach((field, index) => {

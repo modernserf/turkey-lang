@@ -8,34 +8,25 @@ import {
   BoundType,
   CheckedBinding,
   Type,
-  intType,
-  floatType,
-  boolType,
-  stringType,
-  voidType,
-  createVar,
-  funcType,
-  showTrait,
-  listType,
 } from "./types";
 import { Scope } from "../scope";
-
-const showT = createVar(Symbol("T"), [showTrait]);
 
 export class BlockScope implements IBlockScope {
   public obj!: Obj;
   public func!: Func;
-  private vars = new Scope<string, BoundType>().init(
-    "print",
-    funcType([showT], voidType)
-  );
-  private types = new Scope<string, BoundType>()
-    .init("Int", intType)
-    .init("Float", floatType)
-    .init("String", stringType)
-    .init("Bool", boolType)
-    .init("Void", voidType)
-    .init("List", listType);
+  private vars = new Scope<string, BoundType>();
+  private types = new Scope<string, BoundType>();
+  constructor(
+    vars: Array<[string, BoundType]>,
+    types: Array<[string, BoundType]>
+  ) {
+    vars.forEach(([name, type]) => {
+      this.vars.init(name, type);
+    });
+    types.forEach(([name, type]) => {
+      this.types.init(name, type);
+    });
+  }
   inScope<T>(fn: (outerScope: VarScope) => T): T {
     this.vars = this.vars.push();
     this.types = this.types.push();

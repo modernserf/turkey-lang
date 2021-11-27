@@ -141,13 +141,6 @@ export type CheckedStructFieldBinding = {
 };
 
 export type BuiltIn = { tag: "builtIn"; opcode: Opcode[]; type: BoundType };
-export function builtIn(
-  opcode: Opcode[],
-  parameters: Type[],
-  returnType: Type
-): BuiltIn {
-  return { tag: "builtIn", opcode, type: funcType(parameters, returnType) };
-}
 
 export type CheckedParam = { binding: CheckedBinding; type: BoundType };
 export type CheckedUpvalue = { name: string; type: BoundType };
@@ -156,6 +149,27 @@ export type VarScope = Scope<string, BoundType>;
 export type TypeParamScope = Scope<string, TypeVar>;
 
 export type CheckedBlock = { block: CheckedStmt[]; type: BoundType };
+
+export type FieldMap = Map<string, { type: Type; index: number }>;
+export type TypeConstructor =
+  | { tag: "struct"; type: BoundType; fields: FieldMap }
+  | {
+      tag: "enum";
+      index: number;
+      type: BoundType;
+      fields: FieldMap;
+    };
+export type StructInfo = {
+  type: BoundType;
+  fields: FieldMap;
+  isTuple: boolean;
+};
+export type EnumInfo = { type: BoundType; cases: Map<string, EnumCaseInfo> };
+export type EnumCaseInfo = {
+  index: number;
+  fields: FieldMap;
+  isTuple: boolean;
+};
 
 export interface TreeWalker {
   block(block: Stmt[]): CheckedBlock;

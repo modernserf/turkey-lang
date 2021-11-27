@@ -3,7 +3,6 @@ import { Binding, Expr, Stmt, TypeExpr } from "../types";
 import { unify, unifyParam } from "./checker";
 import {
   Func as IFunc,
-  TypeVar,
   TreeWalker,
   BlockScope,
   BoundType,
@@ -14,6 +13,7 @@ import {
   voidType,
   funcType,
   funcTypeName,
+  TypeParamScope,
 } from "./types";
 
 type VarScope = Scope<string, BoundType>;
@@ -37,7 +37,7 @@ export class Func implements IFunc {
   private currentFunc: CurrentFunc | null = null;
   createFunc(
     name: string,
-    typeVars: Scope<string, TypeVar>,
+    typeVars: TypeParamScope,
     inParams: Array<{ binding: Binding; type: TypeExpr }>,
     returnType: TypeExpr,
     inBlock: Stmt[]
