@@ -211,7 +211,7 @@ it("has func literals", () => {
     }
     
     let cell = 1
-    let mapped = map(cell, |x| { x < 10 })
+    let mapped = map(cell, |x| x < 10)
     if (mapped) {
       print("here")
     }
@@ -226,7 +226,7 @@ it("is order-dependent when inferring func literal types", () => {
     }
     
     let cell = 1
-    let mapped = map(|x| { x < 10 }, cell)
+    let mapped = map(|x| x < 10, cell)
     if (mapped) {
       print("here")
     }
@@ -242,9 +242,9 @@ it("chains func calls", () => {
 
     let init = 1
     let result = init
-      .map(|x| { x + 1 })
-      .map(|x| { if (x < 10) { 0.0 } else { 1.0 } })
-      .map(|x| { x + 2.0 })
+      .map(|x| x + 1)
+      .map(|x| if (x < 10) { 0.0 } else { 1.0 })
+      .map(|x| x + 2.0)
       
   `;
   expect(check(code)).toBe(true);

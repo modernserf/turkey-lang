@@ -15,7 +15,6 @@ import {
   funcType,
   funcTypeName,
   createVar,
-  CheckedBlock,
 } from "./types";
 
 type VarScope = Scope<string, BoundType>;

@@ -241,7 +241,7 @@ const checkBaseExpr: Parser<Expr | null> = (state) => {
       state.advance();
       const parameters = commaList(state, checkBinding);
       match(state, "|");
-      const block = matchBlock(state);
+      const block = matchBlockOrExpr(state);
       return { tag: "closure", parameters, block };
     }
     case "do":
@@ -286,17 +286,20 @@ const checkMatchCase: Parser<MatchCase | null> = (state) => {
   if (!enumTag) return null;
   const fields = matchStructFieldBindingList(state);
   match(state, "=>");
-  const binding: MatchBinding = {
-    tag: "typeIdentifier",
-    value: enumTag.value,
-    fields,
+  const block = matchBlockOrExpr(state);
+  return {
+    binding: { tag: "typeIdentifier", value: enumTag.value, fields },
+    block,
   };
+};
+
+const matchBlockOrExpr: Parser<Stmt[]> = (state) => {
   if (state.token().tag === "{") {
     const block = matchBlock(state);
-    return { binding, block };
+    return block;
   } else {
     const expr = matchExpr(state);
-    return { binding, block: [{ tag: "expr", expr }] };
+    return [{ tag: "expr", expr }];
   }
 };
 
