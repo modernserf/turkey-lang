@@ -1,6 +1,6 @@
 import { Trait, Type, BoundType, createType, createVar } from "./types";
 
-function resolveVar(
+export function resolveVar(
   target: Type,
   varName: symbol,
   resolvedValue: BoundType
@@ -106,9 +106,14 @@ export function unifyParam(
   }
 }
 
-export function unify(left: BoundType, right: BoundType): BoundType {
+export function unify(
+  left: BoundType,
+  right: BoundType,
+  onResult?: (res: UnifyResult) => void
+): BoundType {
   while (true) {
     const res = unifyInner(left, right);
+    if (onResult) onResult(res);
     switch (res.tag) {
       case "ok":
         return res.value as BoundType;

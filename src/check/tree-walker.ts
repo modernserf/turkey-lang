@@ -83,7 +83,7 @@ export class TreeWalker implements ITreeWalker {
           });
         });
         const type = matchCases.length
-          ? matchCases.map((c) => c.type).reduce(unify)
+          ? matchCases.map((c) => c.type).reduce((l, r) => unify(l, r))
           : voidType;
 
         return {
@@ -98,7 +98,7 @@ export class TreeWalker implements ITreeWalker {
       case "list":
         return this.obj.createList(expr.items, typeHint);
       case "typeConstructor":
-        return this.obj.createTagged(expr.tag, expr.fields, typeHint);
+        return this.obj.createTagged(expr.value, expr.fields, typeHint);
       case "field": {
         const target = this.expr(expr.expr, null);
         const { index, type } = this.obj.getField(target.type, expr.fieldName);

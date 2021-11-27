@@ -318,3 +318,107 @@ it("rejects invalid type hints", () => {
   `;
   expect(() => check(code3)).toThrow();
 });
+
+it("has structs", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,  
+    }
+    let p = Point { x: 1, y: 2 }
+    print(p:x)
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("has parameterized structs", () => {
+  const code = `
+    struct Point<T> {
+      x: T,
+      y: T,  
+    }
+    let p = Point { x: 1.5, y: 2.5 }
+    print(p:x)
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("progagates struct parameters in func calls", () => {
+  const code = `
+    struct Point<T> {
+      x: T,
+      y: T,  
+    }
+
+    func get_x<T> (p: Point<T>): T {
+      return p:x
+    } 
+
+    let p = Point { x: 1.5, y: 2.5 }
+    print(get_x(p))
+  `;
+  expect(check(code)).toBe(true);
+});
+
+it("rejects incomplete struct constructions", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,  
+    }
+    let p = Point { x: 1 }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects duplicate fields in struct constructions", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,  
+    }
+    let p = Point { x: 1, x: 2, y: 3 }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects unknown fields in struct constructions", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,  
+    }
+    let p = Point { x: 1, y: 2, z: 3 }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects type mismatches in structs", () => {
+  const code = `
+    struct Point<T> {
+      x: T,
+      y: T,  
+    }
+    let p = Point { x: 1, y: 1.5 }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects accessing unknown fields", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,  
+    }
+    let p = Point { x: 1, y: 2 }
+    p:z
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects accessing fields on non-structs", () => {
+  const code = `
+    "foo":y
+  `;
+  expect(() => check(code)).toThrow();
+});

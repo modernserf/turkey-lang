@@ -17,6 +17,7 @@ blockScope.obj = obj;
 func.treeWalker = treeWalker;
 func.scope = blockScope;
 obj.treeWalker = treeWalker;
+obj.scope = blockScope;
 treeWalker.scope = blockScope;
 treeWalker.func = func;
 treeWalker.obj = obj;

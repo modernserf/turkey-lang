@@ -37,7 +37,7 @@ export class BlockScope implements IBlockScope {
   inScope<T>(fn: (outerScope: VarScope) => T): T {
     this.vars = this.vars.push();
     this.types = this.types.push();
-    const res = fn(this.vars.pop());
+    const res = this.obj.inScope(() => fn(this.vars.pop()));
     this.vars = this.vars.pop();
     this.types = this.types.pop();
     return res;

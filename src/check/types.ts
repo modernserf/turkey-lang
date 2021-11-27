@@ -10,6 +10,7 @@ import {
   TypeExpr,
   TypeParam,
   Opcode,
+  TypeBinding,
 } from "../types";
 
 // TODO: trait params
@@ -198,6 +199,7 @@ export interface Func {
 }
 
 export interface Obj {
+  inScope<T>(fn: () => T): T;
   createTuple(
     fields: StructFieldValue[],
     typeHint: BoundType | null
@@ -219,7 +221,7 @@ export interface Obj {
   checkMatchTarget(type: BoundType): Match;
   getIterator(target: Expr): { target: CheckedExpr; iter: BoundType };
   declareStruct(
-    binding: Binding,
+    binding: TypeBinding,
     fields: StructFieldType[],
     isTuple: boolean
   ): void;
