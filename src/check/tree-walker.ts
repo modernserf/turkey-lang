@@ -26,6 +26,7 @@ import {
 
 import { noMatch } from "../utils";
 import { unify } from "./checker";
+// import { Compiler } from "./compiler";
 
 export class TreeWalker implements ITreeWalker {
   public scope!: BlockScope;
@@ -33,6 +34,7 @@ export class TreeWalker implements ITreeWalker {
   public func!: Func;
   public obj!: Obj;
   public traits!: Traits;
+  // public compiler!: Compiler;
   public block(block: Stmt[]): CheckedBlock {
     return this.scope.inScope(() => {
       const checkedBlock = block
@@ -55,8 +57,10 @@ export class TreeWalker implements ITreeWalker {
           type: this.scope.getVar(expr.value),
         };
       case "integer":
+        // this.compiler.primitive(expr.value);
         return { tag: "primitive", value: expr.value, type: intType };
       case "float":
+        // this.compiler.primitive(expr.value);
         return { tag: "primitive", value: expr.value, type: floatType };
       case "string":
         return { tag: "string", value: expr.value, type: stringType };

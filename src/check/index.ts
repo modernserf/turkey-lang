@@ -1,5 +1,6 @@
 import { Opcode, Stmt } from "../types";
 import { BlockScope } from "./block-scope";
+// import { Compiler } from "./compiler";
 import { Func } from "./func";
 import { Obj } from "./obj";
 import { Op } from "./op";
@@ -113,6 +114,7 @@ const binaryOps: Map<string, BuiltIn> = new Map([
 ]);
 
 const blockScope = new BlockScope(vars, types);
+// const compiler = new Compiler();
 const func = new Func();
 const obj = new Obj(typeConstructors, enumInfo);
 const op = new Op(unaryOps, binaryOps);
@@ -126,6 +128,7 @@ func.scope = blockScope;
 obj.treeWalker = treeWalker;
 obj.scope = blockScope;
 treeWalker.scope = blockScope;
+// treeWalker.compiler = compiler;
 treeWalker.func = func;
 treeWalker.obj = obj;
 treeWalker.op = op;

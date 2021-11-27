@@ -3,6 +3,7 @@ import {
   CheckedExpr,
   CheckedStmt,
   CheckedStructFieldBinding,
+  Opcode,
 } from "./types";
 import { Scope } from "./scope";
 import { Writer } from "./writer";
@@ -425,6 +426,7 @@ class Compiler {
   }
   private panic(message: string) {
     this.strings.use(`PANIC: ${message}`);
+    this.asm.writeOpcode(Opcode.PrintStr);
     this.asm.halt();
   }
 }
