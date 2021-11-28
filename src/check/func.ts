@@ -80,6 +80,7 @@ export class Func implements IFunc {
 
       const func: CheckedExpr = {
         tag: "func",
+        name,
         upvalues: upvalues.map((up) => up.name),
         parameters,
         block,
@@ -127,6 +128,7 @@ export class Func implements IFunc {
 
       return {
         tag: "func",
+        name: null,
         upvalues: upvalues.map((up) => up.name),
         parameters,
         block,

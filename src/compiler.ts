@@ -299,8 +299,14 @@ class Compiler {
         this.asm.newClosure(expr.upvalues.length);
         expr.upvalues.forEach((upval, i) => {
           this.asm.dup();
-          this.locals.get(upval);
-          this.asm.setHeap(i);
+          // handle recursive funcs
+          if (upval === expr.name) {
+            this.asm.dup();
+            this.asm.setHeap(i);
+          } else {
+            this.locals.get(upval);
+            this.asm.setHeap(i);
+          }
         });
         this.funcs.push({
           label: funcLabel,
@@ -344,7 +350,7 @@ class Compiler {
           this.locals.inScope(() => {
             for (const { fieldIndex, binding } of bindings) {
               this.locals.get(predicateRef);
-              this.asm.getHeap(fieldIndex + 1);
+              this.asm.getHeap(fieldIndex);
               this.compileBinding(binding);
             }
             this.flushBindingQueue();

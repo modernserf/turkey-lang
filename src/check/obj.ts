@@ -201,7 +201,7 @@ export class Obj implements IObj {
   ): void {
     const type = this.createType(name, typeParameters);
     this.scope.initTypeAlias(name, type);
-    const fields = this.buildFieldsMap(inFields, typeParameters);
+    const fields = this.buildFieldsMap(inFields, typeParameters, 0);
 
     this.structInfo.set(type.name, { type, fields, isTuple });
     this.typeConstructors.init(name, { tag: "struct", type, fields });
@@ -214,13 +214,12 @@ export class Obj implements IObj {
     const type = this.createType(name, typeParameters);
     this.scope.initTypeAlias(name, type);
     const cases = new Map<string, EnumCaseInfo>();
-    inCases.forEach((enumCase, i) => {
-      const index = i + 1; // leave space for tag
+    inCases.forEach((enumCase, index) => {
       const { isTuple, tagName, fields: inFields } = enumCase;
       if (cases.has(tagName)) {
         throw new Error("Duplicate enum case");
       }
-      const fields = this.buildFieldsMap(inFields, typeParameters);
+      const fields = this.buildFieldsMap(inFields, typeParameters, 1);
       cases.set(tagName, { fields, index, isTuple });
       this.typeConstructors.init(tagName, { tag: "enum", index, type, fields });
     });
@@ -280,13 +279,15 @@ export class Obj implements IObj {
   }
   private buildFieldsMap(
     inFields: StructFieldType[],
-    typeVars: TypeParamScope
+    typeVars: TypeParamScope,
+    offset: number
   ) {
     const fields: FieldMap = new Map();
-    inFields.forEach((field, index) => {
+    inFields.forEach((field, i) => {
       if (fields.has(field.fieldName)) {
         throw new Error("Duplicate field");
       }
+      const index = i + offset;
       const type = this.treeWalker.typeExpr(field.type, typeVars);
       fields.set(field.fieldName, { type, index });
     });

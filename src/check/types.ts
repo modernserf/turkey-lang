@@ -84,6 +84,7 @@ export type CheckedExpr =
   | { tag: "identifier"; value: string; type: BoundType }
   | {
       tag: "func";
+      name: string | null;
       upvalues: string[];
       parameters: CheckedParam[];
       block: CheckedStmt[];

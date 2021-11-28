@@ -37,6 +37,9 @@ export class BlockScope implements IBlockScope {
     return res;
   }
   getVar(name: string): BoundType {
+    if (name.startsWith("_")) {
+      throw new Error("cannot reference underscore bindings");
+    }
     const type = this.vars.get(name);
     this.func.checkUpvalue(name, type, (outerScope) => {
       return this.vars.isUpvalue(name, outerScope);
@@ -49,7 +52,9 @@ export class BlockScope implements IBlockScope {
   initVar(binding: Binding, targetType: BoundType): CheckedBinding {
     switch (binding.tag) {
       case "identifier":
-        this.vars.init(binding.value, targetType);
+        if (!binding.value.startsWith("_")) {
+          this.vars.init(binding.value, targetType);
+        }
         return { tag: "identifier", value: binding.value };
       case "struct": {
         this.obj.checkTupleFields(targetType, binding.fields.length);
