@@ -1,5 +1,5 @@
 import { Scope } from "../scope";
-import { Expr, Opcode, Stmt, TypeExpr, TypeParam } from "../types";
+import { CheckedStmt, Expr, Opcode, Stmt, TypeExpr, TypeParam } from "../types";
 import {
   TreeWalker as ITreeWalker,
   BlockScope,
@@ -9,7 +9,6 @@ import {
   CheckedBlock,
   BoundType,
   TypedExpr,
-  CheckedStmt,
   Type,
   createType,
   voidType,
@@ -22,6 +21,7 @@ import {
   createVar,
   Traits,
   TypeParamScope,
+  TypedStmt,
 } from "./types";
 
 import { noMatch } from "../utils";
@@ -147,7 +147,7 @@ export class TreeWalker implements ITreeWalker {
         noMatch(expr);
     }
   }
-  private stmt(stmt: Stmt): CheckedStmt[] {
+  private stmt(stmt: Stmt): TypedStmt[] {
     switch (stmt.tag) {
       case "expr": {
         const expr = this.expr(stmt.expr, null);

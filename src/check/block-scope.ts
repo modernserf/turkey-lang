@@ -1,12 +1,11 @@
 import { noMatch } from "../utils";
-import { Binding } from "../types";
+import { Binding, CheckedBinding } from "../types";
 import {
   BlockScope as IBlockScope,
   Func,
   Obj,
   VarScope,
   BoundType,
-  CheckedBinding,
   Type,
 } from "./types";
 import { Scope } from "../scope";

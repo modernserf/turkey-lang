@@ -9,6 +9,11 @@ import {
   StructFieldValue,
   TypeExpr,
   Opcode,
+  CheckedExpr,
+  CheckedStmt,
+  CheckedBinding,
+  CheckedStructFieldBinding,
+  CheckedMatchCase,
 } from "../types";
 
 // TODO: trait params
@@ -76,71 +81,22 @@ export const listType = createType(
   []
 );
 
-export type CheckedExpr =
-  | { tag: "builtIn"; opcode: Opcode[] }
-  | { tag: "primitive"; value: number }
-  | { tag: "string"; value: string }
-  | { tag: "object"; fields: TypedExpr[] }
-  | { tag: "identifier"; value: string }
-  | {
-      tag: "func";
-      name: string | null;
-      upvalues: string[];
-      parameters: CheckedParam[];
-      block: CheckedStmt[];
-    }
-  | { tag: "field"; expr: CheckedExpr; index: number }
-  | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[] }
-  | { tag: "do"; block: CheckedStmt[] }
-  | {
-      tag: "if";
-      cases: Array<{ predicate: CheckedExpr; block: CheckedStmt[] }>;
-      elseBlock: CheckedStmt[];
-    }
-  | {
-      tag: "match";
-      expr: CheckedExpr;
-      cases: CheckedMatchCase[];
-    };
+type CheckedNonExpr = Exclude<CheckedStmt, { tag: "expr" }>;
 
-export type CheckedMatchCase = {
-  tag: string;
-  bindings: CheckedStructFieldBinding[];
-  block: CheckedStmt[];
-};
-
-export type CheckedStmt =
-  | { tag: "let"; binding: CheckedBinding; expr: CheckedExpr }
-  | { tag: "return"; expr: CheckedExpr | null }
-  | { tag: "while"; expr: TypedExpr; block: CheckedStmt[] }
-  | {
-      tag: "for";
-      binding: CheckedBinding;
-      expr: CheckedExpr;
-      block: CheckedStmt[];
-    }
-  | { tag: "expr"; expr: CheckedExpr; type: BoundType; hasValue: boolean };
-
-export type CheckedBinding =
-  | { tag: "identifier"; value: string }
-  | { tag: "struct"; fields: CheckedStructFieldBinding[] };
-
-export type CheckedStructFieldBinding = {
-  fieldIndex: number;
-  binding: CheckedBinding;
-};
+export type TypedStmt =
+  | CheckedNonExpr
+  | { tag: "expr"; expr: CheckedExpr; hasValue: boolean; type: BoundType };
 
 export type TypedExpr = CheckedExpr & { type: BoundType };
 
 export type BuiltIn = { tag: "builtIn"; opcode: Opcode[]; type: BoundType };
 
-export type CheckedParam = { binding: CheckedBinding; type: BoundType };
 export type CheckedUpvalue = { name: string; type: BoundType };
 
 export type VarScope = Scope<string, BoundType>;
 export type TypeParamScope = Scope<string, TypeVar>;
 
-export type CheckedBlock = { block: CheckedStmt[]; type: BoundType };
+export type CheckedBlock = { block: TypedStmt[]; type: BoundType };
 
 export type FieldMap = Map<string, { type: Type; index: number }>;
 export type TypeConstructor =
@@ -195,7 +151,7 @@ export interface Func {
     parameters: Array<{ binding: Binding; type: TypeExpr }>,
     returnType: TypeExpr,
     block: Stmt[]
-  ): CheckedStmt;
+  ): TypedStmt;
   createClosure(
     parameters: Binding[],
     block: Stmt[],

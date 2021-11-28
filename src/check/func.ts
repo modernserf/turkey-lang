@@ -7,13 +7,13 @@ import {
   BlockScope,
   BoundType,
   TypedExpr,
-  CheckedStmt,
   CheckedUpvalue,
   createType,
   voidType,
   funcType,
   funcTypeName,
   TypeParamScope,
+  TypedStmt,
 } from "./types";
 
 type VarScope = Scope<string, BoundType>;
@@ -41,7 +41,7 @@ export class Func implements IFunc {
     inParams: Array<{ binding: Binding; type: TypeExpr }>,
     returnType: TypeExpr,
     inBlock: Stmt[]
-  ): CheckedStmt {
+  ): TypedStmt {
     // Type as used in rest of program, with type parameters as vars
     const type = this.scope.inScope(() => {
       return funcType(
@@ -82,7 +82,7 @@ export class Func implements IFunc {
         tag: "func",
         name,
         upvalues: upvalues.map((up) => up.name),
-        parameters,
+        parameters: parameters.map((p) => p.binding),
         block,
         type,
       };
@@ -130,7 +130,7 @@ export class Func implements IFunc {
         tag: "func",
         name: null,
         upvalues: upvalues.map((up) => up.name),
-        parameters,
+        parameters: parameters.map((p) => p.binding),
         block,
         type,
       };
@@ -183,7 +183,7 @@ export class Func implements IFunc {
       this.currentFunc.upvalues.set(name, type);
     }
   }
-  private getImplicitReturn(block: CheckedStmt[]): BoundType | null {
+  private getImplicitReturn(block: TypedStmt[]): BoundType | null {
     const lastStmt = block.pop() ?? { tag: "noop" };
     switch (lastStmt.tag) {
       case "return":
@@ -206,7 +206,7 @@ export class Func implements IFunc {
     outerScope: VarScope,
     inBlock: Stmt[]
   ): {
-    block: CheckedStmt[];
+    block: TypedStmt[];
     upvalues: CheckedUpvalue[];
     returnType: BoundType;
   } {

@@ -163,40 +163,35 @@ export type TypeParam = {
 
 // typechecker -> compiler
 
-export type TypeVar = { tag: "var"; name: symbol; traits: BoundType[] };
-export type BoundType = { tag: "type"; name: symbol; parameters: Type[] };
-export type Type = TypeVar | BoundType;
-
 export type CheckedExpr =
-  | { tag: "primitive"; value: number; type: BoundType }
-  | { tag: "string"; value: string; type: BoundType }
-  | { tag: "object"; fields: CheckedExpr[]; type: BoundType }
-  | { tag: "identifier"; value: string; type: BoundType }
+  | { tag: "builtIn"; opcode: Opcode[] }
+  | { tag: "primitive"; value: number }
+  | { tag: "string"; value: string }
+  | { tag: "object"; fields: CheckedExpr[] }
+  | { tag: "identifier"; value: string }
   | {
-      tag: "closure";
-      parameters: CheckedParam[];
-      upvalues: CheckedUpvalue[];
+      tag: "func";
+      name: string | null;
+      upvalues: string[];
+      parameters: CheckedBinding[];
       block: CheckedStmt[];
-      type: BoundType;
     }
-  | { tag: "field"; expr: CheckedExpr; index: number; type: BoundType }
-  | { tag: "builtIn"; opcode: Opcode[]; type: BoundType }
-  | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: BoundType }
-  | { tag: "do"; block: CheckedStmt[]; type: BoundType }
+  | { tag: "field"; expr: CheckedExpr; index: number }
+  | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[] }
+  | { tag: "do"; block: CheckedStmt[] }
   | {
       tag: "if";
       cases: Array<{ predicate: CheckedExpr; block: CheckedStmt[] }>;
       elseBlock: CheckedStmt[];
-      type: BoundType;
     }
   | {
       tag: "match";
       expr: CheckedExpr;
       cases: CheckedMatchCase[];
-      type: BoundType;
     };
 
 export type CheckedMatchCase = {
+  tag: string;
   bindings: CheckedStructFieldBinding[];
   block: CheckedStmt[];
 };
@@ -204,14 +199,6 @@ export type CheckedMatchCase = {
 export type CheckedStmt =
   | { tag: "let"; binding: CheckedBinding; expr: CheckedExpr }
   | { tag: "return"; expr: CheckedExpr | null }
-  | {
-      tag: "func";
-      name: string;
-      parameters: CheckedParam[];
-      upvalues: CheckedUpvalue[];
-      block: CheckedStmt[];
-      type: BoundType;
-    }
   | { tag: "while"; expr: CheckedExpr; block: CheckedStmt[] }
   | {
       tag: "for";
@@ -229,9 +216,6 @@ export type CheckedStructFieldBinding = {
   fieldIndex: number;
   binding: CheckedBinding;
 };
-
-export type CheckedParam = { binding: CheckedBinding; type: BoundType };
-export type CheckedUpvalue = { name: string; type: BoundType };
 
 // compiler -> interpreter
 

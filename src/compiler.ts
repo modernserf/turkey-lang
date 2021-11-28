@@ -4,7 +4,7 @@ import {
   CheckedExpr,
   CheckedStmt,
   CheckedStructFieldBinding,
-} from "./check/types";
+} from "./types";
 import { Scope } from "./scope";
 import { Writer } from "./writer";
 import { noMatch } from "./utils";
@@ -312,7 +312,7 @@ class Compiler {
           label: funcLabel,
           block: expr.block,
           upvalues: expr.upvalues,
-          parameters: expr.parameters.map((p) => p.binding),
+          parameters: expr.parameters,
         });
         return;
       }

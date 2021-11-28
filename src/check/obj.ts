@@ -1,5 +1,7 @@
 import { Scope } from "../scope";
 import {
+  CheckedMatchCase,
+  CheckedStructFieldBinding,
   EnumCase,
   Expr,
   MatchBinding,
@@ -12,7 +14,6 @@ import {
   Match as IMatch,
   BoundType,
   TypedExpr,
-  CheckedStructFieldBinding,
   TreeWalker,
   tupleTypeName,
   tupleType,
@@ -20,7 +21,6 @@ import {
   createType,
   BlockScope,
   intType,
-  CheckedMatchCase,
   listType,
   Traits,
   TypeParamScope,
