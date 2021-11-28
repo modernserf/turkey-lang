@@ -1,10 +1,10 @@
+import { Opcode } from "./types";
 import {
   CheckedBinding,
   CheckedExpr,
   CheckedStmt,
   CheckedStructFieldBinding,
-  Opcode,
-} from "./types";
+} from "./check/types";
 import { Scope } from "./scope";
 import { Writer } from "./writer";
 import { noMatch } from "./utils";
@@ -12,9 +12,8 @@ import { noMatch } from "./utils";
 type QueuedFunc = {
   label: symbol;
   block: CheckedStmt[];
-
-  parameters: CheckedBinding[];
   upvalues: string[];
+  parameters: CheckedBinding[];
 };
 
 type QueuedBinding = {
@@ -55,9 +54,8 @@ class LabelState {
     this.jumpTableRefs.push(ref);
     return ref.labels;
   }
-  newClosure(label: Label, size: number) {
+  func(label: Label) {
     this.ref(label, this.writer.nextIndex());
-    this.writer.newClosure(size);
   }
   private ref(label: Label, index: number): void {
     this.labelRefs.push({ label, index });
@@ -271,10 +269,6 @@ class Compiler {
         this.labels.create(loopEnd);
         return;
       }
-      case "func": {
-        this.compileFuncHeader(stmt.name, Symbol(stmt.name), stmt);
-        return;
-      }
       // istanbul ignore next
       default:
         noMatch(stmt);
@@ -299,11 +293,23 @@ class Compiler {
           this.asm.setHeap(i);
         });
         return;
-      case "closure": {
-        this.compileFuncHeader(null, Symbol("closure"), expr);
+      case "func": {
+        const funcLabel = Symbol("func");
+        this.labels.func(funcLabel);
+        this.asm.newClosure(expr.upvalues.length);
+        expr.upvalues.forEach((upval, i) => {
+          this.asm.dup();
+          this.locals.get(upval);
+          this.asm.setHeap(i);
+        });
+        this.funcs.push({
+          label: funcLabel,
+          block: expr.block,
+          upvalues: expr.upvalues,
+          parameters: expr.parameters.map((p) => p.binding),
+        });
         return;
       }
-
       case "do":
         this.compileBlock(expr.block);
         return;
@@ -375,50 +381,22 @@ class Compiler {
         noMatch(expr);
     }
   }
-  private compileFuncHeader(
-    bindAs: string | null,
-    funcLabel: symbol,
-    stmt: {
-      parameters: { binding: CheckedBinding }[];
-      upvalues: { name: string }[];
-      block: CheckedStmt[];
-    }
-  ) {
-    const upvalues = stmt.upvalues.map((val) => val.name);
-    this.funcs.push({
-      label: funcLabel,
-      block: stmt.block,
-      parameters: stmt.parameters.map((p) => p.binding),
-      upvalues,
-    });
-
-    this.labels.newClosure(funcLabel, upvalues.length);
-    // func statements can be recursive
-    if (bindAs !== null) {
-      this.locals.init(bindAs);
-    }
-
-    for (const [i, name] of upvalues.entries()) {
-      this.asm.dup();
-      this.locals.get(name);
-      this.asm.setHeap(i);
-    }
-    return;
-  }
   private compileFuncBody(func: QueuedFunc) {
     this.labels.create(func.label);
     this.locals.inScope(() => {
       for (const param of func.parameters) {
         this.compileBinding(param);
       }
+      const calleeLabel = Symbol("callee");
+      this.locals.init(calleeLabel);
 
-      const upvaluesLabel = Symbol("upvalues");
-      this.locals.init(upvaluesLabel);
-      for (const [i, upval] of func.upvalues.entries()) {
-        this.locals.get(upvaluesLabel);
+      // handle upvalues
+      // TODO in checker
+      func.upvalues.forEach((upval, i) => {
+        this.locals.get(calleeLabel);
         this.asm.getHeap(i);
         this.locals.init(upval);
-      }
+      });
 
       this.flushBindingQueue();
       this.compileBlockInner(func.block);

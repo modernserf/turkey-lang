@@ -78,19 +78,9 @@ export class Func implements IFunc {
         inBlock
       );
 
-      const callee: CheckedExpr = {
-        tag: "object",
-        fields: upvalues.map((upval) => ({
-          tag: "identifier",
-          value: upval.name,
-          type: upval.type,
-        })),
-        type,
-      };
-
       const func: CheckedExpr = {
         tag: "func",
-        callee,
+        upvalues: upvalues.map((up) => up.name),
         parameters,
         block,
         type,
@@ -135,17 +125,13 @@ export class Func implements IFunc {
         returnType
       );
 
-      const callee: CheckedExpr = {
-        tag: "object",
-        fields: upvalues.map((upval) => ({
-          tag: "identifier",
-          value: upval.name,
-          type: upval.type,
-        })),
+      return {
+        tag: "func",
+        upvalues: upvalues.map((up) => up.name),
+        parameters,
+        block,
         type,
       };
-
-      return { tag: "func", callee, parameters, block, type };
     });
   }
 
@@ -248,7 +234,10 @@ export class Func implements IFunc {
       }
     }
 
-    return { upvalues, block, returnType };
+    // FIXME
+    const upvaluesWithoutPrint = upvalues.filter((u) => u.name !== "print");
+
+    return { upvalues: upvaluesWithoutPrint, block, returnType };
   }
   private checkCalleeType(type: BoundType, arity: number): void {
     if (type.name !== funcTypeName) {

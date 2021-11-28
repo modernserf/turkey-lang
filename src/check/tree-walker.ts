@@ -1,5 +1,5 @@
 import { Scope } from "../scope";
-import { Expr, Stmt, TypeExpr, TypeParam } from "../types";
+import { Expr, Opcode, Stmt, TypeExpr, TypeParam } from "../types";
 import {
   TreeWalker as ITreeWalker,
   BlockScope,
@@ -109,7 +109,35 @@ export class TreeWalker implements ITreeWalker {
         return this.func.createClosure(expr.parameters, expr.block, typeHint);
       case "call": {
         const callee = this.expr(expr.expr, null);
-        return this.func.call(callee, expr.args);
+        const result = this.func.call(callee, expr.args);
+        // FIXME
+        if (
+          result.tag === "call" &&
+          result.callee.tag === "identifier" &&
+          result.callee.value === "print"
+        ) {
+          if (result.args[0].type.name === stringType.name) {
+            return {
+              ...result,
+              callee: {
+                tag: "builtIn",
+                opcode: [Opcode.PrintStr],
+                type: voidType,
+              },
+            };
+          } else {
+            return {
+              ...result,
+              callee: {
+                tag: "builtIn",
+                opcode: [Opcode.PrintNum],
+                type: voidType,
+              },
+            };
+          }
+        }
+
+        return result;
       }
       case "unaryOp":
         return this.func.call(this.op.unary(expr.operator), [expr.expr]);
