@@ -832,7 +832,7 @@ it("has list literals", () => {
 
 it("has for-in loops", () => {
   const code = `
-    let list = Cons(2, Cons(4, Cons(6, Nil)))
+    let list = [2, 4, 6]
 
     for (item in list) {
       print(item)
@@ -841,37 +841,37 @@ it("has for-in loops", () => {
   expect(run(code)).toEqual(["2", "4", "6"]);
 });
 
-// it("has mutable refs", () => {
-//   const code = `
-//     let counter = Ref(0)
-//     print(counter:0)
-//     counter.set(1)
-//     print(counter:0)
-//   `;
-//   expect(run(code)).toEqual(["0", "1"]);
-// });
+it.skip("has mutable refs", () => {
+  const code = `
+    let counter = Ref(0)
+    print(counter:0)
+    counter.set(1)
+    print(counter:0)
+  `;
+  expect(run(code)).toEqual(["0", "1"]);
+});
 
-// it("runs a while loop", () => {
-//   const code = `
-//     let counter = Ref(0)
-//     while(counter:0 < 10) {
-//       let value = counter:0
-//       print(value)
-//       counter.set(value + 1)
-//     }
-//   `;
-//   expect(run(code)).toMatchInlineSnapshot(`
-// Array [
-//   "0",
-//   "1",
-//   "2",
-//   "3",
-//   "4",
-//   "5",
-//   "6",
-//   "7",
-//   "8",
-//   "9",
-// ]
-// `);
-// });
+it.skip("runs a while loop", () => {
+  const code = `
+    let counter = Ref(0)
+    while(counter:0 < 10) {
+      let value = counter:0
+      print(value)
+      counter.set(value + 1)
+    }
+  `;
+  expect(run(code)).toMatchInlineSnapshot(`
+Array [
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+]
+`);
+});

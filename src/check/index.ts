@@ -33,7 +33,7 @@ function createEnum(
   isTuple = false
 ) {
   const fields = new Map(
-    inFields.map(([name, type], index) => [name, { type, index }])
+    inFields.map(([name, type], i) => [name, { type, index: i + 1 }])
   );
 
   return { tag: "enum", index, type, fields, isTuple } as const;

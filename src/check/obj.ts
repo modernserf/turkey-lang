@@ -178,7 +178,11 @@ export class Obj implements IObj {
       : listType;
     const nil: CheckedExpr = { tag: "primitive", value: 0, type };
     return checked.reduceRight((rest, expr) => {
-      return { tag: "object", type, fields: [expr, rest] };
+      return {
+        tag: "object",
+        type,
+        fields: [{ tag: "primitive", value: 1, type }, expr, rest],
+      };
     }, nil);
   }
   getIterator(target: Expr): { target: CheckedExpr; iter: BoundType } {
