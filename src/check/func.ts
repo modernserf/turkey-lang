@@ -6,7 +6,7 @@ import {
   TreeWalker,
   BlockScope,
   BoundType,
-  CheckedExpr,
+  TypedExpr,
   CheckedStmt,
   CheckedUpvalue,
   createType,
@@ -78,7 +78,7 @@ export class Func implements IFunc {
         inBlock
       );
 
-      const func: CheckedExpr = {
+      const func: TypedExpr = {
         tag: "func",
         name,
         upvalues: upvalues.map((up) => up.name),
@@ -98,7 +98,7 @@ export class Func implements IFunc {
     inParameters: Binding[],
     inBlock: Stmt[],
     typeHint: BoundType | null
-  ): CheckedExpr {
+  ): TypedExpr {
     if (!typeHint) throw new Error("insufficient type info for closure");
     this.checkCalleeType(typeHint, inParameters.length);
 
@@ -137,7 +137,7 @@ export class Func implements IFunc {
     });
   }
 
-  call(callee: CheckedExpr, args: Expr[]): CheckedExpr {
+  call(callee: TypedExpr, args: Expr[]): TypedExpr {
     this.checkCalleeType(callee.type, args.length);
 
     let resolvedType = callee.type;
@@ -156,7 +156,7 @@ export class Func implements IFunc {
 
     return { tag: "call", callee, args: checkedArgs, type: returnType };
   }
-  return(expr: Expr | null): CheckedExpr | null {
+  return(expr: Expr | null): TypedExpr | null {
     if (!this.currentFunc) throw new Error("cannot return from top level");
     if (expr) {
       const result = this.treeWalker.expr(expr, this.currentFunc.returnType);
@@ -191,7 +191,7 @@ export class Func implements IFunc {
         return null;
       case "expr":
         block.push({ tag: "return", expr: lastStmt.expr });
-        return lastStmt.expr.type;
+        return lastStmt.type;
       case "noop":
         block.push({ tag: "return", expr: null });
         return voidType;

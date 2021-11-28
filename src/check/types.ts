@@ -77,33 +77,30 @@ export const listType = createType(
 );
 
 export type CheckedExpr =
-  | { tag: "builtIn"; opcode: Opcode[]; type: BoundType }
-  | { tag: "primitive"; value: number; type: BoundType }
-  | { tag: "string"; value: string; type: BoundType }
-  | { tag: "object"; fields: CheckedExpr[]; type: BoundType }
-  | { tag: "identifier"; value: string; type: BoundType }
+  | { tag: "builtIn"; opcode: Opcode[] }
+  | { tag: "primitive"; value: number }
+  | { tag: "string"; value: string }
+  | { tag: "object"; fields: TypedExpr[] }
+  | { tag: "identifier"; value: string }
   | {
       tag: "func";
       name: string | null;
       upvalues: string[];
       parameters: CheckedParam[];
       block: CheckedStmt[];
-      type: BoundType;
     }
-  | { tag: "field"; expr: CheckedExpr; index: number; type: BoundType }
-  | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: BoundType }
-  | { tag: "do"; block: CheckedStmt[]; type: BoundType }
+  | { tag: "field"; expr: CheckedExpr; index: number }
+  | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[] }
+  | { tag: "do"; block: CheckedStmt[] }
   | {
       tag: "if";
       cases: Array<{ predicate: CheckedExpr; block: CheckedStmt[] }>;
       elseBlock: CheckedStmt[];
-      type: BoundType;
     }
   | {
       tag: "match";
       expr: CheckedExpr;
       cases: CheckedMatchCase[];
-      type: BoundType;
     };
 
 export type CheckedMatchCase = {
@@ -115,14 +112,14 @@ export type CheckedMatchCase = {
 export type CheckedStmt =
   | { tag: "let"; binding: CheckedBinding; expr: CheckedExpr }
   | { tag: "return"; expr: CheckedExpr | null }
-  | { tag: "while"; expr: CheckedExpr; block: CheckedStmt[] }
+  | { tag: "while"; expr: TypedExpr; block: CheckedStmt[] }
   | {
       tag: "for";
       binding: CheckedBinding;
       expr: CheckedExpr;
       block: CheckedStmt[];
     }
-  | { tag: "expr"; expr: CheckedExpr; hasValue: boolean };
+  | { tag: "expr"; expr: CheckedExpr; type: BoundType; hasValue: boolean };
 
 export type CheckedBinding =
   | { tag: "identifier"; value: string }
@@ -132,6 +129,8 @@ export type CheckedStructFieldBinding = {
   fieldIndex: number;
   binding: CheckedBinding;
 };
+
+export type TypedExpr = CheckedExpr & { type: BoundType };
 
 export type BuiltIn = { tag: "builtIn"; opcode: Opcode[]; type: BoundType };
 
@@ -166,7 +165,7 @@ export type EnumCaseInfo = {
 
 export interface TreeWalker {
   block(block: Stmt[]): CheckedBlock;
-  expr(expr: Expr, typeHint: BoundType | null): CheckedExpr;
+  expr(expr: Expr, typeHint: BoundType | null): TypedExpr;
   typeExpr(typeExpr: TypeExpr, vars?: TypeParamScope): Type;
 }
 
@@ -179,8 +178,8 @@ export interface BlockScope {
 }
 
 export interface Op {
-  unary(operator: string): CheckedExpr;
-  binary(operator: string): CheckedExpr;
+  unary(operator: string): TypedExpr;
+  binary(operator: string): TypedExpr;
 }
 
 export interface Checker {
@@ -201,9 +200,9 @@ export interface Func {
     parameters: Binding[],
     block: Stmt[],
     typeHint: BoundType | null
-  ): CheckedExpr;
-  call(callee: CheckedExpr, args: Expr[]): CheckedExpr;
-  return(expr: Expr | null): CheckedExpr | null;
+  ): TypedExpr;
+  call(callee: TypedExpr, args: Expr[]): TypedExpr;
+  return(expr: Expr | null): TypedExpr | null;
   checkUpvalue(
     name: string,
     type: BoundType,
@@ -216,20 +215,20 @@ export interface Obj {
   createTuple(
     fields: StructFieldValue[],
     typeHint: BoundType | null
-  ): CheckedExpr;
-  createList(values: Expr[], typeHint: BoundType | null): CheckedExpr;
+  ): TypedExpr;
+  createList(values: Expr[], typeHint: BoundType | null): TypedExpr;
   createTagged(
     tag: string,
     fields: StructFieldValue[],
     typeHint: BoundType | null
-  ): CheckedExpr;
+  ): TypedExpr;
   getField(
     target: BoundType,
     fieldName: string
   ): { type: BoundType; index: number };
   checkTupleFields(targetType: BoundType, size: number): void;
   checkMatchTarget(type: BoundType): Match;
-  getIterator(target: Expr): { target: CheckedExpr; iter: BoundType };
+  getIterator(target: Expr): { target: TypedExpr; iter: BoundType };
   declareStruct(
     name: string,
     typeVars: TypeParamScope,

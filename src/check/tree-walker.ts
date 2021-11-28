@@ -8,7 +8,7 @@ import {
   Obj,
   CheckedBlock,
   BoundType,
-  CheckedExpr,
+  TypedExpr,
   CheckedStmt,
   Type,
   createType,
@@ -38,13 +38,13 @@ export class TreeWalker implements ITreeWalker {
       const checkedBlock = block.flatMap((stmt) => this.stmt(stmt));
       const lastStmt = checkedBlock[checkedBlock.length - 1];
       if (lastStmt?.tag === "expr") {
-        return { block: checkedBlock, type: lastStmt.expr.type };
+        return { block: checkedBlock, type: lastStmt.type };
       } else {
         return { block: checkedBlock, type: voidType };
       }
     });
   }
-  public expr(expr: Expr, typeHint: BoundType | null): CheckedExpr {
+  public expr(expr: Expr, typeHint: BoundType | null): TypedExpr {
     switch (expr.tag) {
       case "identifier":
         return {
@@ -111,27 +111,22 @@ export class TreeWalker implements ITreeWalker {
         const callee = this.expr(expr.expr, null);
         const result = this.func.call(callee, expr.args);
         // FIXME
-        if (
-          result.tag === "call" &&
-          result.callee.tag === "identifier" &&
-          result.callee.value === "print"
-        ) {
-          if (result.args[0].type.name === stringType.name) {
+        if ((result as any)?.callee?.value === "print") {
+          const argType = (result as any)?.args?.[0]?.type?.name;
+          if (argType === stringType.name) {
             return {
-              ...result,
+              ...(result as any),
               callee: {
                 tag: "builtIn",
                 opcode: [Opcode.PrintStr],
-                type: voidType,
               },
             };
           } else {
             return {
-              ...result,
+              ...(result as any),
               callee: {
                 tag: "builtIn",
                 opcode: [Opcode.PrintNum],
-                type: voidType,
               },
             };
           }
@@ -160,6 +155,7 @@ export class TreeWalker implements ITreeWalker {
           {
             tag: "expr",
             expr,
+            type: expr.type,
             hasValue:
               expr.type.name !== voidType.name &&
               expr.type.parameters.length === 0,
@@ -265,7 +261,7 @@ export class TreeWalker implements ITreeWalker {
         noMatch(typeExpr);
     }
   }
-  private checkPredicate(expr: Expr): CheckedExpr {
+  private checkPredicate(expr: Expr): TypedExpr {
     const checked = this.expr(expr, null);
     unify(checked.type, boolType);
     return checked;

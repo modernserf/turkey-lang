@@ -11,7 +11,7 @@ import {
   Obj as IObj,
   Match as IMatch,
   BoundType,
-  CheckedExpr,
+  TypedExpr,
   CheckedStructFieldBinding,
   TreeWalker,
   tupleTypeName,
@@ -62,7 +62,7 @@ export class Obj implements IObj {
   createTuple(
     fields: StructFieldValue[],
     typeHint: BoundType | null
-  ): CheckedExpr {
+  ): TypedExpr {
     const hints = this.tupleFieldHints(typeHint, fields.length);
     const checkedFields = fields.map((field, i) =>
       this.treeWalker.expr(field.expr, hints[i])
@@ -103,11 +103,11 @@ export class Obj implements IObj {
     tag: string,
     inFields: StructFieldValue[],
     typeHint: BoundType | null
-  ): CheckedExpr {
+  ): TypedExpr {
     const typeConstructor = this.typeConstructors.get(tag);
     const hints = this.fieldHints(typeHint, typeConstructor);
     const fieldResolver = new FieldResolver(typeConstructor.type);
-    const matchedFields = new Map<string, CheckedExpr>();
+    const matchedFields = new Map<string, TypedExpr>();
 
     inFields.forEach((field) => {
       if (matchedFields.has(field.fieldName)) {
@@ -138,7 +138,7 @@ export class Obj implements IObj {
     if (typeConstructor.tag === "enum") {
       size = size + 1;
     }
-    const orderedFields: CheckedExpr[] = Array(size).fill(null);
+    const orderedFields: TypedExpr[] = Array(size).fill(null);
     if (typeConstructor.tag === "enum") {
       orderedFields[0] = {
         tag: "primitive",
@@ -161,7 +161,7 @@ export class Obj implements IObj {
     if (!enumInfo) throw new Error("invalid match target");
     return new Match(enumInfo, concreteType, this.scope);
   }
-  createList(values: Expr[], typeHint: BoundType | null): CheckedExpr {
+  createList(values: Expr[], typeHint: BoundType | null): TypedExpr {
     let iterTypeHint: BoundType | null = null;
     if (typeHint) {
       iterTypeHint = this.getIterType(typeHint);
@@ -176,7 +176,7 @@ export class Obj implements IObj {
     const type = iterType
       ? createType(listType.name, [iterType], listType.traits)
       : listType;
-    const nil: CheckedExpr = { tag: "primitive", value: 0, type };
+    const nil: TypedExpr = { tag: "primitive", value: 0, type };
     return checked.reduceRight((rest, expr) => {
       return {
         tag: "object",
@@ -185,7 +185,7 @@ export class Obj implements IObj {
       };
     }, nil);
   }
-  getIterator(target: Expr): { target: CheckedExpr; iter: BoundType } {
+  getIterator(target: Expr): { target: TypedExpr; iter: BoundType } {
     const checked = this.treeWalker.expr(target, null);
     const iter = this.getIterType(checked.type);
     if (!iter) throw new Error("unbound iterator");
