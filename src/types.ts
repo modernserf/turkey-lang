@@ -223,6 +223,8 @@ export enum Opcode {
   Halt,
   LoadPrimitive, // value
   LoadPointer, // value
+  LoadRoot, // root offset
+  StoreRoot, // root offset
   LoadLocal, // frameOffset
   LoadPointerOffset, // heapOffset
   StoreLocal, // frameOffset

@@ -8,8 +8,8 @@ export class Writer {
   nextIndex(): number {
     return this.program.length;
   }
-  writeOpcode(opcode: Opcode): this {
-    this.program.push(opcode);
+  writeOpcode(...code: Opcode[]): this {
+    this.program.push(...code);
     return this;
   }
   patchAddress(index: number, addr: number): void {
@@ -46,6 +46,14 @@ export class Writer {
   }
   drop(): this {
     this.program.push(Opcode.Drop);
+    return this;
+  }
+  loadRoot(offset: number): this {
+    this.program.push(Opcode.LoadRoot, offset);
+    return this;
+  }
+  setRoot(offset: number): this {
+    this.program.push(Opcode.StoreRoot, offset);
     return this;
   }
   loadLocal(frameOffset: number): this {

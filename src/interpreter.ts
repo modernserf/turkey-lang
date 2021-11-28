@@ -148,6 +148,12 @@ class Stack {
   setLocal(offset: number, value: StackValue): void {
     this.stack[this.frame.offset + offset] = value;
   }
+  root(offset: number): StackValue {
+    return assert(this.stack[offset]);
+  }
+  setRoot(offset: number, value: StackValue): void {
+    this.stack[offset] = value;
+  }
   pushFrame(argCount: number, returnAddress: number): void {
     this.frame = new StackFrame(
       this.stack.length - argCount,
@@ -235,6 +241,9 @@ class Interpreter {
       case Opcode.LoadPointer:
         this.stack.push(createAddress(this.program.nextOp()));
         return;
+      case Opcode.LoadRoot:
+        this.stack.push(this.stack.root(this.program.nextOp()));
+        return;
       case Opcode.LoadLocal:
         this.stack.push(this.stack.local(this.program.nextOp()));
         return;
@@ -251,6 +260,9 @@ class Interpreter {
         return;
       case Opcode.StoreLocal:
         this.stack.setLocal(this.program.nextOp(), this.stack.pop());
+        return;
+      case Opcode.StoreRoot:
+        this.stack.setRoot(this.program.nextOp(), this.stack.pop());
         return;
       case Opcode.StorePointerOffset: {
         const value = this.stack.pop();

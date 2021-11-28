@@ -22,6 +22,11 @@ export class InvalidParentScopeError extends Error {
   }
 }
 
+export type ValueWithSource<Value> =
+  | { tag: "local"; value: Value }
+  | { tag: "upvalue"; value: Value }
+  | { tag: "root"; value: Value };
+
 export class Scope<K, V> {
   private map: Map<K, V> = new Map();
   constructor(private parent: Scope<K, V> | null = null) {}
@@ -31,12 +36,29 @@ export class Scope<K, V> {
     return false;
   }
   get(key: K): V {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    if (this.map.has(key)) return this.map.get(key)!;
+    if (this.map.has(key)) return this.map.get(key) as V;
     if (this.parent) return this.parent.get(key);
     throw new KeyNotFoundError(key);
   }
-
+  getWithSource(key: K): ValueWithSource<V> {
+    if (this.map.has(key)) {
+      const value = this.map.get(key) as V;
+      if (this.parent) {
+        return { tag: "local", value };
+      } else {
+        return { tag: "root", value };
+      }
+    }
+    if (this.parent) {
+      const result = this.parent.getWithSource(key);
+      if (result.tag === "local") {
+        return { tag: "upvalue", value: result.value };
+      } else {
+        return result;
+      }
+    }
+    throw new KeyNotFoundError(key);
+  }
   init(key: K, value: V): this {
     if (this.map.has(key)) throw new DuplicateScopeMemberError(key);
     this.map.set(key, value);
