@@ -127,6 +127,21 @@ export function unify(
   }
 }
 
+type TraitMap = Map<symbol, Trait[]>;
+export function getRequiredTraits(
+  type: Type,
+  map: TraitMap = new Map()
+): TraitMap {
+  switch (type.tag) {
+    case "var":
+      map.set(type.name, type.traits);
+      return map;
+    case "type":
+      type.parameters.forEach((param) => getRequiredTraits(param, map));
+      return map;
+  }
+}
+
 function getName(type: Type): string {
   switch (type.tag) {
     // istanbul ignore next

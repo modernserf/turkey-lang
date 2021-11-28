@@ -641,3 +641,33 @@ it("rejects func calls with invalid traits", () => {
   `;
   expect(() => check(code)).toThrow();
 });
+
+it("does trait-like things using structs as impls", () => {
+  const code = `
+    struct MonoidTrait <Self> {
+      zero: Self,
+      concat: func (Self, Self): Self,
+    }
+
+    let sum_int: MonoidTrait<Int> = MonoidTrait {
+      zero: 0,
+      concat: |left, right| left + right,
+    }
+
+    let product_int: MonoidTrait<Int> = MonoidTrait {
+      zero: 1,
+      concat: |left, right| left * right,
+    }
+
+    func fold_m <T>(items: List<T>, trait_obj: MonoidTrait<T>): T {
+      match (items) {
+        Nil => trait_obj:zero,
+        Cons(h, t) => trait_obj:concat(h, t.fold_m(trait_obj)),
+      }
+    }
+
+    let sum = [1,2,3,4,5].fold_m(sum_int)
+    let product = [1,2,3,4,5].fold_m(product_int)
+  `;
+  expect(check(code)).toBe(true);
+});

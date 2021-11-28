@@ -266,7 +266,7 @@ export class Obj implements IObj {
     // given an abstract type, a concrete type, and an abstract fieldmap,
     // produce a concrete fieldmap
     unify(typeHint, typeConstructor.type, (res) => {
-      if (res.tag !== "resolveLeft") return;
+      if (res.tag === "ok") return;
       const { value, varName } = res;
       for (const [fieldName, { type: fieldType }] of typeConstructor.fields) {
         const resolved = resolveVar(fieldType, varName, value);

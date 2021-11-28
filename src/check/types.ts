@@ -77,19 +77,19 @@ export const listType = createType(
 );
 
 export type CheckedExpr =
+  | { tag: "builtIn"; opcode: Opcode[]; type: BoundType }
   | { tag: "primitive"; value: number; type: BoundType }
   | { tag: "string"; value: string; type: BoundType }
   | { tag: "object"; fields: CheckedExpr[]; type: BoundType }
   | { tag: "identifier"; value: string; type: BoundType }
   | {
-      tag: "closure";
+      tag: "func";
+      callee: CheckedExpr;
       parameters: CheckedParam[];
-      upvalues: CheckedUpvalue[];
       block: CheckedStmt[];
       type: BoundType;
     }
   | { tag: "field"; expr: CheckedExpr; index: number; type: BoundType }
-  | { tag: "builtIn"; opcode: Opcode[]; type: BoundType }
   | { tag: "call"; callee: CheckedExpr; args: CheckedExpr[]; type: BoundType }
   | { tag: "do"; block: CheckedStmt[]; type: BoundType }
   | {
@@ -114,14 +114,6 @@ export type CheckedMatchCase = {
 export type CheckedStmt =
   | { tag: "let"; binding: CheckedBinding; expr: CheckedExpr }
   | { tag: "return"; expr: CheckedExpr | null }
-  | {
-      tag: "func";
-      name: string;
-      parameters: CheckedParam[];
-      upvalues: CheckedUpvalue[];
-      block: CheckedStmt[];
-      type: BoundType;
-    }
   | { tag: "while"; expr: CheckedExpr; block: CheckedStmt[] }
   | {
       tag: "for";

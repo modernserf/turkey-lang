@@ -78,7 +78,29 @@ export class Func implements IFunc {
         inBlock
       );
 
-      return { tag: "func", name, block, parameters, upvalues, type };
+      const callee: CheckedExpr = {
+        tag: "object",
+        fields: upvalues.map((upval) => ({
+          tag: "identifier",
+          value: upval.name,
+          type: upval.type,
+        })),
+        type,
+      };
+
+      const func: CheckedExpr = {
+        tag: "func",
+        callee,
+        parameters,
+        block,
+        type,
+      };
+
+      return {
+        tag: "let",
+        expr: func,
+        binding: { tag: "identifier", value: name },
+      };
     });
   }
   createClosure(
@@ -113,7 +135,17 @@ export class Func implements IFunc {
         returnType
       );
 
-      return { tag: "closure", block, parameters, upvalues, type };
+      const callee: CheckedExpr = {
+        tag: "object",
+        fields: upvalues.map((upval) => ({
+          tag: "identifier",
+          value: upval.name,
+          type: upval.type,
+        })),
+        type,
+      };
+
+      return { tag: "func", callee, parameters, block, type };
     });
   }
 
