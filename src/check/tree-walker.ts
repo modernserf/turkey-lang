@@ -35,9 +35,7 @@ export class TreeWalker implements ITreeWalker {
   public traits!: Traits;
   public block(block: Stmt[]): CheckedBlock {
     return this.scope.inScope(() => {
-      const checkedBlock = block
-        .map((stmt) => this.stmt(stmt))
-        .filter((stmt): stmt is CheckedStmt => !!stmt);
+      const checkedBlock = block.flatMap((stmt) => this.stmt(stmt));
       const lastStmt = checkedBlock[checkedBlock.length - 1];
       if (lastStmt?.tag === "expr") {
         return { block: checkedBlock, type: lastStmt.expr.type };
@@ -126,29 +124,33 @@ export class TreeWalker implements ITreeWalker {
         noMatch(expr);
     }
   }
-  private stmt(stmt: Stmt): CheckedStmt | null {
+  private stmt(stmt: Stmt): CheckedStmt[] {
     switch (stmt.tag) {
       case "expr": {
         const expr = this.expr(stmt.expr, null);
-        return {
-          tag: "expr",
-          expr,
-          hasValue:
-            expr.type.name !== voidType.name &&
-            expr.type.parameters.length === 0,
-        };
+        return [
+          {
+            tag: "expr",
+            expr,
+            hasValue:
+              expr.type.name !== voidType.name &&
+              expr.type.parameters.length === 0,
+          },
+        ];
       }
       case "func": {
-        return this.func.createFunc(
-          stmt.name,
-          this.getTypeParameters(stmt.typeParameters),
-          stmt.parameters,
-          stmt.returnType,
-          stmt.block
-        );
+        return [
+          this.func.createFunc(
+            stmt.name,
+            this.getTypeParameters(stmt.typeParameters),
+            stmt.parameters,
+            stmt.returnType,
+            stmt.block
+          ),
+        ];
       }
       case "return":
-        return { tag: "return", expr: this.func.return(stmt.expr) };
+        return [{ tag: "return", expr: this.func.return(stmt.expr) }];
 
       case "struct":
         this.obj.declareStruct(
@@ -157,14 +159,14 @@ export class TreeWalker implements ITreeWalker {
           stmt.fields,
           stmt.isTuple
         );
-        return null;
+        return [];
       case "enum":
         this.obj.declareEnum(
           stmt.binding.value,
           this.getTypeParameters(stmt.binding.typeParameters),
           stmt.cases
         );
-        return null;
+        return [];
       case "let": {
         let typeHint: BoundType | null = null;
         if (stmt.type) {
@@ -177,19 +179,19 @@ export class TreeWalker implements ITreeWalker {
           unify(typeHint, expr.type);
         }
         const binding = this.scope.initVar(stmt.binding, expr.type);
-        return { tag: "let", expr, binding };
+        return [{ tag: "let", expr, binding }];
       }
       case "for":
         return this.scope.inScope(() => {
           const { iter, target } = this.obj.getIterator(stmt.expr);
           const binding = this.scope.initVar(stmt.binding, iter);
           const { block } = this.block(stmt.block);
-          return { tag: "for", binding, block, expr: target };
+          return [{ tag: "for", binding, block, expr: target }];
         });
       case "while": {
         const expr = this.checkPredicate(stmt.expr);
         const { block } = this.block(stmt.block);
-        return { tag: "while", expr, block };
+        return [{ tag: "while", expr, block }];
       }
       case "type":
       case "trait":

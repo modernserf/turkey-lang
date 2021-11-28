@@ -226,10 +226,7 @@ export interface Obj {
     target: BoundType,
     fieldName: string
   ): { type: BoundType; index: number };
-  checkTupleFields(
-    targetType: BoundType,
-    fields: CheckedStructFieldBinding[]
-  ): void;
+  checkTupleFields(targetType: BoundType, size: number): void;
   checkMatchTarget(type: BoundType): Match;
   getIterator(target: Expr): { target: CheckedExpr; iter: BoundType };
   declareStruct(

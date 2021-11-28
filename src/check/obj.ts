@@ -70,17 +70,14 @@ export class Obj implements IObj {
     const type = tupleType(checkedFields.map((field) => field.type));
     return { tag: "object", fields: checkedFields, type };
   }
-  checkTupleFields(
-    targetType: BoundType,
-    fields: CheckedStructFieldBinding[]
-  ): void {
+  checkTupleFields(targetType: BoundType, size: number): void {
     if (targetType.name === tupleTypeName) {
-      if (fields.length === targetType.parameters.length) return;
+      if (size === targetType.parameters.length) return;
       throw new Error("Incomplete tuple destructuring");
     }
     const info = this.structInfo.get(targetType.name);
     if (!info) throw new Error("Cannot destructure");
-    if (!info.isTuple || info.fields.size === fields.length) return;
+    if (!info.isTuple || info.fields.size === size) return;
     throw new Error("Incomplete tuple destructuring");
   }
   getField(

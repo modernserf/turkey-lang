@@ -27,6 +27,7 @@ export class BlockScope implements IBlockScope {
       this.types.init(name, type);
     });
   }
+
   inScope<T>(fn: (outerScope: VarScope) => T): T {
     this.vars = this.vars.push();
     this.types = this.types.push();
@@ -51,6 +52,7 @@ export class BlockScope implements IBlockScope {
         this.vars.init(binding.value, targetType);
         return { tag: "identifier", value: binding.value };
       case "struct": {
+        this.obj.checkTupleFields(targetType, binding.fields.length);
         const fields = binding.fields.map((field) => {
           const { index, type: fieldType } = this.obj.getField(
             targetType,
@@ -59,7 +61,6 @@ export class BlockScope implements IBlockScope {
           const binding = this.initVar(field.binding, fieldType);
           return { fieldIndex: index, binding };
         });
-        this.obj.checkTupleFields(targetType, fields);
         return { tag: "struct", fields };
       }
       // istanbul ignore next
