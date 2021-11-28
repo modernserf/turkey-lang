@@ -98,9 +98,6 @@ it("unifies params one by one", () => {
   expect(unifyParam(tuple(intType, varU), 0, intType)).toEqual(
     tuple(intType, varU)
   );
-  expect(unifyParam(tuple(intType, varU), 0, varT)).toEqual(
-    tuple(intType, varU)
-  );
 });
 
 it("checks traits", () => {

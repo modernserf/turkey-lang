@@ -201,4 +201,5 @@ export interface Match {
 
 export interface Traits {
   getTraitConstraint(expr: TypeExpr): Trait;
+  boxValue(expr: TypedExpr, traits: Trait[]): TypedExpr;
 }

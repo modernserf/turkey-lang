@@ -1,6 +1,6 @@
 import { Scope } from "../scope";
 import { Binding, Expr, Stmt, TypeExpr } from "../types";
-import { unify, unifyParam } from "./checker";
+import { resolveVar, unify, unifyParam } from "./checker";
 import {
   Func as IFunc,
   TreeWalker,
@@ -14,6 +14,7 @@ import {
   funcTypeName,
   TypeParamScope,
   TypedStmt,
+  Traits,
 } from "./types";
 
 type VarScope = Scope<string, BoundType>;
@@ -34,6 +35,7 @@ function unifyMaybe(left: BoundType | null, right: BoundType | null) {
 export class Func implements IFunc {
   public treeWalker!: TreeWalker;
   public scope!: BlockScope;
+  public traits!: Traits;
   private currentFunc: CurrentFunc | null = null;
   createFunc(
     name: string,
@@ -248,5 +250,27 @@ export class Func implements IFunc {
     if (type.parameters.length !== arity + 1) {
       throw new Error("arity mismatch");
     }
+  }
+  private handleParam(
+    funcType: BoundType,
+    paramIndex: number,
+    expr: TypedExpr
+  ): {
+    resolvedType: BoundType;
+    expr: TypedExpr;
+  } {
+    const paramType = funcType.parameters[paramIndex];
+
+    if (paramType.tag === "var") {
+      funcType = resolveVar(funcType, paramType.name, expr.type) as BoundType;
+      expr = this.traits.boxValue(expr, paramType.traits);
+    } else {
+      // TODO: how will I recur over this?
+    }
+
+    return {
+      resolvedType: funcType,
+      expr,
+    };
   }
 }

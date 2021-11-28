@@ -86,7 +86,7 @@ function unifyInner(left: Type, right: Type): UnifyResult {
 export function unifyParam(
   left: BoundType,
   index: number,
-  right: Type
+  right: BoundType
 ): BoundType {
   while (true) {
     const res = unifyInner(left.parameters[index], right);
