@@ -158,7 +158,13 @@ export type TypeBinding = {
 export type TypeParam = {
   tag: "identifier";
   value: string;
-  traits: TypeExpr[];
+  traits: TraitExpr[];
+};
+
+export type TraitExpr = {
+  tag: "identifier";
+  value: string;
+  typeArgs: TypeExpr[];
 };
 
 // typechecker -> compiler

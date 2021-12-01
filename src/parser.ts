@@ -14,6 +14,7 @@ import {
   StructFieldBinding,
   TypeParam,
   TraitField,
+  TraitExpr,
 } from "./types";
 
 interface IParseState {
@@ -384,6 +385,12 @@ const matchType: Parser<TypeExpr> = (state) => {
   return assert(state, "type", checkType(state));
 };
 
+const matchTrait: Parser<TraitExpr> = (state) => {
+  const token = match(state, "typeIdentifier");
+  const typeArgs = matchTypeArgs(state);
+  return { tag: "identifier", value: token.value, typeArgs };
+};
+
 const checkType: Parser<TypeExpr | null> = (state) => {
   const token = state.token();
   switch (token.tag) {
@@ -447,10 +454,10 @@ const matchTypeParams: Parser<TypeParam[]> = (state) => {
 const checkTypeParam: Parser<TypeParam | null> = (state) => {
   const param = check(state, "typeIdentifier");
   if (!param) return null;
-  const traits: TypeExpr[] = [];
+  const traits: TraitExpr[] = [];
   if (check(state, ":")) {
     while (true) {
-      traits.push(matchType(state));
+      traits.push(matchTrait(state));
       if (!check(state, "+")) break;
     }
   }

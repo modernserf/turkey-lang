@@ -6,6 +6,7 @@ import {
   let_,
   PrettyPrinter,
   program_,
+  recur_,
   return_,
 } from "./utils";
 
@@ -25,7 +26,7 @@ it("prints a program", () => {
     let_(
       fizzbuzz,
       func_(
-        [fizzbuzz],
+        [modZero],
         [from, to],
         [
           if_(
@@ -46,7 +47,7 @@ it("prints a program", () => {
             ],
             [builtIn_("print_num", [from])]
           ),
-          call_(fizzbuzz, [builtIn_("add", [from, 1]), to], false),
+          call_(recur_, [builtIn_("add", [from, 1]), to], false),
         ]
       )
     ),
@@ -56,7 +57,7 @@ it("prints a program", () => {
 let mod_zero = func (l, r)  {
   return eq(mod(l, r), 0)
 }
-let fizzbuzz = func (from, to) with fizzbuzz = fizzbuzz {
+let fizzbuzz = func (from, to) with mod_zero = mod_zero {
   if (lt(to, from)) {
     return
   } else if (mod_zero(from, 15)) {
@@ -68,7 +69,7 @@ let fizzbuzz = func (from, to) with fizzbuzz = fizzbuzz {
   } else {
     print_num(from)
   }
-  fizzbuzz(add(from, 1), to)
+  recur(add(from, 1), to)
 }
 fizzbuzz(1, 100)
 `);
