@@ -4,6 +4,11 @@ import { Writer } from "../writer";
 import { noMatch } from "../utils";
 import { Scope } from "../scope";
 
+/* TODO 
+remove `upvalues, recur` from IR, move to OptimizedIR type
+add optimizer pass between check & compile
+*/
+
 type Result = {
   program: number[];
   constants: string[];

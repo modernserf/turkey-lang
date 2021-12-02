@@ -219,6 +219,9 @@ const checkBaseExpr: Parser<Expr | null> = (state) => {
   switch (token.tag) {
     case "(": {
       state.advance();
+      if (check(state, ")")) {
+        return { tag: "tuple", fields: [] };
+      }
       const expr = matchExpr(state);
       if (check(state, ",")) {
         const rest = commaList(state, checkExpr);
@@ -370,20 +373,9 @@ const checkBinding: Parser<Binding | null> = (state) => {
 };
 
 const matchTypeBinding: Parser<TypeBinding> = (state) => {
-  return assert(state, "type binding", checkTypeBinding(state));
-};
-
-const checkTypeBinding: Parser<TypeBinding | null> = (state) => {
-  const token = state.token();
-  switch (token.tag) {
-    case "typeIdentifier": {
-      state.advance();
-      const typeParameters = matchTypeParams(state);
-      return { tag: "identifier", value: token.value, typeParameters };
-    }
-    default:
-      return null;
-  }
+  const { value } = match(state, "typeIdentifier");
+  const typeParameters = matchTypeParams(state);
+  return { tag: "identifier", value, typeParameters };
 };
 
 const matchType: Parser<TypeExpr> = (state) => {

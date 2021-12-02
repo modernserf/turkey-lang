@@ -1,5 +1,7 @@
-import { parse, ParseError } from "./parser";
+import { parse as parseInner, ParseError } from "./parser";
 import { lex } from "./lexer";
+
+const parse = (code: string) => parseInner(lex(code));
 
 it("gets error tokens when input is totally malformed", () => {
   const code = `
@@ -22,76 +24,39 @@ Array [
 ]
 `);
   expect(() => {
-    parse(tokens);
+    parseInner(tokens);
   }).toThrowError(ParseError);
 });
 
-it("parses print, let, numbers", () => {
-  const code = `
-    print(0 + 123)   // add ints
-    let x = 123.45   // a float
-    print(x + 67.89) // add floats
-  `;
-  const ast = parse(lex(code));
-  expect(ast).toMatchInlineSnapshot(`
+it("parses simple literals", () => {
+  expect(parse("1")).toMatchInlineSnapshot(`
 Array [
   Object {
     "expr": Object {
-      "args": Array [
-        Object {
-          "left": Object {
-            "tag": "integer",
-            "value": 0,
-          },
-          "operator": "+",
-          "right": Object {
-            "tag": "integer",
-            "value": 123,
-          },
-          "tag": "binaryOp",
-        },
-      ],
-      "expr": Object {
-        "tag": "identifier",
-        "value": "print",
-      },
-      "tag": "call",
+      "tag": "integer",
+      "value": 1,
     },
     "tag": "expr",
   },
+]
+`);
+  expect(parse("1.5")).toMatchInlineSnapshot(`
+Array [
   Object {
-    "binding": Object {
-      "tag": "identifier",
-      "value": "x",
-    },
     "expr": Object {
       "tag": "float",
-      "value": 123.45,
+      "value": 1.5,
     },
-    "tag": "let",
-    "type": null,
+    "tag": "expr",
   },
+]
+`);
+  expect(parse(`"hello, there"`)).toMatchInlineSnapshot(`
+Array [
   Object {
     "expr": Object {
-      "args": Array [
-        Object {
-          "left": Object {
-            "tag": "identifier",
-            "value": "x",
-          },
-          "operator": "+",
-          "right": Object {
-            "tag": "float",
-            "value": 67.89,
-          },
-          "tag": "binaryOp",
-        },
-      ],
-      "expr": Object {
-        "tag": "identifier",
-        "value": "print",
-      },
-      "tag": "call",
+      "tag": "string",
+      "value": "hello, there",
     },
     "tag": "expr",
   },
@@ -99,49 +64,95 @@ Array [
 `);
 });
 
-it("parses do blocks", () => {
-  const ast = parse(
-    lex(`
-    do {
-      let x = 1
-      x + 2
-    }
-  `)
-  );
-  expect(ast).toMatchInlineSnapshot(`
+it("parses identifiers", () => {
+  expect(parse(`foo`)).toMatchInlineSnapshot(`
 Array [
   Object {
     "expr": Object {
-      "block": Array [
+      "tag": "identifier",
+      "value": "foo",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`bAR_123`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "tag": "identifier",
+      "value": "bAR_123",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`_1`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "tag": "identifier",
+      "value": "_1",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("parses tuples", () => {
+  expect(parse(`()`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "fields": Array [],
+      "tag": "tuple",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  // note: trailing comma for 1-tuple
+  expect(parse(`(1,)`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "fields": Array [
         Object {
-          "binding": Object {
-            "tag": "identifier",
-            "value": "x",
-          },
           "expr": Object {
             "tag": "integer",
             "value": 1,
           },
-          "tag": "let",
-          "type": null,
+          "fieldName": "0",
+        },
+      ],
+      "tag": "tuple",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`(1, "hello")`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "fields": Array [
+        Object {
+          "expr": Object {
+            "tag": "integer",
+            "value": 1,
+          },
+          "fieldName": "0",
         },
         Object {
           "expr": Object {
-            "left": Object {
-              "tag": "identifier",
-              "value": "x",
-            },
-            "operator": "+",
-            "right": Object {
-              "tag": "integer",
-              "value": 2,
-            },
-            "tag": "binaryOp",
+            "tag": "string",
+            "value": "hello",
           },
-          "tag": "expr",
+          "fieldName": "1",
         },
       ],
-      "tag": "do",
+      "tag": "tuple",
     },
     "tag": "expr",
   },
@@ -149,49 +160,33 @@ Array [
 `);
 });
 
-it("parses equations", () => {
-  const ast = parse(lex(`a * b + c / d - e`));
-  const ast2 = parse(lex(`(a * b) + (c / d) - e`));
-  expect(ast).toEqual(ast2);
-
-  expect(ast).toMatchInlineSnapshot(`
+it("parses lists", () => {
+  expect(parse(`[]`)).toMatchInlineSnapshot(`
 Array [
   Object {
     "expr": Object {
-      "left": Object {
-        "left": Object {
-          "left": Object {
-            "tag": "identifier",
-            "value": "a",
-          },
-          "operator": "*",
-          "right": Object {
-            "tag": "identifier",
-            "value": "b",
-          },
-          "tag": "binaryOp",
+      "items": Array [],
+      "tag": "list",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`[1,2]`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "items": Array [
+        Object {
+          "tag": "integer",
+          "value": 1,
         },
-        "operator": "+",
-        "right": Object {
-          "left": Object {
-            "tag": "identifier",
-            "value": "c",
-          },
-          "operator": "/",
-          "right": Object {
-            "tag": "identifier",
-            "value": "d",
-          },
-          "tag": "binaryOp",
+        Object {
+          "tag": "integer",
+          "value": 2,
         },
-        "tag": "binaryOp",
-      },
-      "operator": "-",
-      "right": Object {
-        "tag": "identifier",
-        "value": "e",
-      },
-      "tag": "binaryOp",
+      ],
+      "tag": "list",
     },
     "tag": "expr",
   },
@@ -199,32 +194,62 @@ Array [
 `);
 });
 
-it("does not parse invalid programs", () => {
-  expect(() => {
-    parse(lex(`let 123 = 123`));
-  }).toThrowError(ParseError);
-  expect(() => {
-    parse(lex(`let x + y`));
-  }).toThrowError(ParseError);
-});
-
-it("parses simple type constructors", () => {
-  expect(parse(lex(`print(True)`))).toMatchInlineSnapshot(`
+it("parses type constructors", () => {
+  expect(parse(`True`)).toMatchInlineSnapshot(`
 Array [
   Object {
     "expr": Object {
-      "args": Array [
+      "fields": Array [],
+      "tag": "typeConstructor",
+      "value": "True",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`Some("body")`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "fields": Array [
         Object {
-          "fields": Array [],
-          "tag": "typeConstructor",
-          "value": "True",
+          "expr": Object {
+            "tag": "string",
+            "value": "body",
+          },
+          "fieldName": "0",
         },
       ],
-      "expr": Object {
-        "tag": "identifier",
-        "value": "print",
-      },
-      "tag": "call",
+      "tag": "typeConstructor",
+      "value": "Some",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`Cons(1, Nil)`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "fields": Array [
+        Object {
+          "expr": Object {
+            "tag": "integer",
+            "value": 1,
+          },
+          "fieldName": "0",
+        },
+        Object {
+          "expr": Object {
+            "fields": Array [],
+            "tag": "typeConstructor",
+            "value": "Nil",
+          },
+          "fieldName": "1",
+        },
+      ],
+      "tag": "typeConstructor",
+      "value": "Cons",
     },
     "tag": "expr",
   },
@@ -232,43 +257,29 @@ Array [
 `);
 });
 
-it("parses if statements", () => {
-  const code = `
-    if (x) { print(y) }
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
+it("parses type constructors with named fields", () => {
+  expect(parse(`User { id: 1, name: "Alice" }`)).toMatchInlineSnapshot(`
 Array [
   Object {
     "expr": Object {
-      "cases": Array [
+      "fields": Array [
         Object {
-          "block": Array [
-            Object {
-              "expr": Object {
-                "args": Array [
-                  Object {
-                    "tag": "identifier",
-                    "value": "y",
-                  },
-                ],
-                "expr": Object {
-                  "tag": "identifier",
-                  "value": "print",
-                },
-                "tag": "call",
-              },
-              "tag": "expr",
-            },
-          ],
-          "predicate": Object {
-            "tag": "identifier",
-            "value": "x",
+          "expr": Object {
+            "tag": "integer",
+            "value": 1,
           },
-          "tag": "cond",
+          "fieldName": "id",
+        },
+        Object {
+          "expr": Object {
+            "tag": "string",
+            "value": "Alice",
+          },
+          "fieldName": "name",
         },
       ],
-      "elseBlock": Array [],
-      "tag": "if",
+      "tag": "typeConstructor",
+      "value": "User",
     },
     "tag": "expr",
   },
@@ -276,288 +287,29 @@ Array [
 `);
 });
 
-it("parses if expressions", () => {
-  const code = `
-    if (x) { y } else if (a) { b } else { c } 
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
+it("parses type constructors with punned fields", () => {
+  expect(parse(`User { id, name, }`)).toMatchInlineSnapshot(`
 Array [
   Object {
     "expr": Object {
-      "cases": Array [
-        Object {
-          "block": Array [
-            Object {
-              "expr": Object {
-                "tag": "identifier",
-                "value": "y",
-              },
-              "tag": "expr",
-            },
-          ],
-          "predicate": Object {
-            "tag": "identifier",
-            "value": "x",
-          },
-          "tag": "cond",
-        },
-        Object {
-          "block": Array [
-            Object {
-              "expr": Object {
-                "tag": "identifier",
-                "value": "b",
-              },
-              "tag": "expr",
-            },
-          ],
-          "predicate": Object {
-            "tag": "identifier",
-            "value": "a",
-          },
-          "tag": "cond",
-        },
-      ],
-      "elseBlock": Array [
+      "fields": Array [
         Object {
           "expr": Object {
             "tag": "identifier",
-            "value": "c",
+            "value": "id",
           },
-          "tag": "expr",
-        },
-      ],
-      "tag": "if",
-    },
-    "tag": "expr",
-  },
-]
-`);
-});
-
-it("parses while statements", () => {
-  const code = `while (x) { print(x) }`;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "block": Array [
-      Object {
-        "expr": Object {
-          "args": Array [
-            Object {
-              "tag": "identifier",
-              "value": "x",
-            },
-          ],
-          "expr": Object {
-            "tag": "identifier",
-            "value": "print",
-          },
-          "tag": "call",
-        },
-        "tag": "expr",
-      },
-    ],
-    "expr": Object {
-      "tag": "identifier",
-      "value": "x",
-    },
-    "tag": "while",
-  },
-]
-`);
-});
-
-it("parses comparison expressions", () => {
-  const code = `a < b <= c > d >= e == f != g`;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "expr": Object {
-      "left": Object {
-        "left": Object {
-          "left": Object {
-            "left": Object {
-              "left": Object {
-                "left": Object {
-                  "tag": "identifier",
-                  "value": "a",
-                },
-                "operator": "<",
-                "right": Object {
-                  "tag": "identifier",
-                  "value": "b",
-                },
-                "tag": "binaryOp",
-              },
-              "operator": "<=",
-              "right": Object {
-                "tag": "identifier",
-                "value": "c",
-              },
-              "tag": "binaryOp",
-            },
-            "operator": ">",
-            "right": Object {
-              "tag": "identifier",
-              "value": "d",
-            },
-            "tag": "binaryOp",
-          },
-          "operator": ">=",
-          "right": Object {
-            "tag": "identifier",
-            "value": "e",
-          },
-          "tag": "binaryOp",
-        },
-        "operator": "==",
-        "right": Object {
-          "tag": "identifier",
-          "value": "f",
-        },
-        "tag": "binaryOp",
-      },
-      "operator": "!=",
-      "right": Object {
-        "tag": "identifier",
-        "value": "g",
-      },
-      "tag": "binaryOp",
-    },
-    "tag": "expr",
-  },
-]
-`);
-});
-
-it("parses function declarations without arguments", () => {
-  const code = `
-  func foo (): Void {
-    return
-  }
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "block": Array [
-      Object {
-        "expr": null,
-        "tag": "return",
-      },
-    ],
-    "name": "foo",
-    "parameters": Array [],
-    "returnType": Object {
-      "tag": "identifier",
-      "typeArgs": Array [],
-      "value": "Void",
-    },
-    "tag": "func",
-    "typeParameters": Array [],
-  },
-]
-`);
-});
-
-it("parses function declarations", () => {
-  const code = `
-    func foo (a: Int): Int {
-      return a
-    }
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "block": Array [
-      Object {
-        "expr": Object {
-          "tag": "identifier",
-          "value": "a",
-        },
-        "tag": "return",
-      },
-    ],
-    "name": "foo",
-    "parameters": Array [
-      Object {
-        "binding": Object {
-          "tag": "identifier",
-          "value": "a",
-        },
-        "type": Object {
-          "tag": "identifier",
-          "typeArgs": Array [],
-          "value": "Int",
-        },
-      },
-    ],
-    "returnType": Object {
-      "tag": "identifier",
-      "typeArgs": Array [],
-      "value": "Int",
-    },
-    "tag": "func",
-    "typeParameters": Array [],
-  },
-]
-`);
-});
-
-it("rejects missing function type annotations", () => {
-  expect(() => {
-    parse(lex(`func foo (bar): Void {}`));
-  }).toThrow();
-
-  expect(() => {
-    parse(lex(`func foo (bar: 1): Void {}`));
-  }).toThrow();
-
-  expect(() => {
-    parse(lex(`func foo (bar: Int) {}`));
-  }).toThrow();
-});
-
-it("parses func calls", () => {
-  const code = `
-    foo(bar(1,2), baz())
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "expr": Object {
-      "args": Array [
-        Object {
-          "args": Array [
-            Object {
-              "tag": "integer",
-              "value": 1,
-            },
-            Object {
-              "tag": "integer",
-              "value": 2,
-            },
-          ],
-          "expr": Object {
-            "tag": "identifier",
-            "value": "bar",
-          },
-          "tag": "call",
+          "fieldName": "id",
         },
         Object {
-          "args": Array [],
           "expr": Object {
             "tag": "identifier",
-            "value": "baz",
+            "value": "name",
           },
-          "tag": "call",
+          "fieldName": "name",
         },
       ],
-      "expr": Object {
-        "tag": "identifier",
-        "value": "foo",
-      },
-      "tag": "call",
+      "tag": "typeConstructor",
+      "value": "User",
     },
     "tag": "expr",
   },
@@ -565,27 +317,61 @@ Array [
 `);
 });
 
-it("parses anonymous function literals", () => {
-  const code = `
-    |x| { x + x }
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
+it("parses closure literals", () => {
+  expect(parse(`|| x`)).toMatchInlineSnapshot(`
 Array [
   Object {
     "expr": Object {
       "block": Array [
         Object {
           "expr": Object {
-            "left": Object {
-              "tag": "identifier",
-              "value": "x",
-            },
-            "operator": "+",
-            "right": Object {
-              "tag": "identifier",
-              "value": "x",
-            },
-            "tag": "binaryOp",
+            "tag": "identifier",
+            "value": "x",
+          },
+          "tag": "expr",
+        },
+      ],
+      "parameters": Array [],
+      "tag": "closure",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`|x| x`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "block": Array [
+        Object {
+          "expr": Object {
+            "tag": "identifier",
+            "value": "x",
+          },
+          "tag": "expr",
+        },
+      ],
+      "parameters": Array [
+        Object {
+          "tag": "identifier",
+          "value": "x",
+        },
+      ],
+      "tag": "closure",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`|x| { x }`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "block": Array [
+        Object {
+          "expr": Object {
+            "tag": "identifier",
+            "value": "x",
           },
           "tag": "expr",
         },
@@ -604,27 +390,450 @@ Array [
 `);
 });
 
-it("has tagged variants", () => {
-  const code = `
-    enum IntOption {
-      None,
-      Some(Int),
-    }
-
-    match (val) {
-      None => print("None"),
-      Some(x) => {
-        print(x)
+it("parses unary operators", () => {
+  expect(parse(`-foo`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "expr": Object {
+        "tag": "identifier",
+        "value": "foo",
       },
-    }
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
+      "operator": "-",
+      "tag": "unaryOp",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`!bar`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "expr": Object {
+        "tag": "identifier",
+        "value": "bar",
+      },
+      "operator": "!",
+      "tag": "unaryOp",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("parses binary operators", () => {
+  expect(parse(`foo + bar`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "left": Object {
+        "tag": "identifier",
+        "value": "foo",
+      },
+      "operator": "+",
+      "right": Object {
+        "tag": "identifier",
+        "value": "bar",
+      },
+      "tag": "binaryOp",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`foo - bar`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "left": Object {
+        "tag": "identifier",
+        "value": "foo",
+      },
+      "operator": "-",
+      "right": Object {
+        "tag": "identifier",
+        "value": "bar",
+      },
+      "tag": "binaryOp",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("rejects incomplete operator expressions", () => {
+  expect(() => parse(`foo +`)).toThrowError(ParseError);
+});
+
+it("parses operators with precedence", () => {
+  expect(parse(`1 + 2 * 3 / 4`)).toEqual(parse(`1 + ((2 * 3) / 4)`));
+});
+
+it("parses function calls", () => {
+  expect(parse(`foo(bar, baz)`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "args": Array [
+        Object {
+          "tag": "identifier",
+          "value": "bar",
+        },
+        Object {
+          "tag": "identifier",
+          "value": "baz",
+        },
+      ],
+      "expr": Object {
+        "tag": "identifier",
+        "value": "foo",
+      },
+      "tag": "call",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("parses function calls in method order", () => {
+  expect(parse(`bar.foo(baz)`)).toEqual(parse(`foo(bar, baz)`));
+  expect(parse(`bar.foo()`)).toEqual(parse(`foo(bar)`));
+  // TODO: not sure about this one
+  expect(parse(`bar.foo`)).toEqual(parse(`foo(bar)`));
+});
+
+it("parses field access", () => {
+  expect(parse(`foo:x`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "expr": Object {
+        "tag": "identifier",
+        "value": "foo",
+      },
+      "fieldName": "x",
+      "tag": "field",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`foo:0`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "expr": Object {
+        "tag": "identifier",
+        "value": "foo",
+      },
+      "fieldName": "0",
+      "tag": "field",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("parses type aliases and expressions", () => {
+  expect(parse(`type Foo = Bar`)).toMatchInlineSnapshot(`
 Array [
   Object {
     "binding": Object {
       "tag": "identifier",
       "typeParameters": Array [],
-      "value": "IntOption",
+      "value": "Foo",
+    },
+    "tag": "type",
+    "type": Object {
+      "tag": "identifier",
+      "typeArgs": Array [],
+      "value": "Bar",
+    },
+  },
+]
+`);
+  expect(parse(`type Foo<Arg> = Bar<Arg, Baz>`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [
+        Object {
+          "tag": "identifier",
+          "traits": Array [],
+          "value": "Arg",
+        },
+      ],
+      "value": "Foo",
+    },
+    "tag": "type",
+    "type": Object {
+      "tag": "identifier",
+      "typeArgs": Array [
+        Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Arg",
+        },
+        Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Baz",
+        },
+      ],
+      "value": "Bar",
+    },
+  },
+]
+`);
+});
+
+it("parses tuple type literals", () => {
+  expect(parse(`type Void = ()`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [],
+      "value": "Void",
+    },
+    "tag": "type",
+    "type": Object {
+      "tag": "tuple",
+      "typeArgs": Array [],
+    },
+  },
+]
+`);
+  expect(parse(`type Cell = (Int,)`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [],
+      "value": "Cell",
+    },
+    "tag": "type",
+    "type": Object {
+      "tag": "tuple",
+      "typeArgs": Array [
+        Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Int",
+        },
+      ],
+    },
+  },
+]
+`);
+  expect(parse(`type Point = (Int, Int)`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [],
+      "value": "Point",
+    },
+    "tag": "type",
+    "type": Object {
+      "tag": "tuple",
+      "typeArgs": Array [
+        Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Int",
+        },
+        Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Int",
+        },
+      ],
+    },
+  },
+]
+`);
+});
+
+it("parses func type literals", () => {
+  expect(parse(`type Mapper<From, To> = func (From): To`))
+    .toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [
+        Object {
+          "tag": "identifier",
+          "traits": Array [],
+          "value": "From",
+        },
+        Object {
+          "tag": "identifier",
+          "traits": Array [],
+          "value": "To",
+        },
+      ],
+      "value": "Mapper",
+    },
+    "tag": "type",
+    "type": Object {
+      "parameters": Array [
+        Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "From",
+        },
+      ],
+      "returnType": Object {
+        "tag": "identifier",
+        "typeArgs": Array [],
+        "value": "To",
+      },
+      "tag": "func",
+      "typeParameters": Array [],
+    },
+  },
+]
+`);
+});
+
+it("parses struct type declarations", () => {
+  expect(parse(`struct Foo`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [],
+      "value": "Foo",
+    },
+    "fields": Array [],
+    "isTuple": false,
+    "tag": "struct",
+  },
+]
+`);
+  expect(parse(`struct Foo(Int, Int)`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [],
+      "value": "Foo",
+    },
+    "fields": Array [
+      Object {
+        "fieldName": "0",
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Int",
+        },
+      },
+      Object {
+        "fieldName": "1",
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Int",
+        },
+      },
+    ],
+    "isTuple": true,
+    "tag": "struct",
+  },
+]
+`);
+  expect(
+    parse(`
+    struct Foo { 
+      x: Int, 
+      y: Int, 
+    }`)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [],
+      "value": "Foo",
+    },
+    "fields": Array [
+      Object {
+        "fieldName": "x",
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Int",
+        },
+      },
+      Object {
+        "fieldName": "y",
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Int",
+        },
+      },
+    ],
+    "isTuple": false,
+    "tag": "struct",
+  },
+]
+`);
+});
+
+it("parses enum type declarations", () => {
+  expect(parse(`enum Tag { V1, V2 }`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [],
+      "value": "Tag",
+    },
+    "cases": Array [
+      Object {
+        "fields": Array [],
+        "isTuple": false,
+        "tagName": "V1",
+      },
+      Object {
+        "fields": Array [],
+        "isTuple": false,
+        "tagName": "V2",
+      },
+    ],
+    "tag": "enum",
+  },
+]
+`);
+  expect(
+    parse(`
+    enum Maybe<T> {
+      None,
+      Some(T),
+    }
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [
+        Object {
+          "tag": "identifier",
+          "traits": Array [],
+          "value": "T",
+        },
+      ],
+      "value": "Maybe",
     },
     "cases": Array [
       Object {
@@ -639,7 +848,7 @@ Array [
             "type": Object {
               "tag": "identifier",
               "typeArgs": Array [],
-              "value": "Int",
+              "value": "T",
             },
           },
         ],
@@ -649,6 +858,990 @@ Array [
     ],
     "tag": "enum",
   },
+]
+`);
+  expect(
+    parse(`
+    enum AST {
+      Number(Int),
+      Add { left: AST, right: AST }
+    }
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [],
+      "value": "AST",
+    },
+    "cases": Array [
+      Object {
+        "fields": Array [
+          Object {
+            "fieldName": "0",
+            "type": Object {
+              "tag": "identifier",
+              "typeArgs": Array [],
+              "value": "Int",
+            },
+          },
+        ],
+        "isTuple": true,
+        "tagName": "Number",
+      },
+      Object {
+        "fields": Array [
+          Object {
+            "fieldName": "left",
+            "type": Object {
+              "tag": "identifier",
+              "typeArgs": Array [],
+              "value": "AST",
+            },
+          },
+          Object {
+            "fieldName": "right",
+            "type": Object {
+              "tag": "identifier",
+              "typeArgs": Array [],
+              "value": "AST",
+            },
+          },
+        ],
+        "isTuple": false,
+        "tagName": "Add",
+      },
+    ],
+    "tag": "enum",
+  },
+]
+`);
+});
+
+it("parses let bindings", () => {
+  expect(parse(`let x = 1`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "value": "x",
+    },
+    "expr": Object {
+      "tag": "integer",
+      "value": 1,
+    },
+    "tag": "let",
+    "type": null,
+  },
+]
+`);
+  expect(parse(`let x: Int = 1`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "value": "x",
+    },
+    "expr": Object {
+      "tag": "integer",
+      "value": 1,
+    },
+    "tag": "let",
+    "type": Object {
+      "tag": "identifier",
+      "typeArgs": Array [],
+      "value": "Int",
+    },
+  },
+]
+`);
+});
+
+it("parses let bindings with destructuring", () => {
+  expect(parse(`let { x, y } = point`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "fields": Array [
+        Object {
+          "binding": Object {
+            "tag": "identifier",
+            "value": "x",
+          },
+          "fieldName": "x",
+        },
+        Object {
+          "binding": Object {
+            "tag": "identifier",
+            "value": "y",
+          },
+          "fieldName": "y",
+        },
+      ],
+      "tag": "struct",
+    },
+    "expr": Object {
+      "tag": "identifier",
+      "value": "point",
+    },
+    "tag": "let",
+    "type": null,
+  },
+]
+`);
+  expect(parse(`let { x: new_x, y: new_y, } = point`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "fields": Array [
+        Object {
+          "binding": Object {
+            "tag": "identifier",
+            "value": "new_x",
+          },
+          "fieldName": "x",
+        },
+        Object {
+          "binding": Object {
+            "tag": "identifier",
+            "value": "new_y",
+          },
+          "fieldName": "y",
+        },
+      ],
+      "tag": "struct",
+    },
+    "expr": Object {
+      "tag": "identifier",
+      "value": "point",
+    },
+    "tag": "let",
+    "type": null,
+  },
+]
+`);
+  expect(parse(`let (a, b) = pair`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "fields": Array [
+        Object {
+          "binding": Object {
+            "tag": "identifier",
+            "value": "a",
+          },
+          "fieldName": "0",
+        },
+        Object {
+          "binding": Object {
+            "tag": "identifier",
+            "value": "b",
+          },
+          "fieldName": "1",
+        },
+      ],
+      "tag": "struct",
+    },
+    "expr": Object {
+      "tag": "identifier",
+      "value": "pair",
+    },
+    "tag": "let",
+    "type": null,
+  },
+]
+`);
+});
+
+it("parses while loops", () => {
+  expect(
+    parse(`
+    while (foo) {
+      bar(foo)
+    }
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [
+      Object {
+        "expr": Object {
+          "args": Array [
+            Object {
+              "tag": "identifier",
+              "value": "foo",
+            },
+          ],
+          "expr": Object {
+            "tag": "identifier",
+            "value": "bar",
+          },
+          "tag": "call",
+        },
+        "tag": "expr",
+      },
+    ],
+    "expr": Object {
+      "tag": "identifier",
+      "value": "foo",
+    },
+    "tag": "while",
+  },
+]
+`);
+});
+
+it("parses for loops", () => {
+  expect(
+    parse(`
+    for (x in list) {
+      foo(x)
+    }
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "value": "x",
+    },
+    "block": Array [
+      Object {
+        "expr": Object {
+          "args": Array [
+            Object {
+              "tag": "identifier",
+              "value": "x",
+            },
+          ],
+          "expr": Object {
+            "tag": "identifier",
+            "value": "foo",
+          },
+          "tag": "call",
+        },
+        "tag": "expr",
+      },
+    ],
+    "expr": Object {
+      "tag": "identifier",
+      "value": "list",
+    },
+    "tag": "for",
+  },
+]
+`);
+});
+
+it("parses func declarations", () => {
+  expect(
+    parse(`
+    func foo (bar: Int, baz: String): String {
+      return baz
+    } 
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [
+      Object {
+        "expr": Object {
+          "tag": "identifier",
+          "value": "baz",
+        },
+        "tag": "return",
+      },
+    ],
+    "name": "foo",
+    "parameters": Array [
+      Object {
+        "binding": Object {
+          "tag": "identifier",
+          "value": "bar",
+        },
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Int",
+        },
+      },
+      Object {
+        "binding": Object {
+          "tag": "identifier",
+          "value": "baz",
+        },
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "String",
+        },
+      },
+    ],
+    "returnType": Object {
+      "tag": "identifier",
+      "typeArgs": Array [],
+      "value": "String",
+    },
+    "tag": "func",
+    "typeParameters": Array [],
+  },
+]
+`);
+  expect(
+    parse(`
+  func foo (bar: Int, baz: String): Void {
+    return
+  } 
+`)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [
+      Object {
+        "expr": null,
+        "tag": "return",
+      },
+    ],
+    "name": "foo",
+    "parameters": Array [
+      Object {
+        "binding": Object {
+          "tag": "identifier",
+          "value": "bar",
+        },
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Int",
+        },
+      },
+      Object {
+        "binding": Object {
+          "tag": "identifier",
+          "value": "baz",
+        },
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "String",
+        },
+      },
+    ],
+    "returnType": Object {
+      "tag": "identifier",
+      "typeArgs": Array [],
+      "value": "Void",
+    },
+    "tag": "func",
+    "typeParameters": Array [],
+  },
+]
+`);
+});
+
+it("parses func declarations with type parameters and trait constraints", () => {
+  expect(
+    parse(`
+    func foo <
+      T: Show + Eq, 
+      U, 
+      V: Num,
+    > (
+      t: T, 
+      u: U, 
+      v: V,
+    ): Void {}
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [],
+    "name": "foo",
+    "parameters": Array [
+      Object {
+        "binding": Object {
+          "tag": "identifier",
+          "value": "t",
+        },
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "T",
+        },
+      },
+      Object {
+        "binding": Object {
+          "tag": "identifier",
+          "value": "u",
+        },
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "U",
+        },
+      },
+      Object {
+        "binding": Object {
+          "tag": "identifier",
+          "value": "v",
+        },
+        "type": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "V",
+        },
+      },
+    ],
+    "returnType": Object {
+      "tag": "identifier",
+      "typeArgs": Array [],
+      "value": "Void",
+    },
+    "tag": "func",
+    "typeParameters": Array [
+      Object {
+        "tag": "identifier",
+        "traits": Array [
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "Show",
+          },
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "Eq",
+          },
+        ],
+        "value": "T",
+      },
+      Object {
+        "tag": "identifier",
+        "traits": Array [],
+        "value": "U",
+      },
+      Object {
+        "tag": "identifier",
+        "traits": Array [
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "Num",
+          },
+        ],
+        "value": "V",
+      },
+    ],
+  },
+]
+`);
+});
+
+it("parses trait declarations", () => {
+  expect(
+    parse(`
+    trait Fooable {
+      func foo (Self): String
+      func bar (Int): Self
+    }
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [],
+      "value": "Fooable",
+    },
+    "fields": Array [
+      Object {
+        "name": "foo",
+        "parameters": Array [
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "Self",
+          },
+        ],
+        "returnType": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "String",
+        },
+        "tag": "func",
+        "typeParameters": Array [],
+      },
+      Object {
+        "name": "bar",
+        "parameters": Array [
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "Int",
+          },
+        ],
+        "returnType": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Self",
+        },
+        "tag": "func",
+        "typeParameters": Array [],
+      },
+    ],
+    "tag": "trait",
+  },
+]
+`);
+  expect(
+    parse(`
+    trait Fooable<T: Show> {
+      func foo (Self, T): String
+      func bar (T): Self
+    }
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [
+        Object {
+          "tag": "identifier",
+          "traits": Array [
+            Object {
+              "tag": "identifier",
+              "typeArgs": Array [],
+              "value": "Show",
+            },
+          ],
+          "value": "T",
+        },
+      ],
+      "value": "Fooable",
+    },
+    "fields": Array [
+      Object {
+        "name": "foo",
+        "parameters": Array [
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "Self",
+          },
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "T",
+          },
+        ],
+        "returnType": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "String",
+        },
+        "tag": "func",
+        "typeParameters": Array [],
+      },
+      Object {
+        "name": "bar",
+        "parameters": Array [
+          Object {
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "T",
+          },
+        ],
+        "returnType": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "Self",
+        },
+        "tag": "func",
+        "typeParameters": Array [],
+      },
+    ],
+    "tag": "trait",
+  },
+]
+`);
+});
+
+it("parses trait impls", () => {
+  expect(
+    parse(`
+    impl Fooable for String {
+      func foo (self: Self): String {
+        self
+      }
+    }
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [
+      Object {
+        "block": Array [
+          Object {
+            "expr": Object {
+              "tag": "identifier",
+              "value": "self",
+            },
+            "tag": "expr",
+          },
+        ],
+        "name": "foo",
+        "parameters": Array [
+          Object {
+            "binding": Object {
+              "tag": "identifier",
+              "value": "self",
+            },
+            "type": Object {
+              "tag": "identifier",
+              "typeArgs": Array [],
+              "value": "Self",
+            },
+          },
+        ],
+        "returnType": Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "String",
+        },
+        "tag": "func",
+        "typeParameters": Array [],
+      },
+    ],
+    "tag": "impl",
+    "target": Object {
+      "tag": "identifier",
+      "typeArgs": Array [],
+      "value": "String",
+    },
+    "trait": Object {
+      "tag": "identifier",
+      "typeArgs": Array [],
+      "value": "Fooable",
+    },
+    "typeParameters": Array [],
+  },
+]
+`);
+
+  expect(
+    parse(`
+    impl Fooable<String> for String {
+    }
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [],
+    "tag": "impl",
+    "target": Object {
+      "tag": "identifier",
+      "typeArgs": Array [],
+      "value": "String",
+    },
+    "trait": Object {
+      "tag": "identifier",
+      "typeArgs": Array [
+        Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "String",
+        },
+      ],
+      "value": "Fooable",
+    },
+    "typeParameters": Array [],
+  },
+]
+`);
+
+  expect(
+    parse(`
+    impl <T> Fooable<T> for Cell<T> {
+    }
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "block": Array [],
+    "tag": "impl",
+    "target": Object {
+      "tag": "identifier",
+      "typeArgs": Array [
+        Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "T",
+        },
+      ],
+      "value": "Cell",
+    },
+    "trait": Object {
+      "tag": "identifier",
+      "typeArgs": Array [
+        Object {
+          "tag": "identifier",
+          "typeArgs": Array [],
+          "value": "T",
+        },
+      ],
+      "value": "Fooable",
+    },
+    "typeParameters": Array [
+      Object {
+        "tag": "identifier",
+        "traits": Array [],
+        "value": "T",
+      },
+    ],
+  },
+]
+`);
+});
+
+it("parses do expressions", () => {
+  expect(
+    parse(`do { 
+    let x = 1
+    x
+  }`)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "block": Array [
+        Object {
+          "binding": Object {
+            "tag": "identifier",
+            "value": "x",
+          },
+          "expr": Object {
+            "tag": "integer",
+            "value": 1,
+          },
+          "tag": "let",
+          "type": null,
+        },
+        Object {
+          "expr": Object {
+            "tag": "identifier",
+            "value": "x",
+          },
+          "tag": "expr",
+        },
+      ],
+      "tag": "do",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("parses if expressions", () => {
+  expect(parse(`if (x > 1) { x }`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "cases": Array [
+        Object {
+          "block": Array [
+            Object {
+              "expr": Object {
+                "tag": "identifier",
+                "value": "x",
+              },
+              "tag": "expr",
+            },
+          ],
+          "predicate": Object {
+            "left": Object {
+              "tag": "identifier",
+              "value": "x",
+            },
+            "operator": ">",
+            "right": Object {
+              "tag": "integer",
+              "value": 1,
+            },
+            "tag": "binaryOp",
+          },
+          "tag": "cond",
+        },
+      ],
+      "elseBlock": Array [],
+      "tag": "if",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(
+    parse(`
+  if (x > 1) { 
+    x 
+  } else if (y > 2) { 
+    y 
+  }`)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "cases": Array [
+        Object {
+          "block": Array [
+            Object {
+              "expr": Object {
+                "tag": "identifier",
+                "value": "x",
+              },
+              "tag": "expr",
+            },
+          ],
+          "predicate": Object {
+            "left": Object {
+              "tag": "identifier",
+              "value": "x",
+            },
+            "operator": ">",
+            "right": Object {
+              "tag": "integer",
+              "value": 1,
+            },
+            "tag": "binaryOp",
+          },
+          "tag": "cond",
+        },
+        Object {
+          "block": Array [
+            Object {
+              "expr": Object {
+                "tag": "identifier",
+                "value": "y",
+              },
+              "tag": "expr",
+            },
+          ],
+          "predicate": Object {
+            "left": Object {
+              "tag": "identifier",
+              "value": "y",
+            },
+            "operator": ">",
+            "right": Object {
+              "tag": "integer",
+              "value": 2,
+            },
+            "tag": "binaryOp",
+          },
+          "tag": "cond",
+        },
+      ],
+      "elseBlock": Array [],
+      "tag": "if",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(
+    parse(`
+  if (x > 1) { 
+    x 
+  } else if (y > 2) { 
+    y 
+  } else {
+    z
+  }`)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "cases": Array [
+        Object {
+          "block": Array [
+            Object {
+              "expr": Object {
+                "tag": "identifier",
+                "value": "x",
+              },
+              "tag": "expr",
+            },
+          ],
+          "predicate": Object {
+            "left": Object {
+              "tag": "identifier",
+              "value": "x",
+            },
+            "operator": ">",
+            "right": Object {
+              "tag": "integer",
+              "value": 1,
+            },
+            "tag": "binaryOp",
+          },
+          "tag": "cond",
+        },
+        Object {
+          "block": Array [
+            Object {
+              "expr": Object {
+                "tag": "identifier",
+                "value": "y",
+              },
+              "tag": "expr",
+            },
+          ],
+          "predicate": Object {
+            "left": Object {
+              "tag": "identifier",
+              "value": "y",
+            },
+            "operator": ">",
+            "right": Object {
+              "tag": "integer",
+              "value": 2,
+            },
+            "tag": "binaryOp",
+          },
+          "tag": "cond",
+        },
+      ],
+      "elseBlock": Array [
+        Object {
+          "expr": Object {
+            "tag": "identifier",
+            "value": "z",
+          },
+          "tag": "expr",
+        },
+      ],
+      "tag": "if",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("parses match expressions", () => {
+  expect(
+    parse(`
+    match (list) {
+      Nil => 0,
+      Cons(head, tail) => {
+        1 + length(tail)
+      }
+    }
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
   Object {
     "expr": Object {
       "cases": Array [
@@ -656,27 +1849,89 @@ Array [
           "binding": Object {
             "fields": Array [],
             "tag": "typeIdentifier",
-            "value": "None",
+            "value": "Nil",
           },
           "block": Array [
             Object {
               "expr": Object {
-                "args": Array [
-                  Object {
-                    "tag": "string",
-                    "value": "None",
-                  },
-                ],
-                "expr": Object {
-                  "tag": "identifier",
-                  "value": "print",
-                },
-                "tag": "call",
+                "tag": "integer",
+                "value": 0,
               },
               "tag": "expr",
             },
           ],
         },
+        Object {
+          "binding": Object {
+            "fields": Array [
+              Object {
+                "binding": Object {
+                  "tag": "identifier",
+                  "value": "head",
+                },
+                "fieldName": "0",
+              },
+              Object {
+                "binding": Object {
+                  "tag": "identifier",
+                  "value": "tail",
+                },
+                "fieldName": "1",
+              },
+            ],
+            "tag": "typeIdentifier",
+            "value": "Cons",
+          },
+          "block": Array [
+            Object {
+              "expr": Object {
+                "left": Object {
+                  "tag": "integer",
+                  "value": 1,
+                },
+                "operator": "+",
+                "right": Object {
+                  "args": Array [
+                    Object {
+                      "tag": "identifier",
+                      "value": "tail",
+                    },
+                  ],
+                  "expr": Object {
+                    "tag": "identifier",
+                    "value": "length",
+                  },
+                  "tag": "call",
+                },
+                "tag": "binaryOp",
+              },
+              "tag": "expr",
+            },
+          ],
+        },
+      ],
+      "expr": Object {
+        "tag": "identifier",
+        "value": "list",
+      },
+      "tag": "match",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(
+    parse(`
+    match (ast) {
+      Number(x) => x,
+      Add { left, right } => left + right,
+    }
+  `)
+  ).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "cases": Array [
         Object {
           "binding": Object {
             "fields": Array [
@@ -689,104 +1944,18 @@ Array [
               },
             ],
             "tag": "typeIdentifier",
-            "value": "Some",
+            "value": "Number",
           },
           "block": Array [
             Object {
               "expr": Object {
-                "args": Array [
-                  Object {
-                    "tag": "identifier",
-                    "value": "x",
-                  },
-                ],
-                "expr": Object {
-                  "tag": "identifier",
-                  "value": "print",
-                },
-                "tag": "call",
+                "tag": "identifier",
+                "value": "x",
               },
               "tag": "expr",
             },
           ],
         },
-      ],
-      "expr": Object {
-        "tag": "identifier",
-        "value": "val",
-      },
-      "tag": "match",
-    },
-    "tag": "expr",
-  },
-]
-`);
-});
-
-it("has tagged variants with named fields", () => {
-  const code = `
-    enum Expr {
-      AddExpr { left: Expr, right: Expr },
-      IntExpr { value: Int },
-    }
-
-    match (val) {
-      AddExpr { left: left, right: right } => left + right,
-      IntExpr { value: value } => value,
-    }
-  `;
-
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "binding": Object {
-      "tag": "identifier",
-      "typeParameters": Array [],
-      "value": "Expr",
-    },
-    "cases": Array [
-      Object {
-        "fields": Array [
-          Object {
-            "fieldName": "left",
-            "type": Object {
-              "tag": "identifier",
-              "typeArgs": Array [],
-              "value": "Expr",
-            },
-          },
-          Object {
-            "fieldName": "right",
-            "type": Object {
-              "tag": "identifier",
-              "typeArgs": Array [],
-              "value": "Expr",
-            },
-          },
-        ],
-        "isTuple": false,
-        "tagName": "AddExpr",
-      },
-      Object {
-        "fields": Array [
-          Object {
-            "fieldName": "value",
-            "type": Object {
-              "tag": "identifier",
-              "typeArgs": Array [],
-              "value": "Int",
-            },
-          },
-        ],
-        "isTuple": false,
-        "tagName": "IntExpr",
-      },
-    ],
-    "tag": "enum",
-  },
-  Object {
-    "expr": Object {
-      "cases": Array [
         Object {
           "binding": Object {
             "fields": Array [
@@ -806,7 +1975,7 @@ Array [
               },
             ],
             "tag": "typeIdentifier",
-            "value": "AddExpr",
+            "value": "Add",
           },
           "block": Array [
             Object {
@@ -826,450 +1995,14 @@ Array [
             },
           ],
         },
-        Object {
-          "binding": Object {
-            "fields": Array [
-              Object {
-                "binding": Object {
-                  "tag": "identifier",
-                  "value": "value",
-                },
-                "fieldName": "value",
-              },
-            ],
-            "tag": "typeIdentifier",
-            "value": "IntExpr",
-          },
-          "block": Array [
-            Object {
-              "expr": Object {
-                "tag": "identifier",
-                "value": "value",
-              },
-              "tag": "expr",
-            },
-          ],
-        },
       ],
       "expr": Object {
         "tag": "identifier",
-        "value": "val",
+        "value": "ast",
       },
       "tag": "match",
     },
     "tag": "expr",
-  },
-]
-`);
-});
-
-it("rejects invalid pattern matches", () => {
-  const code = `
-    match (foo) {
-      1 => 1
-    }
-  `;
-
-  expect(() => parse(lex(code))).toThrow();
-});
-
-it("rejects invalid enum/struct bindings", () => {
-  expect(() => parse(lex(`enum 1 {}`))).toThrow();
-});
-
-it("allows empty type constructions", () => {
-  const code = `
-    Foo {}  
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "expr": Object {
-      "fields": Array [],
-      "tag": "typeConstructor",
-      "value": "Foo",
-    },
-    "tag": "expr",
-  },
-]
-`);
-});
-
-it("allows empty pattern matches", () => {
-  const code = `
-    match (foo) {
-      Tag {} => 1,
-    } 
-  `;
-
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "expr": Object {
-      "cases": Array [
-        Object {
-          "binding": Object {
-            "fields": Array [],
-            "tag": "typeIdentifier",
-            "value": "Tag",
-          },
-          "block": Array [
-            Object {
-              "expr": Object {
-                "tag": "integer",
-                "value": 1,
-              },
-              "tag": "expr",
-            },
-          ],
-        },
-      ],
-      "expr": Object {
-        "tag": "identifier",
-        "value": "foo",
-      },
-      "tag": "match",
-    },
-    "tag": "expr",
-  },
-]
-`);
-});
-
-it("parses type parameters", () => {
-  const code = `
-    enum List<T> {
-      Cons(T, List<T>),
-      Nil,
-    }
-    func foo<T> (
-      list: List<T>, 
-      fn: func <U>(T, U): T
-    ): T {}
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "binding": Object {
-      "tag": "identifier",
-      "typeParameters": Array [
-        Object {
-          "tag": "identifier",
-          "traits": Array [],
-          "value": "T",
-        },
-      ],
-      "value": "List",
-    },
-    "cases": Array [
-      Object {
-        "fields": Array [
-          Object {
-            "fieldName": "0",
-            "type": Object {
-              "tag": "identifier",
-              "typeArgs": Array [],
-              "value": "T",
-            },
-          },
-          Object {
-            "fieldName": "1",
-            "type": Object {
-              "tag": "identifier",
-              "typeArgs": Array [
-                Object {
-                  "tag": "identifier",
-                  "typeArgs": Array [],
-                  "value": "T",
-                },
-              ],
-              "value": "List",
-            },
-          },
-        ],
-        "isTuple": true,
-        "tagName": "Cons",
-      },
-      Object {
-        "fields": Array [],
-        "isTuple": false,
-        "tagName": "Nil",
-      },
-    ],
-    "tag": "enum",
-  },
-  Object {
-    "block": Array [],
-    "name": "foo",
-    "parameters": Array [
-      Object {
-        "binding": Object {
-          "tag": "identifier",
-          "value": "list",
-        },
-        "type": Object {
-          "tag": "identifier",
-          "typeArgs": Array [
-            Object {
-              "tag": "identifier",
-              "typeArgs": Array [],
-              "value": "T",
-            },
-          ],
-          "value": "List",
-        },
-      },
-      Object {
-        "binding": Object {
-          "tag": "identifier",
-          "value": "fn",
-        },
-        "type": Object {
-          "parameters": Array [
-            Object {
-              "tag": "identifier",
-              "typeArgs": Array [],
-              "value": "T",
-            },
-            Object {
-              "tag": "identifier",
-              "typeArgs": Array [],
-              "value": "U",
-            },
-          ],
-          "returnType": Object {
-            "tag": "identifier",
-            "typeArgs": Array [],
-            "value": "T",
-          },
-          "tag": "func",
-          "typeParameters": Array [
-            Object {
-              "tag": "identifier",
-              "traits": Array [],
-              "value": "U",
-            },
-          ],
-        },
-      },
-    ],
-    "returnType": Object {
-      "tag": "identifier",
-      "typeArgs": Array [],
-      "value": "T",
-    },
-    "tag": "func",
-    "typeParameters": Array [
-      Object {
-        "tag": "identifier",
-        "traits": Array [],
-        "value": "T",
-      },
-    ],
-  },
-]
-`);
-});
-
-it("parses empty parameter lists? sure, why not", () => {
-  const code = `
-    struct Foo<> {}
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "binding": Object {
-      "tag": "identifier",
-      "typeParameters": Array [],
-      "value": "Foo",
-    },
-    "fields": Array [],
-    "isTuple": false,
-    "tag": "struct",
-  },
-]
-`);
-});
-
-it("parses trait declarations and impls", () => {
-  const code = `
-    trait FooTrait<T> {
-      func bar(Self, T): Int
-    }
-    
-    impl <T> FooTrait<T> for String {
-      func bar(self: Self, arg: T): Int {
-        1
-      }
-    }
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "binding": Object {
-      "tag": "identifier",
-      "typeParameters": Array [
-        Object {
-          "tag": "identifier",
-          "traits": Array [],
-          "value": "T",
-        },
-      ],
-      "value": "FooTrait",
-    },
-    "fields": Array [
-      Object {
-        "name": "bar",
-        "parameters": Array [
-          Object {
-            "tag": "identifier",
-            "typeArgs": Array [],
-            "value": "Self",
-          },
-          Object {
-            "tag": "identifier",
-            "typeArgs": Array [],
-            "value": "T",
-          },
-        ],
-        "returnType": Object {
-          "tag": "identifier",
-          "typeArgs": Array [],
-          "value": "Int",
-        },
-        "tag": "func",
-        "typeParameters": Array [],
-      },
-    ],
-    "tag": "trait",
-  },
-  Object {
-    "block": Array [
-      Object {
-        "block": Array [
-          Object {
-            "expr": Object {
-              "tag": "integer",
-              "value": 1,
-            },
-            "tag": "expr",
-          },
-        ],
-        "name": "bar",
-        "parameters": Array [
-          Object {
-            "binding": Object {
-              "tag": "identifier",
-              "value": "self",
-            },
-            "type": Object {
-              "tag": "identifier",
-              "typeArgs": Array [],
-              "value": "Self",
-            },
-          },
-          Object {
-            "binding": Object {
-              "tag": "identifier",
-              "value": "arg",
-            },
-            "type": Object {
-              "tag": "identifier",
-              "typeArgs": Array [],
-              "value": "T",
-            },
-          },
-        ],
-        "returnType": Object {
-          "tag": "identifier",
-          "typeArgs": Array [],
-          "value": "Int",
-        },
-        "tag": "func",
-        "typeParameters": Array [],
-      },
-    ],
-    "tag": "impl",
-    "target": Object {
-      "tag": "identifier",
-      "typeArgs": Array [],
-      "value": "String",
-    },
-    "trait": Object {
-      "tag": "identifier",
-      "typeArgs": Array [
-        Object {
-          "tag": "identifier",
-          "typeArgs": Array [],
-          "value": "T",
-        },
-      ],
-      "value": "FooTrait",
-    },
-    "typeParameters": Array [
-      Object {
-        "tag": "identifier",
-        "traits": Array [],
-        "value": "T",
-      },
-    ],
-  },
-]
-`);
-});
-
-it("parses trait constraints", () => {
-  const code = `
-    func foo <T: FooTrait<Int> + Num> (arg: T): Void {} 
-  `;
-  expect(parse(lex(code))).toMatchInlineSnapshot(`
-Array [
-  Object {
-    "block": Array [],
-    "name": "foo",
-    "parameters": Array [
-      Object {
-        "binding": Object {
-          "tag": "identifier",
-          "value": "arg",
-        },
-        "type": Object {
-          "tag": "identifier",
-          "typeArgs": Array [],
-          "value": "T",
-        },
-      },
-    ],
-    "returnType": Object {
-      "tag": "identifier",
-      "typeArgs": Array [],
-      "value": "Void",
-    },
-    "tag": "func",
-    "typeParameters": Array [
-      Object {
-        "tag": "identifier",
-        "traits": Array [
-          Object {
-            "tag": "identifier",
-            "typeArgs": Array [
-              Object {
-                "tag": "identifier",
-                "typeArgs": Array [],
-                "value": "Int",
-              },
-            ],
-            "value": "FooTrait",
-          },
-          Object {
-            "tag": "identifier",
-            "typeArgs": Array [],
-            "value": "Num",
-          },
-        ],
-        "value": "T",
-      },
-    ],
   },
 ]
 `);
