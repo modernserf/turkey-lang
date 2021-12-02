@@ -1,5 +1,5 @@
-import { Scope } from "../scope";
-import { CheckedExpr, Opcode, TypeExpr } from "../types";
+import { Scope } from "../../scope";
+import { CheckedExpr, Opcode, TypeExpr } from "../../types";
 import {
   BoundType,
   eqTrait,

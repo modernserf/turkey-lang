@@ -1,4 +1,4 @@
-import { Scope } from "../scope";
+import { Scope } from "../../scope";
 import {
   CheckedMatchCase,
   CheckedStructFieldBinding,
@@ -7,7 +7,7 @@ import {
   MatchBinding,
   StructFieldType,
   StructFieldValue,
-} from "../types";
+} from "../../types";
 import { resolveVar, unify } from "./checker";
 import {
   Obj as IObj,

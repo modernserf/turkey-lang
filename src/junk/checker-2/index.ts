@@ -1,4 +1,4 @@
-import { Opcode, Stmt } from "../types";
+import { Opcode, Stmt } from "../../types";
 import { Compiler } from "./compiler";
 import { TreeWalker } from "./tree-walker";
 import {

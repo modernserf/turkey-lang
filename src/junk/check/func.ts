@@ -1,5 +1,5 @@
-import { Scope } from "../scope";
-import { Binding, Expr, Stmt, TypeExpr } from "../types";
+import { Scope } from "../../scope";
+import { Binding, Expr, Stmt, TypeExpr } from "../../types";
 import { resolveVar, unify, unifyParam } from "./checker";
 import {
   Func as IFunc,

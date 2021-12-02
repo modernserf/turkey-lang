@@ -1,4 +1,4 @@
-import { Scope, ValueWithSource } from "../scope";
+import { Scope, ValueWithSource } from "../../scope";
 import { BoundType, ExprAttrs, StdLib, Type, TypeVar } from "./types";
 
 export class BlockScope {

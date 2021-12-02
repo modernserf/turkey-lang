@@ -44,3 +44,83 @@ it("rejects invalid types in let bindings", () => {
   `;
   expect(() => check(code)).toThrow();
 });
+
+it("rejects invalid type expressions", () => {
+  const code = `
+    let x: FakeType = 1
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("checks funcs", () => {
+  const code = `
+    func foo (x: Int, y: Float): Int {
+      x
+    }
+  `;
+  expect(check(code)).toBeTruthy();
+});
+
+it("rejects funcs with implicit return type mismatches", () => {
+  const code = `
+    func foo (x: Int, y: Float): Int {
+      y
+    }
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("calls funcs", () => {
+  const code = `
+    func foo (x: Int, y: Float): Int {
+      x
+    }
+    let result = foo(1, 1.5)
+  `;
+  expect(check(code)).toBeTruthy();
+});
+
+it("rejects func calls with the wrong arity", () => {
+  const code = `
+    func foo (x: Int, y: Float): Int {
+      x
+    }
+    let result = foo(1)
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects func calls with the wrong types", () => {
+  const code = `
+    func foo (x: Int, y: Float): Int {
+      x
+    }
+    let result = foo(1, 2)
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("rejects func calls on non-funcs", () => {
+  const code = `
+    let foo = 1
+    let result = foo(1, 2)
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("calls funcs with trait args", () => {
+  const code = `
+    print(1) 
+    print(1.5)
+    print("foo")
+  `;
+  expect(check(code)).toBeTruthy();
+});
+
+it("rejects func calls with invalid traits", () => {
+  const code = `
+    print(print(1))
+  `;
+
+  expect(() => check(code)).toThrow();
+});

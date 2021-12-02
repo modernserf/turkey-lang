@@ -2,88 +2,110 @@ import { Binding, Expr, Stmt, TraitExpr, TypeExpr } from "../types";
 import { IRStmt, IRExpr } from "../compiler-2/types";
 
 export type Type =
-  | { tag: "concrete"; name: symbol; parameters: Type[] }
-  | { tag: "abstract"; name: symbol };
+  | {
+      tag: "concrete";
+      name: symbol;
+      parameters: Type[];
+      traitParams: TraitParam[];
+    }
+  | { tag: "abstract"; name: symbol; traits: Trait[] };
 
 export type Trait = { name: symbol; parameters: Type[] };
+export type TraitParam = { type: Type; trait: Trait };
 
-export function createVar(name: symbol): Type {
-  return { tag: "abstract", name };
+export function createVar(name: symbol, traits: Trait[]): Type {
+  return { tag: "abstract", name, traits };
 }
-export function createType(name: symbol, parameters: Type[]): Type {
-  return { tag: "concrete", name, parameters };
+export function createType(
+  name: symbol,
+  parameters: Type[],
+  traitParams: TraitParam[]
+): Type {
+  return { tag: "concrete", name, parameters, traitParams };
+}
+
+export function createTrait(name: symbol, parameters: Type[]): Trait {
+  return { name, parameters };
 }
 
 export const tupleTypeName = Symbol("Tuple");
 export function tupleType(parameters: Type[]): Type {
-  return createType(tupleTypeName, parameters);
+  return createType(tupleTypeName, parameters, []);
 }
 
 export const funcTypeName = Symbol("Func");
-export function funcType(returnType: Type, parameters: Type[]): Type {
-  return createType(funcTypeName, [returnType, ...parameters]);
+export function funcType(
+  returnType: Type,
+  parameters: Type[],
+  traitParams: TraitParam[]
+): Type {
+  return createType(funcTypeName, [returnType, ...parameters], traitParams);
 }
 
 export const voidType = tupleType([]);
-export const intType = createType(Symbol("Int"), []);
-export const floatType = createType(Symbol("Float"), []);
-export const stringType = createType(Symbol("String"), []);
-export const boolType = createType(Symbol("Bool"), []);
+export const intType = createType(Symbol("Int"), [], []);
+export const floatType = createType(Symbol("Float"), [], []);
+export const stringType = createType(Symbol("String"), [], []);
+export const boolType = createType(Symbol("Bool"), [], []);
 
-// abstract param name -> trait[]
-export type TraitParams = Map<symbol, Trait[]>;
+export const showTrait = createTrait(Symbol("Show"), []);
+export const numTrait = createTrait(Symbol("Num"), []);
+export const eqTrait = createTrait(Symbol("Eq"), []);
 
-export type ExprAttrs = {
-  type: Type;
-  traitParams?: TraitParams;
-};
-
-export type CheckedExpr = IRExpr & { attrs: ExprAttrs };
+export type CheckedExpr = IRExpr & { type: Type };
 
 export type CheckedStmt =
   | Exclude<IRStmt, { tag: "expr" }>
   | {
       tag: "expr";
       expr: IRExpr;
-      attrs: ExprAttrs;
+      type: Type;
     };
 
+export type UnifyResult = {
+  type: Type;
+  leftResults: Map<symbol, Type>;
+  rightResults: Map<symbol, Type>;
+};
+
 export interface TreeWalker {
-  expr(expr: Expr, context: ExprAttrs | null): CheckedExpr;
-  block(block: Stmt[]): { block: CheckedStmt[]; attrs: ExprAttrs };
-  typeExpr(typeExpr: TypeExpr, typeParams?: Map<string, ExprAttrs>): ExprAttrs;
+  expr(expr: Expr, context: Type | null): CheckedExpr;
+  block(block: Stmt[]): { block: CheckedStmt[]; type: Type };
+  typeExpr(typeExpr: TypeExpr, typeParams?: Map<string, Type>): Type;
 }
 
 export interface BlockScope {
   initValue(
     binding: Binding,
-    value: ExprAttrs
+    value: Type
   ): { root: symbol; rest: Array<{ name: symbol; expr: CheckedExpr }> };
-  getValue(name: string): { name: symbol; attrs: ExprAttrs };
-  initType(name: string, value: ExprAttrs): void;
-  getType(name: string): { attrs: ExprAttrs };
+  getValue(name: string): { name: symbol; type: Type };
+  initType(name: string, value: Type): void;
+  getType(name: string): { type: Type };
   inScope<T>(fn: () => T): T;
-}
-
-export interface Checker {
-  checkType(expected: Type, received: Type): void;
 }
 
 export interface Func {
   return(expr: Expr | null): CheckedExpr | null;
   create(
-    traitParams: TraitParams,
-    parameters: Array<{ binding: Binding; attrs: ExprAttrs }>,
-    returns: ExprAttrs,
+    name: string,
+    typeParams: Array<{ type: Type; traits: Trait[] }>,
+    parameters: Array<{ binding: Binding; type: Type }>,
+    returnType: Type,
     block: Stmt[]
-  ): CheckedExpr;
+  ): IRExpr;
+  call(callee: Expr, args: Expr[]): CheckedExpr;
 }
 
 export interface Traits {
   getTrait(traitExpr: TraitExpr): Trait;
+  provideImpl(type: Type, trait: Trait, impl: IRExpr): void;
+  getImpl(type: Type, trait: Trait): IRExpr;
 }
 
 export type Stdlib = {
-  types: Map<string, ExprAttrs>;
-  // values: Map<string, { attrs: ExprAttrs,  }>;
+  types: Map<string, { type: Type }>;
+  values: Map<string, CheckedExpr>;
+  traits: Map<string, Trait>;
+  impls: Map<Type["name"], Map<Trait["name"], IRExpr>>;
 };

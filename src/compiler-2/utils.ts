@@ -3,7 +3,7 @@ import { IRExpr, IRStmt, Builtin } from "./types";
 type IRExprLiteral = string | symbol | number | IRExprLiteral[] | IRExpr;
 type IRStmtLiteral = IRExprLiteral | IRStmt;
 
-function expr_(value: IRExprLiteral): IRExpr {
+export function expr_(value: IRExprLiteral): IRExpr {
   switch (typeof value) {
     case "string":
       return { tag: "string", value };

@@ -1,6 +1,6 @@
 import { check as checkInner } from "./index";
-import { lex } from "../lexer";
-import { parse } from "../parser";
+import { lex } from "../../lexer";
+import { parse } from "../../parser";
 
 function check(program: string): boolean {
   checkInner(parse(lex(program)));

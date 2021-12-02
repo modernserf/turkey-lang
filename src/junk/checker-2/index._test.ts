@@ -1,7 +1,7 @@
 import { compile } from "./index";
-import { interpret } from "../interpreter";
-import { lex } from "../lexer";
-import { parse } from "../parser";
+import { interpret } from "../../interpreter";
+import { lex } from "../../lexer";
+import { parse } from "../../parser";
 
 const run = (code: string) => interpret(compile(parse(lex(code))));
 

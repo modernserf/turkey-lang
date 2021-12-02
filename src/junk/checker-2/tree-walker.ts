@@ -1,5 +1,5 @@
-import { noMatch } from "../utils";
-import { Stmt, Expr, TypeExpr } from "../types";
+import { noMatch } from "../../utils";
+import { Stmt, Expr, TypeExpr } from "../../types";
 import { BlockScope } from "./block-scope";
 import { Func } from "./func";
 import { Traits } from "./traits";

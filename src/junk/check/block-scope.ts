@@ -1,5 +1,5 @@
-import { noMatch } from "../utils";
-import { Binding, CheckedBinding } from "../types";
+import { noMatch } from "../../utils";
+import { Binding, CheckedBinding } from "../../types";
 import {
   BlockScope as IBlockScope,
   Func,
@@ -8,7 +8,7 @@ import {
   BoundType,
   Type,
 } from "./types";
-import { Scope } from "../scope";
+import { Scope } from "../../scope";
 
 export class BlockScope implements IBlockScope {
   public obj!: Obj;

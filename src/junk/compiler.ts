@@ -1,13 +1,13 @@
-import { Opcode } from "./types";
+import { Opcode } from "../types";
 import {
   CheckedBinding,
   CheckedExpr,
   CheckedStmt,
   CheckedStructFieldBinding,
-} from "./types";
-import { Scope } from "./scope";
-import { Writer } from "./writer";
-import { noMatch } from "./utils";
+} from "../types";
+import { Scope } from "../scope";
+import { Writer } from "../writer";
+import { noMatch } from "../utils";
 
 type QueuedFunc = {
   label: symbol;

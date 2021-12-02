@@ -1,6 +1,6 @@
-import { Scope } from "../scope";
-import { noMatch } from "../utils";
-import { Writer } from "../writer";
+import { Scope } from "../../scope";
+import { noMatch } from "../../utils";
+import { Writer } from "../../writer";
 import { BaseTypedExpr, StdLib, TypedStmt } from "./types";
 
 export class Compiler {

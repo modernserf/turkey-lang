@@ -1,5 +1,12 @@
-import { Scope } from "../scope";
-import { CheckedStmt, Expr, Opcode, Stmt, TypeExpr, TypeParam } from "../types";
+import { Scope } from "../../scope";
+import {
+  CheckedStmt,
+  Expr,
+  Opcode,
+  Stmt,
+  TypeExpr,
+  TypeParam,
+} from "../../types";
 import {
   TreeWalker as ITreeWalker,
   BlockScope,
@@ -24,7 +31,7 @@ import {
   TypedStmt,
 } from "./types";
 
-import { noMatch } from "../utils";
+import { noMatch } from "../../utils";
 import { unify } from "./checker";
 
 export class TreeWalker implements ITreeWalker {

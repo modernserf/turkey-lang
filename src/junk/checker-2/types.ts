@@ -1,4 +1,4 @@
-import { Opcode } from "../types";
+import { Opcode } from "../../types";
 export type Impl = { tag: "impl"; attrs: ExprAttrs };
 
 // TODO: trait params

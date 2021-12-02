@@ -1,4 +1,4 @@
-import { Scope } from "../scope";
+import { Scope } from "../../scope";
 import {
   Binding,
   EnumCase,
@@ -14,7 +14,7 @@ import {
   CheckedBinding,
   CheckedStructFieldBinding,
   CheckedMatchCase,
-} from "../types";
+} from "../../types";
 
 // TODO: trait params
 export type Trait = { tag: "trait"; name: symbol };

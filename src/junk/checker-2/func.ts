@@ -1,4 +1,4 @@
-import { Binding, TypeParam } from "../types";
+import { Binding, TypeParam } from "../../types";
 import { BlockScope } from "./block-scope";
 import { Traits } from "./traits";
 import {

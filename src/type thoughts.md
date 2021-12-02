@@ -392,3 +392,57 @@ let bar: func (Int): Int = |x| x + 1 // type passed in
 ```
 
 context is built left to right, so `map([1,2,3], |x| x + 1)` checks, but `map(|x| x + 1, [1,2,3])` does not.
+
+---
+
+## more on traits and impls
+
+- from the checker's perspective, everything there is to know about a value can be derived from its type.
+- concrete types have names and parameters (which is a list of types)
+- global information is associated with concrete types by their names:
+  - supported traits & their implementations
+  - struct fields and layouts
+  - enum cases
+- local information is encoded in concrete type parameters:
+  - `Foo<Int, Float> -> let Foo = { name: Symbol(Foo), parameters: [Int, Float] }`
+  - `(Int, Float) -> { name: Symbol(Tuple), parameters: [Int, Float] }`
+  - `func (Int, Float): String -> { name: Symbol(Func), parameters: [String, Int, Float] }`
+- types are compatible if the names are the same, the number of parameters is the same, and their parameters are each compatible
+
+Func type parameters with trait constraints are hidden arguments
+
+`func foo <T: Show> (arg: T): String -> func foo <T> (impl: Impl_Show<T>, arg: T): String`
+
+How do we encode this in the type, while still allowing compatibility? In the name:
+
+`func foo <T: Show> (arg: T): String -> { name: Symbol(Func_1), parameters: [String, Impl_Show<T>, T] }`
+
+unpacked as -- first param is return type, next n (based on type name) are type params, remainder are normal params
+
+How does substitution work? eg.
+
+```
+func for_each <T> (list: List<T>, cb: func (T): Void) : Void { ... }
+
+func print <T: Show> (value: T): Void {}
+
+[1,2,3].for_each(print)
+```
+
+`for_each` should accept callbacks with trait constraints, provided the list item can match those constraints
+
+```
+func for_each_showable <T: Show> (list: List<T>, cb: func (T): Void): Void { ... }
+
+func noop <T> (value: T): Void {}
+
+[1,2,3].for_each_showable(noop)
+```
+
+this suggests that hidden trait args should be separate from type parameters. However, because each function has its own trait parameter list, this cannot be stored globally like struct field layouts. The hidden trait args need to propagate when working with types as well, e.g. if a function returns another function that has trait params, calling that function should produce a type that includes those.
+
+Do other parameterized types need hidden trait lists?:
+
+```
+type Foo<T: Show> = (Int, T)
+```

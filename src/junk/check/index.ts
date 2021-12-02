@@ -1,4 +1,4 @@
-import { CheckedStmt, Opcode, Stmt } from "../types";
+import { CheckedStmt, Opcode, Stmt } from "../../types";
 import { BlockScope } from "./block-scope";
 // import { Compiler } from "./compiler";
 import { Func } from "./func";

@@ -1,29 +1,24 @@
 import { Scope } from "../scope";
 import { Binding } from "../types";
 import { noMatch } from "../utils";
-import {
-  BlockScope as IBlockScope,
-  CheckedExpr,
-  ExprAttrs,
-  Stdlib,
-} from "./types";
+import { BlockScope as IBlockScope, CheckedExpr, Stdlib, Type } from "./types";
 
 export class BlockScope implements IBlockScope {
-  private values = new Scope<string, { name: symbol; attrs: ExprAttrs }>();
-  private types = new Scope<string, ExprAttrs>();
+  private values = new Scope<string, { name: symbol; type: Type }>();
+  private types = new Scope<string, Type>();
   constructor(stdlib: Stdlib) {
-    for (const [name, value] of stdlib.types) {
-      this.types.init(name, value);
+    for (const [name, { type }] of stdlib.types) {
+      this.types.init(name, type);
     }
   }
   initValue(
     binding: Binding,
-    attrs: ExprAttrs
+    type: Type
   ): { root: symbol; rest: Array<{ name: symbol; expr: CheckedExpr }> } {
     switch (binding.tag) {
       case "identifier": {
         const name = Symbol(binding.value);
-        this.values.init(binding.value, { name, attrs });
+        this.values.init(binding.value, { name, type });
         return { root: name, rest: [] };
       }
       case "struct":
@@ -33,14 +28,14 @@ export class BlockScope implements IBlockScope {
         noMatch(binding);
     }
   }
-  getValue(name: string): { name: symbol; attrs: ExprAttrs } {
+  getValue(name: string): { name: symbol; type: Type } {
     return this.values.get(name);
   }
-  initType(name: string, value: ExprAttrs): void {
+  initType(name: string, value: Type): void {
     this.types.init(name, value);
   }
-  getType(name: string): { attrs: ExprAttrs } {
-    return { attrs: this.types.get(name) };
+  getType(name: string): { type: Type } {
+    return { type: this.types.get(name) };
   }
   inScope<T>(fn: () => T): T {
     this.values = this.values.push();
