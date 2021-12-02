@@ -12,6 +12,8 @@ import {
   createVar,
   showTrait,
   funcType,
+  numTrait,
+  eqTrait,
 } from "./types";
 import { Traits } from "./trait";
 import { IRExpr, IRStmt, func_, field_, call_, expr_, builtIn_ } from "../ir";
@@ -49,7 +51,11 @@ const stdlib: Stdlib = {
     ["String", { type: stringType }],
   ]),
   values: new Map([["print", printFunc]]),
-  traits: new Map(),
+  traits: new Map([
+    ["Show", showTrait],
+    ["Num", numTrait],
+    ["Eq", eqTrait],
+  ]),
   impls: new Map([
     [intType.name, new Map([[showTrait.name, implNumShow]])],
     [floatType.name, new Map([[showTrait.name, implNumShow]])],
@@ -64,6 +70,7 @@ export function check(program: Stmt[]): IRStmt[] {
   const traits = new Traits(stdlib);
   treeWalker.scope = blockScope;
   treeWalker.func = func;
+  treeWalker.traits = traits;
   func.scope = blockScope;
   func.treeWalker = treeWalker;
   func.traits = traits;

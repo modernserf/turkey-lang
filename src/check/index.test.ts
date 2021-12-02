@@ -117,10 +117,39 @@ it("calls funcs with trait args", () => {
   expect(check(code)).toBeTruthy();
 });
 
-it("rejects func calls with invalid traits", () => {
+it("rejects func calls with args that do not match traits", () => {
   const code = `
-    print(print(1))
+    func num <T: Num> (arg: T): Void {}
+    num("hello")
   `;
 
+  expect(() => check(code)).toThrow();
+});
+
+it("propagates generic types", () => {
+  const code = `
+    func id <T> (arg: T): T { arg }  
+    let x: Int = id(1)
+  `;
+  expect(check(code)).toBeTruthy();
+});
+
+it("propagates trait params", () => {
+  const code = `
+    func print_twice <T: Show> (arg: T): Void {
+      print(arg)
+      print(arg)
+    }
+  
+    print_twice(1)
+    print_twice("hello")
+  `;
+  expect(check(code)).toBeTruthy();
+});
+
+it("rejects unknown traits", () => {
+  const code = `
+    func print_twice <T: Nope> (arg: T): Void { }
+  `;
   expect(() => check(code)).toThrow();
 });

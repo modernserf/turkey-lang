@@ -34,7 +34,9 @@ export class Traits implements ITraits {
   }
   getTrait(traitExpr: TraitExpr): Trait {
     const trait = this.traits.get(traitExpr.value);
-    if (!trait) throw new Error("unknown trait");
+    if (!trait) {
+      throw new Error("unknown trait");
+    }
     traitExpr.typeArgs.forEach((arg) => {
       throw new Error("todo");
     });
