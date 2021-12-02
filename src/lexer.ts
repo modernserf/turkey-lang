@@ -1,4 +1,4 @@
-import { Token } from "./types";
+import { Token } from "./token";
 
 // _: whitespace _: comment  1: number 2: identifier 3: typeIdentifier 4: operator 5: string 6: error
 const pattern =

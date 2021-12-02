@@ -1,5 +1,5 @@
-import { IRExpr } from "../compiler-2/types";
-import { TraitExpr } from "../types";
+import { IRExpr } from "../ir";
+import { TraitExpr } from "../ast";
 import { Type, Trait, Traits as ITraits, Stdlib } from "./types";
 
 class ImplNotFoundError extends Error {

@@ -1,5 +1,5 @@
-import { IRStmt } from "../compiler-2/types";
-import { Expr, Stmt, TypeExpr } from "../types";
+import { IRStmt } from "../ir";
+import { Expr, Stmt, TypeExpr } from "../ast";
 import { noMatch } from "../utils";
 import { CheckerCtx } from "./checker";
 import {

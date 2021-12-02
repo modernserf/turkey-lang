@@ -1,5 +1,5 @@
-import { Binding, Expr, Stmt, TraitExpr, TypeExpr } from "../types";
-import { IRStmt, IRExpr } from "../compiler-2/types";
+import { Binding, Expr, Stmt, TraitExpr, TypeExpr } from "../ast";
+import { IRStmt, IRExpr } from "../ir";
 
 export type Type =
   | {

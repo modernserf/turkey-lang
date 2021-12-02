@@ -8,7 +8,7 @@ import {
   program_,
   recur_,
   return_,
-} from "./utils";
+} from "../ir";
 import { interpret } from "../interpreter";
 
 it("runs a program", () => {

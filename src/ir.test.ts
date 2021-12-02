@@ -8,7 +8,7 @@ import {
   program_,
   recur_,
   return_,
-} from "./utils";
+} from "./ir";
 
 it("prints a program", () => {
   const modZero = Symbol("mod_zero");

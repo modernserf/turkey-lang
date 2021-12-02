@@ -1,4 +1,4 @@
-import { Opcode } from "./types";
+import { Opcode } from "./opcode";
 
 export class Writer {
   private program: number[] = [];

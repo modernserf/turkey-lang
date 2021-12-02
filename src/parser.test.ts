@@ -1,6 +1,5 @@
-import { parse } from "./parser";
+import { parse, ParseError } from "./parser";
 import { lex } from "./lexer";
-import { ParseError } from "./types";
 
 it("gets error tokens when input is totally malformed", () => {
   const code = `

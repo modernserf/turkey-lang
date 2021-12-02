@@ -1,5 +1,5 @@
 import { Scope } from "../scope";
-import { Binding } from "../types";
+import { Binding } from "../ast";
 import { noMatch } from "../utils";
 import { BlockScope as IBlockScope, CheckedExpr, Stdlib, Type } from "./types";
 

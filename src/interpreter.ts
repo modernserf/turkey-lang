@@ -1,4 +1,4 @@
-import { Opcode } from "./types";
+import { Opcode } from "./opcode";
 
 function assert<T>(value: T | undefined): T {
   // istanbul ignore next

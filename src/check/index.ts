@@ -1,5 +1,4 @@
-import { IRExpr, IRStmt } from "../compiler-2/types";
-import { Stmt } from "../types";
+import { Stmt } from "../ast";
 import { BlockScope } from "./block-scope";
 import { TreeWalker } from "./tree-walker";
 import { Func } from "./func";
@@ -15,7 +14,7 @@ import {
   funcType,
 } from "./types";
 import { Traits } from "./trait";
-import { func_, field_, call_, expr_, builtIn_ } from "../compiler-2/utils";
+import { IRExpr, IRStmt, func_, field_, call_, expr_, builtIn_ } from "../ir";
 
 const printFunc: CheckedExpr = (() => {
   const implShow = Symbol("impl_Show_T");

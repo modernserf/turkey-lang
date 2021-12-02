@@ -1,4 +1,4 @@
-import { Opcode } from "./types";
+import { Opcode } from "./opcode";
 
 export function disassembler(code: number[]): string {
   let byte: Opcode | undefined;

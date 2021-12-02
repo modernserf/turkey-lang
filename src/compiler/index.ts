@@ -1,5 +1,5 @@
-import { Builtin, IRExpr, IRStmt } from "./types";
-import { Opcode } from "../types";
+import { Builtin, IRExpr, IRStmt } from "../ir";
+import { Opcode } from "../opcode";
 import { Writer } from "../writer";
 import { noMatch } from "../utils";
 import { Scope } from "../scope";

@@ -1,5 +1,5 @@
-import { IRExpr } from "../compiler-2/types";
-import { Binding, Expr, Stmt } from "../types";
+import { IRExpr } from "../ir";
+import { Binding, Expr, Stmt } from "../ast";
 import { CheckerCtx } from "./checker";
 import {
   CheckedExpr,

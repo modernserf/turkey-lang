@@ -1,9 +1,7 @@
 import {
-  Token,
   Stmt,
   Expr,
   Binding,
-  ParseError,
   IfCase,
   TypeExpr,
   TypeBinding,
@@ -15,7 +13,8 @@ import {
   TypeParam,
   TraitField,
   TraitExpr,
-} from "./types";
+} from "./ast";
+import { Token } from "./token";
 
 interface IParseState {
   token(): Token;
@@ -33,6 +32,12 @@ class ParseState implements IParseState {
   }
   advance(): void {
     this.index++;
+  }
+}
+
+export class ParseError extends Error {
+  constructor(expected: string, received: Token) {
+    super(`expected ${expected}, received ${received.tag}`);
   }
 }
 
