@@ -156,6 +156,8 @@ const checkExpr: Parser<Expr | null> = (state) => {
   return infixLeft(state, checkAddExpr, ["==", "!=", ">", "<", "<=", ">="]);
 };
 
+// TODO: stick logic in here
+
 const checkAddExpr: Parser<Expr | null> = (state) => {
   return infixLeft(state, checkMulExpr, ["+", "-"]);
 };
@@ -261,6 +263,12 @@ const checkBaseExpr: Parser<Expr | null> = (state) => {
     case "string":
       state.advance();
       return { tag: "string", value: token.value };
+    case "||": {
+      // in this context, `||` begins a closure with no args, not logical or
+      state.advance();
+      const block = matchBlockOrExpr(state);
+      return { tag: "closure", parameters: [], block };
+    }
     case "|": {
       state.advance();
       const parameters = commaList(state, checkBinding);
@@ -344,6 +352,7 @@ const matchStructFieldBindingList: Parser<StructFieldBinding[]> = (state) => {
 const checkStructFieldBinding: Parser<StructFieldBinding | null> = (state) => {
   const fieldName = checkField(state);
   if (!fieldName) return null;
+
   if (check(state, ":")) {
     const binding = matchBinding(state);
     return { fieldName, binding };

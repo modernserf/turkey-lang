@@ -1,4 +1,4 @@
-import { IRStmt } from "../ir";
+import { Builtin, IRStmt } from "../ir";
 import { Expr, Stmt, TypeExpr } from "../ast";
 import { noMatch } from "../utils";
 import { CheckerCtx } from "./checker";
@@ -24,6 +24,8 @@ export class TreeWalker implements ITreeWalker {
   public scope!: BlockScope;
   public func!: Func;
   public traits!: Traits;
+  private unaryOps!: Map<string, { op: Builtin; type: Type }>;
+  private binaryOps!: Map<string, { op: Builtin; type: Type }>;
   program(stdlib: Stdlib, program: Stmt[]): IRStmt[] {
     const prelude: IRStmt[] = Array.from(stdlib.values).map(([name, expr]) => {
       const binding = this.scope.initValue(
@@ -33,6 +35,9 @@ export class TreeWalker implements ITreeWalker {
 
       return { tag: "let", binding: binding.root, expr };
     });
+
+    this.unaryOps = stdlib.unaryOps;
+    this.binaryOps = stdlib.binaryOps;
 
     return [...prelude, ...this.block(program).block];
   }
@@ -68,9 +73,19 @@ export class TreeWalker implements ITreeWalker {
       case "call":
         return this.func.call(expr.expr, expr.args);
       case "field":
-      case "unaryOp":
-      case "binaryOp":
         throw new Error("todo");
+      case "unaryOp": {
+        const op = this.unaryOps.get(expr.operator);
+        // istanbul ignore next
+        if (!op) throw new Error("unknown operator");
+        return this.func.op(op.op, op.type, [expr.expr]);
+      }
+      case "binaryOp": {
+        const op = this.binaryOps.get(expr.operator);
+        // istanbul ignore next
+        if (!op) throw new Error("unknown operator");
+        return this.func.op(op.op, op.type, [expr.left, expr.right]);
+      }
       case "do": {
         const { block, type } = this.block(expr.block);
         return { tag: "do", block, type };

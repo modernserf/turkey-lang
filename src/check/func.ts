@@ -1,4 +1,4 @@
-import { IRExpr } from "../ir";
+import { Builtin, IRExpr } from "../ir";
 import { Binding, Expr, Stmt } from "../ast";
 import { CheckerCtx } from "./checker";
 import {
@@ -109,6 +109,17 @@ export class Func implements IFunc {
     const finalReturnType = checker.resolve(returnType);
     const hasValue = this.hasValue(finalReturnType);
     return { tag: "call", callee, args, hasValue, type: finalReturnType };
+  }
+  op(op: Builtin, type: Type, inArgs: Expr[]): CheckedExpr {
+    const { returnType, params } = this.checkCallee(type, inArgs.length);
+    const checker = new CheckerCtx(this.traits);
+    const args = inArgs.map((arg, i) => {
+      const checkedArg = this.treeWalker.expr(arg, checker.resolve(params[i]));
+      checkedArg.type = checker.unify(params[i], checkedArg.type);
+      return checkedArg;
+    });
+    const finalReturnType = checker.resolve(returnType);
+    return { tag: "builtin", value: op, args, type: finalReturnType };
   }
   private checkCallee(
     type: Type,

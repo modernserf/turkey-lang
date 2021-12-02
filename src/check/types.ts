@@ -1,5 +1,5 @@
 import { Binding, Expr, Stmt, TraitExpr, TypeExpr } from "../ast";
-import { IRStmt, IRExpr } from "../ir";
+import { IRStmt, IRExpr, Builtin } from "../ir";
 
 export type Type =
   | {
@@ -95,6 +95,7 @@ export interface Func {
     block: Stmt[]
   ): IRExpr;
   call(callee: Expr, args: Expr[]): CheckedExpr;
+  op(op: Builtin, type: Type, args: Expr[]): CheckedExpr;
 }
 
 export interface Traits {
@@ -108,4 +109,6 @@ export type Stdlib = {
   values: Map<string, CheckedExpr>;
   traits: Map<string, Trait>;
   impls: Map<Type["name"], Map<Trait["name"], IRExpr>>;
+  unaryOps: Map<string, { op: Builtin; type: Type }>;
+  binaryOps: Map<string, { op: Builtin; type: Type }>;
 };

@@ -24,6 +24,9 @@ export type Token =
   | { tag: "<=" }
   | { tag: ">=" }
   | { tag: "=>" }
+  | { tag: "&&" }
+  | { tag: "||" }
+  | { tag: "^^" }
   | { tag: "!" }
   | { tag: "+" }
   | { tag: "-" }

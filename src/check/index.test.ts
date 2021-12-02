@@ -153,3 +153,13 @@ it("rejects unknown traits", () => {
   `;
   expect(() => check(code)).toThrow();
 });
+
+it("supports arithmetic operators", () => {
+  const code = `
+    print(-1)
+    print(1 + 2)
+    print(1.5 * 2.5)
+    print((1 / 3) + 0.6667) 
+  `;
+  expect(check(code)).toBeTruthy();
+});

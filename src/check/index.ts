@@ -14,6 +14,7 @@ import {
   funcType,
   numTrait,
   eqTrait,
+  boolType,
 } from "./types";
 import { Traits } from "./trait";
 import { IRExpr, IRStmt, func_, field_, call_, expr_, builtIn_ } from "../ir";
@@ -38,10 +39,28 @@ const implNumShow: IRExpr = (() => {
   return expr_([func_([], [value], [builtIn_("print_num", [value])])]);
 })();
 
+// Num has an empty implementation, you just have to have it
+// TODO: how do you prevent other types from trying to implement Num?
+const implNum = expr_([]);
+
+const implEqPrimitive: IRExpr = (() => {
+  const value = Symbol("value");
+  return expr_([
+    // this is just the identity function
+    func_([], [value], [value]),
+  ]);
+})();
+
 const implStringShow: IRExpr = (() => {
   const value = Symbol("value");
-  return expr_([func_([], [value], [builtIn_("print_string", [value])])]);
+  return expr_([
+    //
+    func_([], [value], [builtIn_("print_string", [value])]),
+  ]);
 })();
+
+const numT = createVar(Symbol("T"), [numTrait]);
+const eqT = createVar(Symbol("T"), [eqTrait]);
 
 const stdlib: Stdlib = {
   types: new Map([
@@ -57,9 +76,53 @@ const stdlib: Stdlib = {
     ["Eq", eqTrait],
   ]),
   impls: new Map([
-    [intType.name, new Map([[showTrait.name, implNumShow]])],
-    [floatType.name, new Map([[showTrait.name, implNumShow]])],
-    [stringType.name, new Map([[showTrait.name, implStringShow]])],
+    [
+      intType.name,
+      new Map([
+        [showTrait.name, implNumShow],
+        [numTrait.name, implNum],
+        [eqTrait.name, implEqPrimitive],
+      ]),
+    ],
+    [
+      floatType.name,
+      new Map([
+        [showTrait.name, implNumShow],
+        [numTrait.name, implNum],
+        [eqTrait.name, implEqPrimitive],
+      ]),
+    ],
+    [
+      stringType.name,
+      new Map([
+        [showTrait.name, implStringShow],
+        [eqTrait.name, implEqPrimitive],
+      ]),
+    ],
+  ]),
+  unaryOps: new Map([
+    ["!", { op: "not", type: funcType(boolType, [boolType], []) }],
+    ["-", { op: "neg", type: funcType(numT, [numT], []) }],
+  ]),
+  binaryOps: new Map([
+    // arithmetic ops
+    ["+", { op: "add", type: funcType(numT, [numT, numT], []) }],
+    ["-", { op: "sub", type: funcType(numT, [numT, numT], []) }],
+    ["*", { op: "mul", type: funcType(numT, [numT, numT], []) }],
+    ["%", { op: "mod", type: funcType(numT, [numT, numT], []) }],
+    ["/", { op: "div", type: funcType(floatType, [numT, numT], []) }],
+    // comparison ops
+    ["<", { op: "lt", type: funcType(boolType, [numT, numT], []) }],
+    ["<=", { op: "lte", type: funcType(boolType, [numT, numT], []) }],
+    [">", { op: "gt", type: funcType(boolType, [numT, numT], []) }],
+    [">=", { op: "gte", type: funcType(boolType, [numT, numT], []) }],
+    // equality
+    ["==", { op: "eq", type: funcType(boolType, [eqT, eqT], []) }],
+    ["!=", { op: "neq", type: funcType(boolType, [eqT, eqT], []) }],
+    // logical
+    ["&&", { op: "and", type: funcType(boolType, [boolType, boolType], []) }],
+    ["||", { op: "or", type: funcType(boolType, [boolType, boolType], []) }],
+    ["^^", { op: "or", type: funcType(boolType, [boolType, boolType], []) }],
   ]),
 };
 

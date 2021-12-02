@@ -1,9 +1,20 @@
 export type Builtin =
   | "add"
   | "sub"
-  | "lt"
-  | "eq"
+  | "mul"
   | "mod"
+  | "div"
+  | "neg"
+  | "eq"
+  | "neq"
+  | "lt"
+  | "lte"
+  | "gt"
+  | "gte"
+  | "and"
+  | "or"
+  | "xor"
+  | "not"
   | "print_num"
   | "print_string";
 

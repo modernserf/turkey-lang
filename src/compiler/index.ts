@@ -20,12 +20,23 @@ export function compile(program: IRStmt[]): Result {
 
 const builtins: Record<Builtin, { code: Opcode[]; hasValue: boolean }> = {
   add: { code: [Opcode.Add], hasValue: true },
-  eq: { code: [Opcode.Eq], hasValue: true },
-  lt: { code: [Opcode.Lt], hasValue: true },
+  sub: { code: [Opcode.Sub], hasValue: true },
+  mul: { code: [Opcode.Mul], hasValue: true },
   mod: { code: [Opcode.Mod], hasValue: true },
+  div: { code: [Opcode.Div], hasValue: true },
+  neg: { code: [Opcode.Neg], hasValue: true },
+  eq: { code: [Opcode.Eq], hasValue: true },
+  neq: { code: [Opcode.Neq], hasValue: true },
+  lt: { code: [Opcode.Lt], hasValue: true },
+  lte: { code: [Opcode.Lte], hasValue: true },
+  gt: { code: [Opcode.Gt], hasValue: true },
+  gte: { code: [Opcode.Gte], hasValue: true },
+  and: { code: [Opcode.And], hasValue: true },
+  or: { code: [Opcode.Or], hasValue: true },
+  xor: { code: [Opcode.Xor], hasValue: true },
+  not: { code: [Opcode.Not], hasValue: true },
   print_num: { code: [Opcode.PrintNum], hasValue: false },
   print_string: { code: [Opcode.PrintStr], hasValue: false },
-  sub: { code: [Opcode.Sub], hasValue: true },
 };
 
 type QueuedFunc = {
