@@ -1,5 +1,6 @@
 import { Binding, Expr, Stmt, TraitExpr, TypeExpr } from "../ast";
 import { IRStmt, IRExpr, Builtin } from "../ir";
+import { CheckerCtx } from "./checker";
 
 export type Type =
   | {
@@ -74,15 +75,20 @@ export interface TreeWalker {
   typeExpr(typeExpr: TypeExpr, typeParams?: Map<string, Type>): Type;
 }
 
-export interface BlockScope {
+export interface Scope {
   initValue(
     binding: Binding,
-    value: Type
+    type: Type
   ): { root: symbol; rest: Array<{ name: symbol; expr: CheckedExpr }> };
-  getValue(name: string): { name: symbol; type: Type };
+  getValue(str: string): CheckedExpr;
   initType(name: string, value: Type): void;
   getType(name: string): { type: Type };
-  inScope<T>(fn: () => T): T;
+  blockScope<T>(fn: () => T): T;
+  loopScope<T>(id: symbol, fn: () => T): T;
+  funcScope<T>(
+    returns: CheckerCtx,
+    fn: () => T
+  ): { upvalues: symbol[]; result: T };
 }
 
 export interface Func {

@@ -211,12 +211,12 @@ class Interpreter {
   private stack: Stack = new Stack();
   private heap: Heap;
   private program: Program;
-  private output: string[] = [];
+  private output: Array<string | number> = [];
   constructor(program: number[], constants: string[]) {
     this.program = new Program(program);
     this.heap = new Heap(constants);
   }
-  private write(value: string): void {
+  private write(value: string | number): void {
     this.output.push(value);
   }
   private runAll() {
@@ -369,7 +369,7 @@ class Interpreter {
       }
       case Opcode.PrintNum: {
         const value = this.stack.pop();
-        this.write(String(value));
+        this.write(value);
         return;
       }
       // istanbul ignore next

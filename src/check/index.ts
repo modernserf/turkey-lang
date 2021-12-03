@@ -1,5 +1,5 @@
 import { Stmt } from "../ast";
-import { BlockScope } from "./block-scope";
+import { Scope } from "./scope";
 import { TreeWalker } from "./tree-walker";
 import { Func } from "./func";
 import {
@@ -128,13 +128,13 @@ const stdlib: Stdlib = {
 
 export function check(program: Stmt[]): IRStmt[] {
   const treeWalker = new TreeWalker();
-  const blockScope = new BlockScope(stdlib);
+  const scope = new Scope(stdlib);
   const func = new Func();
   const traits = new Traits(stdlib);
-  treeWalker.scope = blockScope;
+  treeWalker.scope = scope;
   treeWalker.func = func;
   treeWalker.traits = traits;
-  func.scope = blockScope;
+  func.scope = scope;
   func.treeWalker = treeWalker;
   func.traits = traits;
 

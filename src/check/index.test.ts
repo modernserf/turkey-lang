@@ -1,6 +1,7 @@
 import { check as checkInner } from "./index";
 import { lex } from "../lexer";
 import { parse } from "../parser";
+import { PrettyPrinter } from "../ir";
 
 const check = (code: string) => checkInner(parse(lex(code)));
 
@@ -137,7 +138,7 @@ it("propagates generic types", () => {
 it("propagates trait params", () => {
   const code = `
     func print_twice <T: Show> (arg: T): Void {
-      print(arg)
+      // print(arg)
       print(arg)
     }
   

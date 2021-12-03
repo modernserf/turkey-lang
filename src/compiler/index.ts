@@ -2,7 +2,7 @@ import { Builtin, IRExpr, IRStmt } from "../ir";
 import { Opcode } from "../opcode";
 import { Writer } from "../writer";
 import { noMatch } from "../utils";
-import { Scope } from "../scope";
+import { StrictMap } from "../strict-map";
 
 /* TODO 
 remove `upvalues, recur` from IR, move to OptimizedIR type
@@ -48,13 +48,15 @@ type QueuedFunc = {
 
 const callee = Symbol("callee");
 
+let counter = 0;
+
 export class Compiler {
   private asm = new Writer();
   private labels = new LabelState(this.asm);
   private varIndex = 0;
   private vars = new Map<symbol, number>();
   private strings = new Map<string, number>();
-  private funcs: QueuedFunc[] = [];
+  private funcs = new Map<symbol, QueuedFunc>();
   compile(program: IRStmt[]): Result {
     this.block(program);
     this.asm.halt();
@@ -210,7 +212,7 @@ export class Compiler {
         return res;
       }
       case "func": {
-        const ref = Symbol("func");
+        const ref = Symbol(`func_${counter++}`);
         this.labels.func(ref);
         this.asm.newClosure(expr.upvalues.length);
         expr.upvalues.forEach(({ expr }, i) => {
@@ -257,7 +259,7 @@ export class Compiler {
     this.asm.setLocal(index);
   }
   private queueFunc(func: QueuedFunc): void {
-    this.funcs.push(func);
+    this.funcs.set(func.label, func);
   }
   private compileFunc(func: QueuedFunc): void {
     this.varIndex = 0;
@@ -288,7 +290,7 @@ export class Compiler {
 type Label = symbol;
 type JumpTableRef = { labels: Label[]; index: number };
 class LabelState {
-  private labels: Scope<Label, number> = new Scope();
+  private labels = new StrictMap<Label, number>();
   private labelRefs: Array<{ label: Label; index: number }> = [];
   private jumpTableRefs: JumpTableRef[] = [];
   constructor(private writer: Writer) {}

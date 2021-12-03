@@ -10,37 +10,37 @@ it("prints", () => {
     print(0)
     print("hello")
   `;
-  expect(run(code)).toEqual(["123.45", "0", "hello"]);
+  expect(run(code)).toEqual([123.45, 0, "hello"]);
 });
 
-// it("adds", () => {
-//   expect(run(`print(123456 + 1)`)).toEqual(["123457"]);
-//   expect(run(`print(1.5 + -2.0)`)).toEqual(["-0.5"]);
-// });
+it("adds", () => {
+  expect(run(`print(123456 + 1)`)).toEqual([123457]);
+  expect(run(`print(1.5 + -2.0)`)).toEqual([-0.5]);
+});
 
-// it("references variables", () => {
-//   const code = `
-//     let x = 1
-//     let y : Int = 2 + 3
-//     x - y
-//     print(x + y + 4)
-//   `;
-//   expect(run(code)).toEqual(["10"]);
-// });
+it("references variables", () => {
+  const code = `
+    let x = 1
+    let y : Int = 2 + 3
+    x - y
+    print(x + y + 4)
+  `;
+  expect(run(code)).toEqual([10]);
+});
 
-// it("uses do blocks", () => {
-//   const code = `
-//     let res = do {
-//       let x = 1
-//       let y = 2
-//       print(x)
-//       print(y)
-//       x + y
-//     }
-//     print(res)
-//   `;
-//   expect(run(code)).toEqual(["1", "2", "3"]);
-// });
+it("uses do blocks", () => {
+  const code = `
+    let res = do {
+      let x = 1
+      let y = 2
+      print(x)
+      print(y)
+      x + y
+    }
+    print(res)
+  `;
+  expect(run(code)).toEqual([1, 2, 3]);
+});
 
 // it("uses conditionals", () => {
 //   const code = `
@@ -53,7 +53,7 @@ it("prints", () => {
 //     }
 //     print(x)
 //   `;
-//   expect(run(code)).toEqual(["1"]);
+//   expect(run(code)).toEqual([1]);
 // });
 
 // it("uses conditional statements", () => {
@@ -63,7 +63,7 @@ it("prints", () => {
 //     }
 //     print(2)
 //   `;
-//   expect(run(code)).toEqual(["1", "2"]);
+//   expect(run(code)).toEqual([1, 2]);
 // });
 
 // it("theoretically uses loops", () => {
@@ -81,27 +81,17 @@ it("prints", () => {
 //   expect(run(code)).toEqual(["2"]);
 // });
 
-// it("drops expressions called for their side effects", () => {
-//   const code = `
-//     let x = 1
-//     x + 2
-//     print(x + 3)
-//   `;
-//   expect(run(code)).toEqual(["4"]);
-// });
+it("calls functions", () => {
+  const code = `
+    func print_twice (x: Int): Void {
+      print(x)
+      print(x)
+    }
 
-// it("calls functions", () => {
-//   const code = `
-//     func print_twice (x: Int): Void {
-//       print(x)
-//       print(x)
-//       return
-//     }
-
-//     print_twice(2)
-//   `;
-//   expect(run(code)).toEqual(["2", "2"]);
-// });
+    print_twice(2)
+  `;
+  expect(run(code)).toEqual([2, 2]);
+});
 
 // it("calls closures", () => {
 //   const code = `

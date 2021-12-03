@@ -4,7 +4,7 @@ import { CheckerCtx } from "./checker";
 import {
   CheckedExpr,
   Func as IFunc,
-  BlockScope,
+  Scope,
   TreeWalker,
   funcTypeName,
   Type,
@@ -16,7 +16,7 @@ import {
 } from "./types";
 
 export class Func implements IFunc {
-  public scope!: BlockScope;
+  public scope!: Scope;
   public treeWalker!: TreeWalker;
   public traits!: Traits;
 
@@ -30,23 +30,25 @@ export class Func implements IFunc {
     returnType: Type,
     inBlock: Stmt[]
   ): IRExpr {
-    return this.scope.inScope(() => {
-      // when creating the function _type_, we bind the type params to vars,
-      // but when checking the function _body_, we bind them to unique concrete types,
-      // so that they're not unified with anything else.
-      const typeParamsWithTracers = typeParams.map(({ type, traits }) => {
-        const tracer = createType(
-          Symbol(`Trace(${type.name.description})`),
-          [],
-          []
-        );
-        return { type, traits, tracer };
-      });
-
-      const tracerTypes = new Map(
-        typeParamsWithTracers.map(({ type, tracer }) => [type.name, tracer])
+    // when creating the function _type_, we bind the type params to vars,
+    // but when checking the function _body_, we bind them to unique concrete types,
+    // so that they're not unified with anything else.
+    const typeParamsWithTracers = typeParams.map(({ type, traits }) => {
+      const tracer = createType(
+        Symbol(`Trace(${type.name.description})`),
+        [],
+        []
       );
+      return { type, traits, tracer };
+    });
 
+    const tracerTypes = new Map(
+      typeParamsWithTracers.map(({ type, tracer }) => [type.name, tracer])
+    );
+
+    const checker = new CheckerCtx(this.traits, tracerTypes);
+
+    const { upvalues: us, result } = this.scope.funcScope(checker, () => {
       // the impls for the traits required by our type parameters are passed in as arguments.
       // this generates the symbols with which we'll bind these arguments,
       // and it defines the implementation of traits for our tracer types
@@ -63,8 +65,6 @@ export class Func implements IFunc {
         }
       );
 
-      const checker = new CheckerCtx(this.traits, tracerTypes);
-
       // update the value params and return type to use the concrete type params
       // and get the symbols that the corresponding arguments will be bound to
       const mainParamSymbols = inParameters.map((p) => {
@@ -79,11 +79,16 @@ export class Func implements IFunc {
       const parameters = [...traitParamSymbols, ...mainParamSymbols];
 
       const { block, type: blockReturnType } = this.treeWalker.block(inBlock);
-      // TODO: handle upvalues, recursion, explicit returns
       returnType = checker.unify(returnType, blockReturnType);
-
-      return { tag: "func", upvalues: [], parameters, block };
+      return { parameters, block };
     });
+    const { parameters, block } = result;
+    const upvalues = us.map((value) => ({
+      binding: value,
+      expr: { tag: "ident", value } as IRExpr,
+    }));
+
+    return { tag: "func", upvalues, parameters, block };
   }
   call(inCallee: Expr, inArgs: Expr[]): CheckedExpr {
     const callee = this.treeWalker.expr(inCallee, null);

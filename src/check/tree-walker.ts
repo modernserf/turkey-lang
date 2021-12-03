@@ -5,7 +5,7 @@ import { CheckerCtx } from "./checker";
 import {
   TreeWalker as ITreeWalker,
   CheckedExpr,
-  BlockScope,
+  Scope,
   CheckedStmt,
   voidType,
   intType,
@@ -21,7 +21,7 @@ import {
 } from "./types";
 
 export class TreeWalker implements ITreeWalker {
-  public scope!: BlockScope;
+  public scope!: Scope;
   public func!: Func;
   public traits!: Traits;
   private unaryOps!: Map<string, { op: Builtin; type: Type }>;
@@ -43,10 +43,8 @@ export class TreeWalker implements ITreeWalker {
   }
   expr(expr: Expr, context: Type | null): CheckedExpr {
     switch (expr.tag) {
-      case "identifier": {
-        const { name, type } = this.scope.getValue(expr.value);
-        return { tag: "ident", value: name, type };
-      }
+      case "identifier":
+        return this.scope.getValue(expr.value);
       case "integer":
         return {
           tag: "primitive",
@@ -99,7 +97,7 @@ export class TreeWalker implements ITreeWalker {
     }
   }
   block(inBlock: Stmt[]): { block: CheckedStmt[]; type: Type } {
-    return this.scope.inScope(() => {
+    return this.scope.blockScope(() => {
       const block = inBlock.flatMap((stmt) => this.stmt(stmt));
       const lastItem = block[block.length - 1];
       if (lastItem && lastItem.tag === "expr") {
