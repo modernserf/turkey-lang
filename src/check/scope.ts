@@ -1,8 +1,16 @@
 import { Binding } from "../ast";
 import { noMatch } from "../utils";
-import { CheckedExpr, Stdlib, Type, Scope as IScope } from "./types";
+import {
+  CheckedExpr,
+  Stdlib,
+  Type,
+  Scope as IScope,
+  CheckedStmt,
+  voidType,
+} from "./types";
 import { StrictMap } from "../strict-map";
-import { CheckerCtx } from "./checker";
+
+type CheckType = (value: Type) => void;
 
 type ValueRecord = { name: symbol; type: Type };
 type ScopeFrameBase =
@@ -13,7 +21,7 @@ type ScopeFrameBase =
       tag: "func";
       parent: ScopeFrame;
       upvalues: Set<symbol>;
-      returns: CheckerCtx;
+      checkReturns: CheckType;
     };
 
 type ScopeFrame = ScopeFrameBase & {
@@ -64,6 +72,22 @@ export class Scope implements IScope {
     for (const [name, { type }] of stdlib.types) {
       this.initType(name, type);
     }
+  }
+  break(): CheckedStmt {
+    throw new Error("todo");
+  }
+  continue(): CheckedStmt {
+    throw new Error("todo");
+  }
+  return(expr: CheckedExpr | null): CheckedStmt {
+    const func = this.func();
+    if (!func) throw new Error("cannot return from outside func");
+    if (expr) {
+      func.checkReturns(expr.type);
+    } else {
+      func.checkReturns(voidType);
+    }
+    return { tag: "return", expr };
   }
   initValue(
     binding: Binding,
@@ -131,12 +155,12 @@ export class Scope implements IScope {
     return res;
   }
   funcScope<T>(
-    returns: CheckerCtx,
+    checkReturns: CheckType,
     fn: () => T
   ): { upvalues: symbol[]; result: T } {
     this.frame = {
       tag: "func",
-      returns,
+      checkReturns,
       upvalues: new Set(),
       values: new StrictMap(),
       types: new StrictMap(),
@@ -146,5 +170,13 @@ export class Scope implements IScope {
     const { upvalues } = this.frame;
     this.frame = this.frame.parent;
     return { upvalues: Array.from(upvalues), result };
+  }
+  private func(): (ScopeFrame & { tag: "func" }) | null {
+    let frame = this.frame;
+    while (frame.tag !== "root") {
+      if (frame.tag === "func") return frame;
+      frame = frame.parent;
+    }
+    return null;
   }
 }

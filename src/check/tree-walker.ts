@@ -199,10 +199,10 @@ export class TreeWalker implements ITreeWalker {
 
         return [{ tag: "let", binding: root, expr }];
       }
-      case "return": {
-        const expr = this.func.return(stmt.expr);
-        return [{ tag: "return", expr }];
-      }
+      case "return":
+        return [
+          this.scope.return(stmt.expr ? this.expr(stmt.expr, null) : null),
+        ];
       case "while": {
         const expr = this.expr(stmt.expr, null);
         new CheckerCtx(this.traits).unify(boolType, expr.type);

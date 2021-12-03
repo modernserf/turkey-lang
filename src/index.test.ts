@@ -93,18 +93,31 @@ it("calls functions", () => {
   expect(run(code)).toEqual([2, 2]);
 });
 
-// it("calls closures", () => {
-//   const code = `
-//     let x = 1.5
-//     func get_x (): Float {
-//       return x
-//     }
+it("calls generic functions with trait constraints", () => {
+  const code = `
+    func print_twice<T: Show> (x: T): Void {
+      print(x)
+      print(x)
+    }
 
-//     print(get_x())
-//   `;
+    print_twice(2)
+    print_twice("hello")
+  `;
+  expect(run(code)).toEqual([2, 2, "hello", "hello"]);
+});
 
-//   expect(run(code)).toEqual(["1.5"]);
-// });
+it("calls closures", () => {
+  const code = `
+    let x = 1.5
+    func get_x (): Float {
+      return x
+    }
+
+    print(get_x())
+  `;
+
+  expect(run(code)).toEqual([1.5]);
+});
 
 // it("calls nested closures", () => {
 //   const code = `

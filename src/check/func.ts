@@ -13,16 +13,13 @@ import {
   createType,
   Trait,
   Traits,
+  CheckedStmt,
 } from "./types";
 
 export class Func implements IFunc {
   public scope!: Scope;
   public treeWalker!: TreeWalker;
   public traits!: Traits;
-
-  return(expr: Expr | null): CheckedExpr | null {
-    throw new Error("todo");
-  }
   create(
     name: string,
     typeParams: Array<{ type: Type; traits: Trait[] }>,
@@ -47,8 +44,9 @@ export class Func implements IFunc {
     );
 
     const checker = new CheckerCtx(this.traits, tracerTypes);
+    const check = (type: Type) => checker.unify(type, returnType);
 
-    const { upvalues: us, result } = this.scope.funcScope(checker, () => {
+    const { upvalues: us, result } = this.scope.funcScope(check, () => {
       // the impls for the traits required by our type parameters are passed in as arguments.
       // this generates the symbols with which we'll bind these arguments,
       // and it defines the implementation of traits for our tracer types
@@ -74,12 +72,12 @@ export class Func implements IFunc {
         if (res.rest.length) throw new Error("todo");
         return res.root;
       });
-      returnType = checker.resolve(returnType);
-
       const parameters = [...traitParamSymbols, ...mainParamSymbols];
 
-      const { block, type: blockReturnType } = this.treeWalker.block(inBlock);
-      returnType = checker.unify(returnType, blockReturnType);
+      const { block } = this.treeWalker.block(inBlock);
+      const blockReturnType = this.blockReturnType(block);
+      if (blockReturnType) check(blockReturnType);
+
       return { parameters, block };
     });
     const { parameters, block } = result;
@@ -146,5 +144,17 @@ export class Func implements IFunc {
     if (type.tag === "abstract") throw new Error();
     if (type.name !== voidType.name) return true;
     return type.parameters.length > 0;
+  }
+  private blockReturnType(block: CheckedStmt[]): Type | null {
+    if (block.length === 0) return voidType;
+    const last = block[block.length - 1];
+    switch (last.tag) {
+      case "return":
+        return null;
+      case "expr":
+        return last.type;
+      default:
+        return voidType;
+    }
   }
 }

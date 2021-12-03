@@ -76,6 +76,9 @@ export interface TreeWalker {
 }
 
 export interface Scope {
+  break(): CheckedStmt;
+  continue(): CheckedStmt;
+  return(expr: CheckedExpr | null): CheckedStmt;
   initValue(
     binding: Binding,
     type: Type
@@ -86,13 +89,12 @@ export interface Scope {
   blockScope<T>(fn: () => T): T;
   loopScope<T>(id: symbol, fn: () => T): T;
   funcScope<T>(
-    returns: CheckerCtx,
+    checkReturns: (type: Type) => void,
     fn: () => T
   ): { upvalues: symbol[]; result: T };
 }
 
 export interface Func {
-  return(expr: Expr | null): CheckedExpr | null;
   create(
     name: string,
     typeParams: Array<{ type: Type; traits: Trait[] }>,
