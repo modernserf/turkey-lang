@@ -752,25 +752,25 @@ it("has anonymous function literals", () => {
 //   expect(() => run(code)).toThrow();
 // });
 
-// it("does not bind identifiers starting with underscore", () => {
-//   const code = `
-//     let _ = 1
-//     let _ = 2
+it("does not bind identifiers starting with underscore", () => {
+  const code = `
+    let _ = 1
+    let _ = 2
 
-//     func foo (_arg: Int, _arg: Int): Void {}
+    func foo (_arg: Int, _arg: Int): Void {}
 
-//     foo(1, 2)
-//   `;
-//   expect(run(code)).toEqual([]);
-// });
+    foo(1, 2)
+  `;
+  expect(run(code)).toEqual([]);
+});
 
-// it("cannot reference underscore identifiers", () => {
-//   const code = `
-//     let _ = 1
-//     print(_)
-//   `;
-//   expect(() => run(code)).toThrow();
-// });
+it("cannot reference underscore identifiers", () => {
+  const code = `
+    let _ = 1
+    print(_)
+  `;
+  expect(() => run(code)).toThrow();
+});
 
 // it("has list literals", () => {
 //   const code = `

@@ -91,7 +91,9 @@ export class Scope implements IScope {
     switch (binding.tag) {
       case "identifier": {
         const name = Symbol(binding.value);
-        this.frame.values.init(binding.value, { name, type });
+        if (!binding.value.startsWith("_")) {
+          this.frame.values.init(binding.value, { name, type });
+        }
         return { root: name, rest: [] };
       }
       case "struct":
@@ -102,6 +104,9 @@ export class Scope implements IScope {
     }
   }
   getValue(str: string): CheckedExpr {
+    if (str.startsWith("_")) {
+      throw new Error("cannot reference underscore variables");
+    }
     return getValue(this.frame, str);
   }
   initType(name: string, value: Type): void {
