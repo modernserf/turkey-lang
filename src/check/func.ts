@@ -97,12 +97,13 @@ export class Func implements IFunc {
 
     const { upvalues: us, result } = this.scope.funcScope(check, () => {
       // not sure about this
-      const traitParamSymbols = traitParams.map((p) => {
-        const id = Symbol(
-          `impl_${p.type.name.description}_${p.trait.name.description}`
-        );
-        this.traits.provideImpl(p.type, p.trait, { tag: "local", value: id });
-        return id;
+      const traitParamSymbols = traitParams.map((_p) => {
+        throw new Error("todo");
+        // const id = Symbol(
+        //   `impl_${p.type.name.description}_${p.trait.name.description}`
+        // );
+        // this.traits.provideImpl(p.type, p.trait, { tag: "local", value: id });
+        // return id;
       });
 
       const mainParamSymbols = inParams.map((binding, i) => {

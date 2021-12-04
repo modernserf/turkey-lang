@@ -338,6 +338,26 @@ it("handles generics in anonymous functions", () => {
   expect(run(code)).toEqual([10]);
 });
 
+it("has tuples", () => {
+  const code = `
+    let pair = (1, "hello")
+    print(pair:0)
+    print(pair:1)
+  `;
+  expect(run(code)).toEqual([1, "hello"]);
+});
+
+it("has tuple types", () => {
+  const code = `
+    func print_pair (pair: (Int, String)): Void {
+      print(pair:0)
+      print(pair:1)
+    }
+    print_pair((1, "hello"))
+  `;
+  expect(run(code)).toEqual([1, "hello"]);
+});
+
 // it.skip("has type aliases", () => {
 //   const code = `
 //     type Mapper = func (Int): Int

@@ -1,7 +1,6 @@
 import { check as checkInner } from "./index";
 import { lex } from "../lexer";
 import { parse } from "../parser";
-import { PrettyPrinter } from "../ir";
 
 const check = (code: string) => checkInner(parse(lex(code)));
 
@@ -163,4 +162,32 @@ it("supports arithmetic operators", () => {
     print((1 / 3) + 0.6667) 
   `;
   expect(check(code)).toBeTruthy();
+});
+
+it("allows closures with type context", () => {
+  const code = `
+    let fn: func (Int): Int = |x| { x + 1 } 
+  `;
+  expect(check(code)).toBeTruthy();
+});
+
+it("rejects closures without type context", () => {
+  const code = `
+    let fn = |x| { x + 1 } 
+  `;
+  expect(() => check(code)).toThrow();
+});
+
+it("supports fixed-size array types", () => {
+  const code = `
+    let xs: Array[Int; 4] = Array[255,255,255,0]
+  `;
+  expect(check(code)).toBeTruthy();
+});
+
+it("rejects size mismatches in array types", () => {
+  const code = `
+    let xs: Array[Int; 4] = Array[0;1]
+  `;
+  expect(() => check(code)).toThrow();
 });

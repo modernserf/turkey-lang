@@ -2110,3 +2110,9 @@ it("rejects invalid assignment LHS", () => {
     parse(`arr:x = 1`);
   }).toThrow();
 });
+
+it("rejects malformed field acces", () => {
+  expect(() => {
+    parse(`foo:`);
+  }).toThrowError(ParseError);
+});

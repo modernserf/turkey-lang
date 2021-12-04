@@ -21,6 +21,7 @@ import {
   Stdlib,
   tupleType,
   vecType,
+  arrayType,
 } from "./types";
 
 export class TreeWalker implements ITreeWalker {
@@ -177,6 +178,7 @@ export class TreeWalker implements ITreeWalker {
           type,
         };
       }
+      // istanbul ignore next
       default:
         noMatch(expr);
     }
@@ -212,8 +214,12 @@ export class TreeWalker implements ITreeWalker {
           typeExpr.parameters.map((p) => this.typeExpr(p, typeParams)),
           [] // TODO: something with type params here?
         );
-      case "array":
-        throw new Error("todo");
+      case "array": {
+        if (typeExpr.value !== "Array") throw new Error("todo");
+        const type = this.typeExpr(typeExpr.type, typeParams);
+        return arrayType(type, typeExpr.size);
+      }
+
       // istanbul ignore next
       default:
         noMatch(typeExpr);
@@ -292,9 +298,9 @@ export class TreeWalker implements ITreeWalker {
         return [{ tag: "while", expr, block }];
       }
       case "for": {
+        const expr = this.expr(stmt.expr, null);
+        const iter = this.obj.iter(expr);
         return this.scope.blockScope(() => {
-          const expr = this.expr(stmt.expr, null);
-          const iter = this.obj.iter(expr);
           const { root, rest } = this.scope.initValue(stmt.binding, iter.type);
           if (rest.length) throw new Error("todo");
           const { block } = this.block(stmt.block);

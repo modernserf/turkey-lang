@@ -117,7 +117,7 @@ export class Compiler {
         const loopIn = Symbol("loop_in");
         const loopOut = Symbol("loop_out");
         // evaluate the list & store as `iter` var
-        // either `0` => Nil or `[1, value, next]` => Cons(value, next)
+        // either `0` => Nil or `[1, value, get_next]` => Cons(value, get_next)
         this.expr(stmt.expr);
         this.initVar(iter);
         // allocate space for list item
@@ -133,6 +133,7 @@ export class Compiler {
         this.setVar(stmt.binding);
         // update the rest of the list
         this.asm.getHeap(2);
+        this.asm.callClosure(0);
         this.setVar(iter);
         // run the loop
         this.loopBlock(stmt.block);
