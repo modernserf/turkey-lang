@@ -5,13 +5,16 @@ export enum Opcode {
   LoadRoot, // root offset
   StoreRoot, // root offset
   LoadLocal, // frameOffset
-  LoadPointerOffset, // heapOffset
   StoreLocal, // frameOffset
-  StorePointerOffset, // offset
+  LoadField, // heapOffset
+  StoreField, // offset
+  LoadIndex,
+  StoreIndex,
   Dup,
   Drop,
   New, // size
   NewClosure, // size, target
+  NewArray,
   //
   Jump, // target
   JumpIfZero, // target

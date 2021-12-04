@@ -49,7 +49,7 @@ const matchProgram: Parser<Stmt[]> = (state) => {
   return parseUntil(state, matchStatement, checkEndOfInput);
 };
 
-const matchStatement: Parser<Stmt> = (state) => {
+const matchStatement: Parser<Stmt | null> = (state) => {
   const token = state.token();
   switch (token.tag) {
     case "type": {
@@ -143,6 +143,9 @@ const matchStatement: Parser<Stmt> = (state) => {
       const block = matchBlock(state);
       return { tag: "impl", typeParameters, trait, target, block };
     }
+    case ";":
+      state.advance();
+      return null;
     default:
       return { tag: "expr", expr: matchExpr(state) };
   }
@@ -222,19 +225,13 @@ const checkBaseExpr: Parser<Expr | null> = (state) => {
     case "(": {
       state.advance();
       if (check(state, ")")) {
-        return { tag: "tuple", fields: [] };
+        return { tag: "tuple", items: [] };
       }
       const expr = matchExpr(state);
       if (check(state, ",")) {
         const rest = commaList(state, checkExpr);
         match(state, ")");
-        return {
-          tag: "tuple",
-          fields: [expr, ...rest].map((expr, i) => ({
-            fieldName: String(i),
-            expr,
-          })),
-        };
+        return { tag: "tuple", items: [expr, ...rest] };
       } else {
         match(state, ")");
         return expr;
@@ -246,11 +243,9 @@ const checkBaseExpr: Parser<Expr | null> = (state) => {
       match(state, "]");
       return { tag: "list", items };
     }
-    case "typeIdentifier": {
+    case "typeIdentifier":
       state.advance();
-      const { fields } = matchStructFieldValueList(state);
-      return { tag: "typeConstructor", value: token.value, fields };
-    }
+      return matchTypeStructure(state, token.value);
     case "identifier":
       state.advance();
       return { tag: "identifier", value: token.value };
@@ -402,8 +397,16 @@ const checkType: Parser<TypeExpr | null> = (state) => {
   switch (token.tag) {
     case "typeIdentifier": {
       state.advance();
-      const typeArgs = matchTypeArgs(state);
-      return { tag: "identifier", value: token.value, typeArgs };
+      if (check(state, "[")) {
+        const type = matchType(state);
+        match(state, ";");
+        const size = match(state, "integer").value;
+        match(state, "]");
+        return { tag: "array", value: token.value, type, size };
+      } else {
+        const typeArgs = matchTypeArgs(state);
+        return { tag: "identifier", value: token.value, typeArgs };
+      }
     }
     case "(": {
       state.advance();
@@ -505,25 +508,37 @@ const checkStructFieldType: Parser<StructFieldType | null> = (state) => {
   return { fieldName, type };
 };
 
-const matchStructFieldValueList: Parser<{
-  fields: StructFieldValue[];
-  isTuple: boolean;
-}> = (state) => {
-  if (check(state, "{")) {
-    const fields = commaList(state, checkStructFieldValue);
-    match(state, "}");
-    return { fields, isTuple: false };
-  } else if (check(state, "(")) {
-    const fields = commaList(state, checkExpr);
-    match(state, ")");
-    return {
-      fields: fields.map((expr, i) => ({ fieldName: String(i), expr })),
-      isTuple: true,
-    };
-  } else {
-    return { fields: [], isTuple: false };
+function matchTypeStructure(state: IParseState, value: string): Expr {
+  const tok = state.token();
+  switch (tok.tag) {
+    case "{": {
+      state.advance();
+      const fields = commaList(state, checkStructFieldValue);
+      match(state, "}");
+      return { tag: "typeRecord", value, fields };
+    }
+    case "(": {
+      state.advance();
+      const items = commaList(state, checkExpr);
+      match(state, ")");
+      return { tag: "typeTuple", value, items };
+    }
+    case "[": {
+      state.advance();
+      const items = commaList(state, checkExpr);
+      if (items.length === 1 && check(state, ";")) {
+        const size = match(state, "integer").value;
+        match(state, "]");
+        return { tag: "typeSizedList", value, expr: items[0], size };
+      } else {
+        match(state, "]");
+        return { tag: "typeList", value, items };
+      }
+    }
+    default:
+      return { tag: "typeLiteral", value };
   }
-};
+}
 
 const checkField: Parser<string | null> = (state) => {
   const field = check(state, "identifier");
@@ -596,12 +611,15 @@ const matchBlock: Parser<Stmt[]> = (state) => {
 
 function parseUntil<T>(
   state: IParseState,
-  parseValue: Parser<T>,
+  parseValue: Parser<T | null>,
   parseEnd: Parser<boolean>
 ): T[] {
   const out: T[] = [];
   while (!parseEnd(state)) {
-    out.push(parseValue(state));
+    const value = parseValue(state);
+    if (value) {
+      out.push(value);
+    }
   }
   return out;
 }

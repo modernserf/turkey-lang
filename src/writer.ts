@@ -65,11 +65,11 @@ export class Writer {
     return this;
   }
   setHeap(offset: number): this {
-    this.program.push(Opcode.StorePointerOffset, offset);
+    this.program.push(Opcode.StoreField, offset);
     return this;
   }
   getHeap(offset: number): this {
-    this.program.push(Opcode.LoadPointerOffset, offset);
+    this.program.push(Opcode.LoadField, offset);
     return this;
   }
   newObject(size: number): this {

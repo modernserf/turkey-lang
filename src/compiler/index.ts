@@ -32,6 +32,9 @@ const builtins: Record<Builtin, { code: Opcode[]; hasValue: boolean }> = {
   not: { code: [Opcode.Not], hasValue: true },
   print_num: { code: [Opcode.PrintNum], hasValue: false },
   print_string: { code: [Opcode.PrintStr], hasValue: false },
+  init_array: { code: [Opcode.NewArray], hasValue: true },
+  get_array: { code: [Opcode.LoadIndex], hasValue: true },
+  set_array: { code: [Opcode.StoreIndex], hasValue: false },
 };
 
 type QueuedFunc = {

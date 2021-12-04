@@ -2,7 +2,7 @@ import { Token } from "./token";
 
 // _: whitespace _: comment  1: number 2: identifier 3: typeIdentifier 4: operator 5: string 6: error
 const pattern =
-  /[ \t\n]+|\/\/[^\n]*|((?:0|[1-9][0-9]*)(?:\.[0-9]+)?)|([_a-z][_a-zA-Z0-9]*)|([A-Z][_a-zA-Z0-9]*)|(==|!=|<=|>=|&&|\|\||\^\^|=>|[.|,:!+\-*/%=<>(){}[\]])|"((?:[^"]|\\")*)"|(.)/y;
+  /[ \t\n]+|\/\/[^\n]*|((?:0|[1-9][0-9]*)(?:\.[0-9]+)?)|([_a-z][_a-zA-Z0-9]*)|([A-Z][_a-zA-Z0-9]*)|(==|!=|<=|>=|&&|\|\||\^\^|=>|[.|,;:!+\-*/%=<>(){}[\]])|"((?:[^"]|\\")*)"|(.)/y;
 
 export function lex(string: string): Token[] {
   const tokens: Token[] = [];
@@ -41,38 +41,7 @@ export function lex(string: string): Token[] {
     } else if (result[3]) {
       tokens.push({ tag: "typeIdentifier", value: result[3] });
     } else if (result[4]) {
-      switch (result[4]) {
-        case "==":
-        case "!=":
-        case "<=":
-        case ">=":
-        case "&&":
-        case "||":
-        case "^^":
-        case "=>":
-        case "|":
-        case ":":
-        case ".":
-        case ",":
-        case "!":
-        case "+":
-        case "-":
-        case "*":
-        case "/":
-        case "%":
-        case "=":
-        case "<":
-        case ">":
-        case "{":
-        case "}":
-        case "(":
-        case ")":
-        case "[":
-        case "]":
-          // Hmm, it seems like there is a maximum number of cases this will check?
-          tokens.push({ tag: result[4] as any });
-          break;
-      }
+      tokens.push({ tag: result[4] as any });
     } else if (result[5] !== undefined) {
       tokens.push({ tag: "string", value: result[5] });
     } else if (result[6] !== undefined) {

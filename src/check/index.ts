@@ -39,6 +39,14 @@ const implNumShow: IRExpr = (() => {
   return expr_([func_([], [value], [builtIn_("print_num", [value])])]);
 })();
 
+const implStringShow: IRExpr = (() => {
+  const value = Symbol("value");
+  return expr_([
+    //
+    func_([], [value], [builtIn_("print_string", [value])]),
+  ]);
+})();
+
 // Num has an empty implementation, you just have to have it
 // TODO: how do you prevent other types from trying to implement Num?
 const implNum = expr_([]);
@@ -48,14 +56,6 @@ const implEqPrimitive: IRExpr = (() => {
   return expr_([
     // this is just the identity function
     func_([], [value], [value]),
-  ]);
-})();
-
-const implStringShow: IRExpr = (() => {
-  const value = Symbol("value");
-  return expr_([
-    //
-    func_([], [value], [builtIn_("print_string", [value])]),
   ]);
 })();
 

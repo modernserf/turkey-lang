@@ -105,7 +105,7 @@ it("parses tuples", () => {
 Array [
   Object {
     "expr": Object {
-      "fields": Array [],
+      "items": Array [],
       "tag": "tuple",
     },
     "tag": "expr",
@@ -117,13 +117,10 @@ Array [
 Array [
   Object {
     "expr": Object {
-      "fields": Array [
+      "items": Array [
         Object {
-          "expr": Object {
-            "tag": "integer",
-            "value": 1,
-          },
-          "fieldName": "0",
+          "tag": "integer",
+          "value": 1,
         },
       ],
       "tag": "tuple",
@@ -136,20 +133,14 @@ Array [
 Array [
   Object {
     "expr": Object {
-      "fields": Array [
+      "items": Array [
         Object {
-          "expr": Object {
-            "tag": "integer",
-            "value": 1,
-          },
-          "fieldName": "0",
+          "tag": "integer",
+          "value": 1,
         },
         Object {
-          "expr": Object {
-            "tag": "string",
-            "value": "hello",
-          },
-          "fieldName": "1",
+          "tag": "string",
+          "value": "hello",
         },
       ],
       "tag": "tuple",
@@ -199,8 +190,7 @@ it("parses type constructors", () => {
 Array [
   Object {
     "expr": Object {
-      "fields": Array [],
-      "tag": "typeConstructor",
+      "tag": "typeLiteral",
       "value": "True",
     },
     "tag": "expr",
@@ -211,16 +201,13 @@ Array [
 Array [
   Object {
     "expr": Object {
-      "fields": Array [
+      "items": Array [
         Object {
-          "expr": Object {
-            "tag": "string",
-            "value": "body",
-          },
-          "fieldName": "0",
+          "tag": "string",
+          "value": "body",
         },
       ],
-      "tag": "typeConstructor",
+      "tag": "typeTuple",
       "value": "Some",
     },
     "tag": "expr",
@@ -231,24 +218,17 @@ Array [
 Array [
   Object {
     "expr": Object {
-      "fields": Array [
+      "items": Array [
         Object {
-          "expr": Object {
-            "tag": "integer",
-            "value": 1,
-          },
-          "fieldName": "0",
+          "tag": "integer",
+          "value": 1,
         },
         Object {
-          "expr": Object {
-            "fields": Array [],
-            "tag": "typeConstructor",
-            "value": "Nil",
-          },
-          "fieldName": "1",
+          "tag": "typeLiteral",
+          "value": "Nil",
         },
       ],
-      "tag": "typeConstructor",
+      "tag": "typeTuple",
       "value": "Cons",
     },
     "tag": "expr",
@@ -278,7 +258,7 @@ Array [
           "fieldName": "name",
         },
       ],
-      "tag": "typeConstructor",
+      "tag": "typeRecord",
       "value": "User",
     },
     "tag": "expr",
@@ -308,7 +288,7 @@ Array [
           "fieldName": "name",
         },
       ],
-      "tag": "typeConstructor",
+      "tag": "typeRecord",
       "value": "User",
     },
     "tag": "expr",
@@ -2003,6 +1983,101 @@ Array [
       "tag": "match",
     },
     "tag": "expr",
+  },
+]
+`);
+});
+
+it("disambiguates expressions with semicolon", () => {
+  expect(
+    parse(`
+    1
+    -2 
+  `)
+  ).toEqual(parse(`1 - 2`));
+
+  expect(
+    parse(`
+    1;
+    -2
+  `)
+  ).toEqual(parse(`1; (-2)`));
+});
+
+it("supports typed array literals", () => {
+  expect(parse(`Array [1,2,3]`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "items": Array [
+        Object {
+          "tag": "integer",
+          "value": 1,
+        },
+        Object {
+          "tag": "integer",
+          "value": 2,
+        },
+        Object {
+          "tag": "integer",
+          "value": 3,
+        },
+      ],
+      "tag": "typeList",
+      "value": "Array",
+    },
+    "tag": "expr",
+  },
+]
+`);
+  expect(parse(`Array [0; 32]`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "expr": Object {
+      "expr": Object {
+        "tag": "integer",
+        "value": 0,
+      },
+      "size": 32,
+      "tag": "typeSizedList",
+      "value": "Array",
+    },
+    "tag": "expr",
+  },
+]
+`);
+});
+
+it("supports array types", () => {
+  expect(
+parse(`
+    type Vec4<T> = Array [T; 4] 
+  `)).
+toMatchInlineSnapshot(`
+Array [
+  Object {
+    "binding": Object {
+      "tag": "identifier",
+      "typeParameters": Array [
+        Object {
+          "tag": "identifier",
+          "traits": Array [],
+          "value": "T",
+        },
+      ],
+      "value": "Vec4",
+    },
+    "tag": "type",
+    "type": Object {
+      "size": 4,
+      "tag": "array",
+      "type": Object {
+        "tag": "identifier",
+        "typeArgs": Array [],
+        "value": "T",
+      },
+      "value": "Array",
+    },
   },
 ]
 `);

@@ -16,7 +16,10 @@ export type Builtin =
   | "xor"
   | "not"
   | "print_num"
-  | "print_string";
+  | "print_string"
+  | "init_array"
+  | "get_array"
+  | "set_array";
 
 export type IRExpr =
   | { tag: "primitive"; value: number }

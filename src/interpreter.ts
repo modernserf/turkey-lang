@@ -247,9 +247,15 @@ class Interpreter {
       case Opcode.LoadLocal:
         this.stack.push(this.stack.local(this.program.nextOp()));
         return;
-      case Opcode.LoadPointerOffset: {
+      case Opcode.LoadField: {
         const addr = this.stack.pop();
         this.stack.push(this.heap.get(addr, this.program.nextOp()));
+        return;
+      }
+      case Opcode.LoadIndex: {
+        const index = this.stack.pop();
+        const addr = this.stack.pop();
+        this.stack.push(this.heap.get(addr, index));
         return;
       }
       case Opcode.Dup:
@@ -264,14 +270,27 @@ class Interpreter {
       case Opcode.StoreRoot:
         this.stack.setRoot(this.program.nextOp(), this.stack.pop());
         return;
-      case Opcode.StorePointerOffset: {
+      case Opcode.StoreField: {
         const value = this.stack.pop();
         const addr = this.stack.pop();
         this.heap.set(addr, this.program.nextOp(), value);
         return;
       }
+      case Opcode.StoreIndex: {
+        const value = this.stack.pop();
+        const index = this.stack.pop();
+        const addr = this.stack.pop();
+        this.heap.set(addr, index, value);
+        return;
+      }
       case Opcode.New: {
         const size = this.program.nextOp();
+        const addr = this.heap.object(size);
+        this.stack.push(addr);
+        return;
+      }
+      case Opcode.NewArray: {
+        const size = this.stack.pop();
         const addr = this.heap.object(size);
         this.stack.push(addr);
         return;

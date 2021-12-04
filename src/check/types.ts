@@ -42,6 +42,12 @@ export function funcType(
   return createType(funcTypeName, [returnType, ...parameters], traitParams);
 }
 
+export const arrayTypeName = Symbol("Array");
+// TODO: iter trait
+export function arrayType(type: Type) {
+  return createType(arrayTypeName, [type], []);
+}
+
 export const voidType = tupleType([]);
 export const intType = createType(Symbol("Int"), [], []);
 export const floatType = createType(Symbol("Float"), [], []);

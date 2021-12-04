@@ -49,13 +49,17 @@ export type TraitField = {
 
 export type Expr =
   | { tag: "identifier"; value: string }
+  | { tag: "typeLiteral"; value: string }
+  | { tag: "typeTuple"; value: string; items: Expr[] }
+  | { tag: "tuple"; items: Expr[] }
+  | { tag: "typeSizedList"; value: string; expr: Expr; size: number }
+  | { tag: "typeList"; value: string; items: Expr[] }
+  | { tag: "list"; items: Expr[] }
   | {
-      tag: "typeConstructor";
+      tag: "typeRecord";
       value: string;
       fields: StructFieldValue[];
     }
-  | { tag: "tuple"; fields: StructFieldValue[] }
-  | { tag: "list"; items: Expr[] }
   | { tag: "integer"; value: number }
   | { tag: "float"; value: number }
   | { tag: "string"; value: string }
@@ -66,6 +70,7 @@ export type Expr =
   | { tag: "if"; cases: IfCase[]; elseBlock: Stmt[] }
   | { tag: "match"; expr: Expr; cases: MatchCase[] }
   | { tag: "field"; expr: Expr; fieldName: string }
+  | { tag: "index"; expr: Expr; index: number }
   | { tag: "call"; expr: Expr; args: Expr[] };
 
 export type IfCase = { tag: "cond"; predicate: Expr; block: Stmt[] };
@@ -83,6 +88,7 @@ export type Binding =
 
 export type TypeExpr =
   | { tag: "identifier"; value: string; typeArgs: TypeExpr[] }
+  | { tag: "array"; value: string; type: TypeExpr; size: number }
   | { tag: "tuple"; typeArgs: TypeExpr[] }
   | {
       tag: "func";

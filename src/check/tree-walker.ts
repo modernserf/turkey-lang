@@ -66,7 +66,11 @@ export class TreeWalker implements ITreeWalker {
         };
       case "tuple":
       case "list":
-      case "typeConstructor":
+      case "typeLiteral":
+      case "typeRecord":
+      case "typeTuple":
+      case "typeList":
+      case "typeSizedList":
         throw new Error("todo");
       case "closure":
         if (!context) {
@@ -76,6 +80,7 @@ export class TreeWalker implements ITreeWalker {
       case "call":
         return this.func.call(expr.expr, expr.args);
       case "field":
+      case "index":
         throw new Error("todo");
       case "unaryOp": {
         const op = this.unaryOps.get(expr.operator);
@@ -142,13 +147,16 @@ export class TreeWalker implements ITreeWalker {
         return this.scope.getType(typeExpr.value).type;
       }
       case "tuple":
-        return tupleType(typeExpr.typeArgs.map((arg) => this.typeExpr(arg)));
+        return tupleType(
+          typeExpr.typeArgs.map((arg) => this.typeExpr(arg, typeParams))
+        );
       case "func":
         return funcType(
-          this.typeExpr(typeExpr.returnType),
-          typeExpr.parameters.map((p) => this.typeExpr(p)),
+          this.typeExpr(typeExpr.returnType, typeParams),
+          typeExpr.parameters.map((p) => this.typeExpr(p, typeParams)),
           [] // TODO: something with type params here?
         );
+      case "array":
         throw new Error("todo");
       // istanbul ignore next
       default:

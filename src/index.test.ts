@@ -42,29 +42,29 @@ it("uses do blocks", () => {
   expect(run(code)).toEqual([1, 2, 3]);
 });
 
-// it("uses conditionals", () => {
-//   const code = `
-//     let x = if (True) {
-//       let result = 1
-//       let ignored = 2
-//       result
-//     } else {
-//       2
-//     }
-//     print(x)
-//   `;
-//   expect(run(code)).toEqual([1]);
-// });
+it("uses conditionals", () => {
+  const code = `
+    let x = if (1 > 0) {
+      let result = 1
+      let ignored = 2
+      result
+    } else {
+      2
+    }
+    print(x)
+  `;
+  expect(run(code)).toEqual([1]);
+});
 
-// it("uses conditional statements", () => {
-//   const code = `
-//     if (True) {
-//       print(1)
-//     }
-//     print(2)
-//   `;
-//   expect(run(code)).toEqual([1, 2]);
-// });
+it("uses conditional statements", () => {
+  const code = `
+    if (1 > 0) {
+      print(1)
+    }
+    print(2)
+  `;
+  expect(run(code)).toEqual([1, 2]);
+});
 
 // it("theoretically uses loops", () => {
 //   const code = `
@@ -325,6 +325,17 @@ it("has anonymous function literals", () => {
   `;
 
   expect(run(code)).toEqual([20]);
+});
+
+it("handles generics in anonymous functions", () => {
+  const code = `
+    func do_func <T> (value: T, fn: func (T): Void): Void {
+      fn(value)
+    }
+    do_func(10, |x| { print(x) })
+  `;
+
+  expect(run(code)).toEqual([10]);
 });
 
 // it.skip("has type aliases", () => {

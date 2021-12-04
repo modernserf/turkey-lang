@@ -11,7 +11,7 @@ export function disassembler(code: number[]): string {
       case Opcode.StoreRoot:
       case Opcode.LoadLocal:
       case Opcode.StoreLocal:
-      case Opcode.StorePointerOffset:
+      case Opcode.StoreField:
       case Opcode.New:
       case Opcode.Jump:
       case Opcode.JumpIfZero:
