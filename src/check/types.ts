@@ -1,6 +1,5 @@
 import { Binding, Expr, Stmt, TraitExpr, TypeExpr } from "../ast";
 import { IRStmt, IRExpr, Builtin } from "../ir";
-import { CheckerCtx } from "./checker";
 
 export type Type =
   | {
@@ -96,12 +95,12 @@ export interface Scope {
 
 export interface Func {
   create(
-    name: string,
+    binding: symbol,
     typeParams: Array<{ type: Type; traits: Trait[] }>,
     parameters: Array<{ binding: Binding; type: Type }>,
     returnType: Type,
     block: Stmt[]
-  ): IRExpr;
+  ): CheckedStmt;
   call(callee: Expr, args: Expr[]): CheckedExpr;
   op(op: Builtin, type: Type, args: Expr[]): CheckedExpr;
 }

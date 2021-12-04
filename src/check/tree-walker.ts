@@ -18,6 +18,7 @@ import {
   funcType,
   Type,
   Stdlib,
+  tupleType,
 } from "./types";
 
 export class TreeWalker implements ITreeWalker {
@@ -88,7 +89,26 @@ export class TreeWalker implements ITreeWalker {
         const { block, type } = this.block(expr.block);
         return { tag: "do", block, type };
       }
-      case "if":
+      case "if": {
+        const predChecker = new CheckerCtx(this.traits);
+        const resultChecker = new CheckerCtx(this.traits);
+        const resultType = createVar(Symbol("Result"), []);
+
+        const ifCases = expr.cases.map((ifCase) => {
+          const predicate = this.expr(ifCase.predicate, null);
+          predChecker.unify(boolType, predicate.type);
+
+          const caseResult = this.block(ifCase.block);
+          resultChecker.unify(resultType, caseResult.type);
+          return { expr: predicate, block: caseResult.block };
+        });
+
+        const elseResult = this.block(expr.elseBlock);
+        resultChecker.unify(resultType, elseResult.type);
+
+        const type = resultChecker.resolve(resultType);
+        return { tag: "if", ifCases, elseBlock: elseResult.block, type };
+      }
       case "match":
         throw new Error("todo");
 
@@ -118,7 +138,13 @@ export class TreeWalker implements ITreeWalker {
         return this.scope.getType(typeExpr.value).type;
       }
       case "tuple":
+        return tupleType(typeExpr.typeArgs.map((arg) => this.typeExpr(arg)));
       case "func":
+        return funcType(
+          this.typeExpr(typeExpr.returnType),
+          typeExpr.parameters.map((p) => this.typeExpr(p)),
+          [] // TODO: something with type params here?
+        );
         throw new Error("todo");
       // istanbul ignore next
       default:
@@ -189,15 +215,9 @@ export class TreeWalker implements ITreeWalker {
           type
         );
 
-        const expr = this.func.create(
-          stmt.name,
-          typeParams,
-          parameters,
-          returns,
-          stmt.block
-        );
-
-        return [{ tag: "let", binding: root, expr }];
+        return [
+          this.func.create(root, typeParams, parameters, returns, stmt.block),
+        ];
       }
       case "return":
         return [

@@ -29,36 +29,25 @@ type ScopeFrame = ScopeFrameBase & {
   types: StrictMap<string, Type>;
 };
 
-function getValue(
-  frame: ScopeFrame,
-  key: string,
-  upvalues: Set<symbol> | null
-): ValueRecord {
+function getValue(frame: ScopeFrame, key: string): ValueRecord {
   switch (frame.tag) {
-    case "root": {
-      const res = frame.values.get(key);
-      upvalues?.add(res.name);
-      return res;
-    }
-    case "func": {
+    case "root":
+      return frame.values.get(key);
+    case "func":
       if (frame.values.has(key)) {
-        const res = frame.values.get(key);
-        upvalues?.add(res.name);
-        return res;
+        return frame.values.get(key);
       } else {
-        return getValue(frame.parent, key, upvalues || frame.upvalues);
+        const res = getValue(frame.parent, key);
+        frame.upvalues.add(res.name);
+        return res;
       }
-    }
+    case "block":
     case "loop":
-    case "block": {
       if (frame.values.has(key)) {
-        const res = frame.values.get(key);
-        upvalues?.add(res.name);
-        return res;
+        return frame.values.get(key);
       } else {
-        return getValue(frame.parent, key, upvalues);
+        return getValue(frame.parent, key);
       }
-    }
   }
 }
 
@@ -107,7 +96,7 @@ export class Scope implements IScope {
     }
   }
   getValue(str: string): CheckedExpr {
-    const res = getValue(this.frame, str, null);
+    const res = getValue(this.frame, str);
     return { tag: "ident", value: res.name, type: res.type };
   }
   initType(name: string, value: Type): void {

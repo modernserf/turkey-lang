@@ -4,11 +4,6 @@ import { Writer } from "../writer";
 import { noMatch } from "../utils";
 import { StrictMap } from "../strict-map";
 
-/* TODO 
-remove `upvalues, recur` from IR, move to OptimizedIR type
-add optimizer pass between check & compile
-*/
-
 type Result = {
   program: number[];
   constants: string[];
@@ -46,8 +41,6 @@ type QueuedFunc = {
   parameters: symbol[];
 };
 
-const callee = Symbol("callee");
-
 let counter = 0;
 
 export class Compiler {
@@ -78,6 +71,24 @@ export class Compiler {
         // void assignments should be eliminated by the typechecker
         if (!res.hasValue) throw new Error("assigning void to var");
         this.initVar(stmt.binding);
+        return { hasValue: false };
+      }
+      case "func": {
+        const ref = Symbol(`func_${counter++}`);
+        this.labels.func(ref);
+        this.asm.newClosure(stmt.upvalues.length);
+        this.initVar(stmt.binding);
+        stmt.upvalues.forEach(({ expr }, i) => {
+          this.asm.dup();
+          this.expr(expr);
+          this.asm.setHeap(i);
+        });
+        this.queueFunc({
+          label: ref,
+          block: stmt.block,
+          upvalues: stmt.upvalues.map((u) => u.binding),
+          parameters: stmt.parameters,
+        });
         return { hasValue: false };
       }
       case "return":
@@ -153,9 +164,6 @@ export class Compiler {
         return { hasValue: true };
       case "ident":
         this.getVar(expr.value);
-        return { hasValue: true };
-      case "recur":
-        this.getVar(callee);
         return { hasValue: true };
       case "field":
         this.expr(expr.target);
@@ -268,8 +276,7 @@ export class Compiler {
     func.parameters.forEach((param) => {
       this.initVar(param);
     });
-    // assign callee var to current callee
-    // this is used both for upvalues and for recursion
+    const callee = Symbol("callee");
     this.initVar(callee);
     // copy values out of callee object onto stack
     func.upvalues.forEach((upval, i) => {

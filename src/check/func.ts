@@ -21,12 +21,12 @@ export class Func implements IFunc {
   public treeWalker!: TreeWalker;
   public traits!: Traits;
   create(
-    name: string,
+    binding: symbol,
     typeParams: Array<{ type: Type; traits: Trait[] }>,
     inParameters: Array<{ binding: Binding; type: Type }>,
     returnType: Type,
     inBlock: Stmt[]
-  ): IRExpr {
+  ): CheckedStmt {
     // when creating the function _type_, we bind the type params to vars,
     // but when checking the function _body_, we bind them to unique concrete types,
     // so that they're not unified with anything else.
@@ -77,7 +77,6 @@ export class Func implements IFunc {
       const { block } = this.treeWalker.block(inBlock);
       const blockReturnType = this.blockReturnType(block);
       if (blockReturnType) check(blockReturnType);
-
       return { parameters, block };
     });
     const { parameters, block } = result;
@@ -86,7 +85,7 @@ export class Func implements IFunc {
       expr: { tag: "ident", value } as IRExpr,
     }));
 
-    return { tag: "func", upvalues, parameters, block };
+    return { tag: "func", binding, upvalues, parameters, block };
   }
   call(inCallee: Expr, inArgs: Expr[]): CheckedExpr {
     const callee = this.treeWalker.expr(inCallee, null);

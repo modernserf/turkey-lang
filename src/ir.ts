@@ -23,7 +23,6 @@ export type IRExpr =
   | { tag: "string"; value: string }
   | { tag: "object"; value: IRExpr[] }
   | { tag: "ident"; value: symbol }
-  | { tag: "recur" }
   | {
       tag: "func";
       upvalues: Array<{ binding: symbol; expr: IRExpr }>;
@@ -51,7 +50,14 @@ export type IRStmt =
   | { tag: "let"; binding: symbol; expr: IRExpr }
   | { tag: "for"; binding: symbol; expr: IRExpr; block: IRStmt[] }
   | { tag: "while"; expr: IRExpr; block: IRStmt[] }
-  | { tag: "return"; expr: IRExpr | null };
+  | { tag: "return"; expr: IRExpr | null }
+  | {
+      tag: "func";
+      binding: symbol;
+      upvalues: Array<{ binding: symbol; expr: IRExpr }>;
+      parameters: symbol[];
+      block: IRStmt[];
+    };
 
 type IRExprLiteral = string | symbol | number | IRExprLiteral[] | IRExpr;
 type IRStmtLiteral = IRExprLiteral | IRStmt;
@@ -87,8 +93,6 @@ function stmt_(value: IRStmtLiteral): IRStmt {
       return { tag: "expr", expr: value };
   }
 }
-
-export const recur_: IRExpr = { tag: "recur" };
 
 export function func_(
   upvalues: symbol[],
@@ -211,6 +215,12 @@ export class PrettyPrinter {
         return `for (${this.binding(stmt.binding)} in ${this.expr(
           stmt.expr
         )}) ${this.block(stmt.block)}`;
+      case "func":
+        return `func ${this.binding(stmt.binding)} (${stmt.parameters
+          .map((p) => this.binding(p))
+          .join(", ")}) ${this.upvalues(stmt.upvalues)} ${this.block(
+          stmt.block
+        )}`;
     }
   }
   expr(expr: IRExpr): { value: string; multiline?: boolean } {
@@ -221,8 +231,6 @@ export class PrettyPrinter {
         return { value: `"${expr.value}"` };
       case "object":
         return this.exprList(expr.value, "[", "]");
-      case "recur":
-        return { value: "recur", multiline: false };
       case "ident":
         return { value: this.binding(expr.value) };
       case "func": {
@@ -276,12 +284,6 @@ export class PrettyPrinter {
       }
       case "call": {
         const args = this.exprList(expr.args, "(", ")");
-        if (expr.callee.tag === "recur") {
-          return {
-            value: `recur${args.value}`,
-            multiline: args.multiline,
-          };
-        }
         if (expr.callee.tag === "ident") {
           return {
             value: `${this.binding(expr.callee.value)}${args.value}`,
