@@ -162,7 +162,10 @@ export class Compiler {
           this.asm.setHeap(i);
         });
         return { hasValue: true };
-      case "ident":
+      case "rootVar":
+        this.getRoot(expr.value);
+        return { hasValue: true };
+      case "local":
         this.getVar(expr.value);
         return { hasValue: true };
       case "field":
@@ -258,6 +261,10 @@ export class Compiler {
   private getVar(value: symbol): void {
     const index = this.vars.get(value) as number;
     this.asm.loadLocal(index);
+  }
+  private getRoot(value: symbol): void {
+    const index = this.vars.get(value) as number;
+    this.asm.loadRoot(index);
   }
   private initVar(value: symbol): void {
     this.vars.set(value, this.varIndex++);

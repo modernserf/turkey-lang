@@ -57,7 +57,7 @@ export class Func implements IFunc {
             const id = Symbol(
               `impl_${type.name.description}_${trait.name.description}`
             );
-            this.traits.provideImpl(tracer, trait, { tag: "ident", value: id });
+            this.traits.provideImpl(tracer, trait, { tag: "local", value: id });
             return id;
           });
         }
@@ -82,7 +82,7 @@ export class Func implements IFunc {
     const { parameters, block } = result;
     const upvalues = us.map((value) => ({
       binding: value,
-      expr: { tag: "ident", value } as IRExpr,
+      expr: { tag: "local", value } as IRExpr,
     }));
 
     return { tag: "func", binding, upvalues, parameters, block };

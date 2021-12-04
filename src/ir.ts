@@ -22,7 +22,8 @@ export type IRExpr =
   | { tag: "primitive"; value: number }
   | { tag: "string"; value: string }
   | { tag: "object"; value: IRExpr[] }
-  | { tag: "ident"; value: symbol }
+  | { tag: "rootVar"; value: symbol }
+  | { tag: "local"; value: symbol }
   | {
       tag: "func";
       upvalues: Array<{ binding: symbol; expr: IRExpr }>;
@@ -67,7 +68,7 @@ export function expr_(value: IRExprLiteral): IRExpr {
     case "string":
       return { tag: "string", value };
     case "symbol":
-      return { tag: "ident", value };
+      return { tag: "local", value };
     case "number":
       return { tag: "primitive", value };
     default:
@@ -231,7 +232,8 @@ export class PrettyPrinter {
         return { value: `"${expr.value}"` };
       case "object":
         return this.exprList(expr.value, "[", "]");
-      case "ident":
+      case "rootVar":
+      case "local":
         return { value: this.binding(expr.value) };
       case "func": {
         return {
@@ -284,7 +286,7 @@ export class PrettyPrinter {
       }
       case "call": {
         const args = this.exprList(expr.args, "(", ")");
-        if (expr.callee.tag === "ident") {
+        if (expr.callee.tag === "local" || expr.callee.tag === "rootVar") {
           return {
             value: `${this.binding(expr.callee.value)}${args.value}`,
             multiline: args.multiline,
