@@ -67,8 +67,12 @@ export class TreeWalker implements ITreeWalker {
       case "tuple":
       case "list":
       case "typeConstructor":
-      case "closure":
         throw new Error("todo");
+      case "closure":
+        if (!context) {
+          throw new Error("insufficient type info for closure");
+        }
+        return this.func.createClosure(expr.parameters, expr.block, context);
       case "call":
         return this.func.call(expr.expr, expr.args);
       case "field":

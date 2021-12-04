@@ -101,6 +101,11 @@ export interface Func {
     returnType: Type,
     block: Stmt[]
   ): CheckedStmt;
+  createClosure(
+    inParams: Binding[],
+    inBlock: Stmt[],
+    typeHint: Type
+  ): CheckedExpr;
   call(callee: Expr, args: Expr[]): CheckedExpr;
   op(op: Builtin, type: Type, args: Expr[]): CheckedExpr;
 }

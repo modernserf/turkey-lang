@@ -87,6 +87,51 @@ export class Func implements IFunc {
 
     return { tag: "func", binding, upvalues, parameters, block };
   }
+  createClosure(
+    inParams: Binding[],
+    inBlock: Stmt[],
+    typeHint: Type
+  ): CheckedExpr {
+    const { returnType, params, traitParams } = this.checkCallee(
+      typeHint,
+      inParams.length
+    );
+    const checker = new CheckerCtx(this.traits);
+    const check = (type: Type) => checker.unify(type, returnType);
+
+    const { upvalues: us, result } = this.scope.funcScope(check, () => {
+      // not sure about this
+      const traitParamSymbols = traitParams.map((p) => {
+        const id = Symbol(
+          `impl_${p.type.name.description}_${p.trait.name.description}`
+        );
+        this.traits.provideImpl(p.type, p.trait, { tag: "local", value: id });
+        return id;
+      });
+
+      const mainParamSymbols = inParams.map((binding, i) => {
+        const res = this.scope.initValue(binding, params[i]);
+        // TODO: add destructured bindings to beginning of block
+        if (res.rest.length) throw new Error("todo");
+        return res.root;
+      });
+      const parameters = [...traitParamSymbols, ...mainParamSymbols];
+
+      const { block } = this.treeWalker.block(inBlock);
+      const blockReturnType = this.blockReturnType(block);
+      if (blockReturnType) check(blockReturnType);
+      return { parameters, block };
+    });
+
+    const { parameters, block } = result;
+    const upvalues = us.map((value) => ({
+      binding: value,
+      expr: { tag: "local", value } as IRExpr,
+    }));
+
+    return { tag: "func", upvalues, parameters, block, type: typeHint };
+  }
+
   call(inCallee: Expr, inArgs: Expr[]): CheckedExpr {
     const callee = this.treeWalker.expr(inCallee, null);
     const { returnType, params, traitParams } = this.checkCallee(

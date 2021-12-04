@@ -287,60 +287,45 @@ Array [
 `);
 });
 
-// it("handles dropping scope values correctly", () => {
-//   const code = `
-//     func get_three(): Int { 3 }
+it("accepts functions as parameters", () => {
+  const code = `
+    func map (value: Int, fn: func (Int): Int): Int {
+      fn(value)
+    }
+    func double (value: Int): Int {
+      return value + value
+    }
+    print(map(10, double))
+  `;
 
-//     if (True) {
-//       let x = get_three()
-//       get_three()
-//       print(x)
-//     } else {
-//       print(0)
-//     }
-//   `;
-//   expect(run(code)).toEqual(["3"]);
-// });
+  expect(run(code)).toEqual([20]);
+});
 
-// it("accepts functions as parameters", () => {
-//   const code = `
-//     func map (value: Int, fn: func (Int): Int): Int {
-//       fn(value)
-//     }
-//     func double (value: Int): Int {
-//       return value + value
-//     }
-//     print(map(10, double))
-//   `;
+it("accepts functions as return values", () => {
+  const code = `
+    func add_curried (left: Int): func (Int): Int {
+      func add_right(right: Int): Int {
+        return left + right
+      }
+      return add_right
+    }
 
-//   expect(run(code)).toEqual(["20"]);
-// });
+    print(add_curried(1)(2))
+  `;
 
-// it("accepts functions as return values", () => {
-//   const code = `
-//     func add_curried (left: Int): func (Int): Int {
-//       func add_right(right: Int): Int {
-//         return left + right
-//       }
-//       return add_right
-//     }
+  expect(run(code)).toEqual([3]);
+});
 
-//     print(add_curried(1)(2))
-//   `;
+it("has anonymous function literals", () => {
+  const code = `
+    func map (value: Int, fn: func (Int): Int): Int {
+      fn(value)
+    }
+    print(map(10, |x| { x + x }))
+  `;
 
-//   expect(run(code)).toEqual(["3"]);
-// });
-
-// it("has anonymous function literals", () => {
-//   const code = `
-//     func map (value: Int, fn: func (Int): Int): Int {
-//       fn(value)
-//     }
-//     print(map(10, |x| { x + x }))
-//   `;
-
-//   expect(run(code)).toEqual(["20"]);
-// });
+  expect(run(code)).toEqual([20]);
+});
 
 // it.skip("has type aliases", () => {
 //   const code = `
