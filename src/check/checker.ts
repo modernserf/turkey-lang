@@ -60,7 +60,8 @@ export class CheckerCtx {
       } else {
         if (
           left.name !== right.name ||
-          left.parameters.length !== right.parameters.length
+          left.parameters.length !== right.parameters.length ||
+          left.arraySize !== right.arraySize
         ) {
           throw new TypeCheckError(left, right);
         }

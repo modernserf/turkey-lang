@@ -146,8 +146,19 @@ const matchStatement: Parser<Stmt | null> = (state) => {
     case ";":
       state.advance();
       return null;
-    default:
-      return { tag: "expr", expr: matchExpr(state) };
+    default: {
+      const expr = matchExpr(state);
+      if (check(state, "=")) {
+        if (expr.tag !== "index") {
+          throw new Error("invalid assignment");
+        }
+        const { expr: target, index } = expr;
+        const value = matchExpr(state);
+        return { tag: "assign", target, index, value };
+      } else {
+        return { tag: "expr", expr };
+      }
+    }
   }
 };
 
@@ -196,8 +207,13 @@ const checkPostfixExpr: Parser<Expr | null> = (state) => {
       }
       case ":": {
         state.advance();
-        const fieldName = assert(state, "field", checkField(state));
-        expr = { tag: "field", expr, fieldName };
+        const fieldName = checkField(state);
+        if (fieldName) {
+          expr = { tag: "field", expr, fieldName };
+        } else {
+          const index = assert(state, "field", checkIndex(state));
+          expr = { tag: "index", expr, index };
+        }
         break;
       }
       case ".": {
@@ -543,8 +559,12 @@ function matchTypeStructure(state: IParseState, value: string): Expr {
 const checkField: Parser<string | null> = (state) => {
   const field = check(state, "identifier");
   if (field) return field.value;
-  const field2 = check(state, "integer");
-  if (field2) return String(field2.value);
+  return null;
+};
+
+const checkIndex: Parser<number | null> = (state) => {
+  const field = check(state, "integer");
+  if (field) return field.value;
   return null;
 };
 
@@ -656,7 +676,7 @@ function commaList<T>(state: IParseState, checkParser: Parser<T | null>): T[] {
 }
 
 function assert<T>(state: IParseState, type: string, res: T | null) {
-  if (!res) {
+  if (res === null) {
     throw new ParseError(type, state.token());
   }
   return res;

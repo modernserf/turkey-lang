@@ -4,6 +4,7 @@ import { noMatch } from "../utils";
 import { CheckerCtx } from "./checker";
 import {
   TreeWalker as ITreeWalker,
+  Obj,
   CheckedExpr,
   Scope,
   CheckedStmt,
@@ -19,12 +20,14 @@ import {
   Type,
   Stdlib,
   tupleType,
+  vecType,
 } from "./types";
 
 export class TreeWalker implements ITreeWalker {
   public scope!: Scope;
   public func!: Func;
   public traits!: Traits;
+  public obj!: Obj;
   private unaryOps!: Map<string, { op: Builtin; type: Type }>;
   private binaryOps!: Map<string, { op: Builtin; type: Type }>;
   program(stdlib: Stdlib, program: Stmt[]): IRStmt[] {
@@ -64,14 +67,45 @@ export class TreeWalker implements ITreeWalker {
           value: expr.value,
           type: stringType,
         };
-      case "tuple":
-      case "list":
-      case "typeLiteral":
-      case "typeRecord":
-      case "typeTuple":
-      case "typeList":
-      case "typeSizedList":
-        throw new Error("todo");
+      case "tuple": {
+        return this.obj.tuple(
+          {
+            tag: "struct",
+            type: tupleType(
+              expr.items.map((_, i) => createVar(Symbol(`T${i}`), []))
+            ),
+          },
+          expr.items,
+          context
+        );
+      }
+      case "list": {
+        return this.obj.list(
+          { tag: "struct", type: vecType(createVar(Symbol("T"), [])) },
+          expr.items,
+          context
+        );
+      }
+      case "typeLiteral": {
+        const ctor = this.scope.getConstructor(expr.value);
+        return this.obj.tuple(ctor, [], context);
+      }
+      case "typeRecord": {
+        const ctor = this.scope.getConstructor(expr.value);
+        return this.obj.record(ctor, expr.fields, context);
+      }
+      case "typeTuple": {
+        const ctor = this.scope.getConstructor(expr.value);
+        return this.obj.tuple(ctor, expr.items, context);
+      }
+      case "typeList": {
+        const ctor = this.scope.getConstructor(expr.value);
+        return this.obj.list(ctor, expr.items, context);
+      }
+      case "typeSizedList": {
+        const ctor = this.scope.getConstructor(expr.value);
+        return this.obj.sizedList(ctor, expr.expr, expr.size, context);
+      }
       case "closure":
         if (!context) {
           throw new Error("insufficient type info for closure");
@@ -80,8 +114,9 @@ export class TreeWalker implements ITreeWalker {
       case "call":
         return this.func.call(expr.expr, expr.args);
       case "field":
+        return this.obj.getField(this.expr(expr.expr, null), expr.fieldName);
       case "index":
-        throw new Error("todo");
+        return this.obj.getIndex(this.expr(expr.expr, null), expr.index);
       case "unaryOp": {
         const op = this.unaryOps.get(expr.operator);
         // istanbul ignore next
@@ -118,9 +153,30 @@ export class TreeWalker implements ITreeWalker {
         const type = resultChecker.resolve(resultType);
         return { tag: "if", ifCases, elseBlock: elseResult.block, type };
       }
-      case "match":
-        throw new Error("todo");
+      case "match": {
+        const target = this.expr(expr.expr, null);
+        const resultChecker = new CheckerCtx(this.traits);
+        const resultType = createVar(Symbol("Result"), []);
+        const matcher = this.obj.createMatcher(target);
 
+        const matchCases = expr.cases.map((matchCase) => {
+          return this.scope.blockScope(() => {
+            const { index, block: header } = matcher.case(matchCase.binding);
+            const { block, type } = this.block(matchCase.block);
+            resultChecker.unify(resultType, type);
+            return { index, block: [...header, ...block] };
+          });
+        });
+
+        const type = resultChecker.resolve(resultType);
+        return {
+          tag: "match",
+          expr: target,
+          binding: matcher.binding,
+          matchCases,
+          type,
+        };
+      }
       default:
         noMatch(expr);
     }
@@ -182,14 +238,8 @@ export class TreeWalker implements ITreeWalker {
           new CheckerCtx(this.traits).unify(type, expr.type);
         }
         const bindings = this.scope.initValue(stmt.binding, expr.type);
-        return [
-          { tag: "let", binding: bindings.root, expr },
-          ...bindings.rest.map(({ name, expr }) => ({
-            tag: "let" as const,
-            binding: name,
-            expr,
-          })),
-        ];
+        if (bindings.rest.length) throw new Error("todo");
+        return [{ tag: "let", binding: bindings.root, expr }];
       }
       case "func": {
         // for each type param:
@@ -241,8 +291,20 @@ export class TreeWalker implements ITreeWalker {
         const { block } = this.block(stmt.block);
         return [{ tag: "while", expr, block }];
       }
-      case "for":
-        throw new Error("todo");
+      case "for": {
+        return this.scope.blockScope(() => {
+          const expr = this.expr(stmt.expr, null);
+          const iter = this.obj.iter(expr);
+          const { root, rest } = this.scope.initValue(stmt.binding, iter.type);
+          if (rest.length) throw new Error("todo");
+          const { block } = this.block(stmt.block);
+
+          return [{ tag: "for", binding: root, expr, block }];
+        });
+      }
+      case "assign": {
+        return [this.obj.assign(stmt.target, stmt.index, stmt.value)];
+      }
       // istanbul ignore next
       default:
         noMatch(stmt);

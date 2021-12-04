@@ -80,6 +80,10 @@ export class Writer {
     this.program.push(Opcode.NewClosure, count, addr);
     return this;
   }
+  newArray(size: number): this {
+    this.program.push(Opcode.NewArray, size);
+    return this;
+  }
   private patchNewClosure(index: number, addr: number) {
     this.program[index + 2] = addr;
     return this;

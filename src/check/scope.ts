@@ -7,27 +7,30 @@ import {
   Scope as IScope,
   CheckedStmt,
   voidType,
+  TypeConstructor,
 } from "./types";
 import { StrictMap } from "../strict-map";
 
 type CheckType = (value: Type) => void;
 
 type ValueRecord = { name: symbol; type: Type };
-type ScopeFrameBase =
-  | { tag: "root" }
-  | { tag: "block"; parent: ScopeFrame }
-  | { tag: "loop"; parent: ScopeFrame; id: symbol }
-  | {
-      tag: "func";
-      parent: ScopeFrame;
-      upvalues: Set<symbol>;
-      checkReturns: CheckType;
-    };
 
-type ScopeFrame = ScopeFrameBase & {
+type ScopeFrameValue = {
   values: StrictMap<string, ValueRecord>;
   types: StrictMap<string, Type>;
+  typeConstructors: StrictMap<string, TypeConstructor>;
 };
+
+type ScopeFrame<T = ScopeFrameValue> =
+  | ({ tag: "root" } & T)
+  | ({ tag: "block"; parent: ScopeFrame<T> } & T)
+  | ({ tag: "loop"; parent: ScopeFrame<T>; id: symbol } & T)
+  | ({
+      tag: "func";
+      parent: ScopeFrame<T>;
+      upvalues: Set<symbol>;
+      checkReturns: CheckType;
+    } & T);
 
 function getValue(frame: ScopeFrame, key: string): CheckedExpr {
   switch (frame.tag) {
@@ -60,12 +63,18 @@ function getValue(frame: ScopeFrame, key: string): CheckedExpr {
 export class Scope implements IScope {
   private frame: ScopeFrame = {
     tag: "root",
-    values: new StrictMap(),
-    types: new StrictMap(),
+    ...this.newFrameValue(),
   };
   constructor(stdlib: Stdlib) {
-    for (const [name, { type }] of stdlib.types) {
+    for (const [name, { type, constructors }] of stdlib.types) {
       this.initType(name, type);
+      if (constructors) {
+        if (constructors.length) {
+          this.initEnumConstructors(constructors, type);
+        } else {
+          this.initStructConstructor(name, type);
+        }
+      }
     }
   }
   break(): CheckedStmt {
@@ -114,28 +123,39 @@ export class Scope implements IScope {
   }
   getType(name: string): { type: Type } {
     let frame = this.frame;
-    while (true) {
-      switch (frame.tag) {
-        case "root": {
-          return { type: frame.types.get(name) };
-        }
-        case "block":
-        case "func":
-        case "loop":
-          if (frame.types.has(name)) {
-            return { type: frame.types.get(name) };
-          } else {
-            frame = frame.parent;
-          }
+    while (frame.tag !== "root") {
+      if (frame.types.has(name)) {
+        return { type: frame.types.get(name) };
+      } else {
+        frame = frame.parent;
       }
     }
+    return { type: frame.types.get(name) };
+  }
+  initStructConstructor(name: string, type: Type) {
+    this.frame.typeConstructors.init(name, { tag: "struct", type });
+  }
+  initEnumConstructors(names: string[], type: Type) {
+    names.forEach((name, tagValue) => {
+      this.frame.typeConstructors.init(name, { tag: "enum", type, tagValue });
+    });
+  }
+  getConstructor(name: string): TypeConstructor {
+    let frame = this.frame;
+    while (frame.tag !== "root") {
+      if (frame.typeConstructors.has(name)) {
+        return frame.typeConstructors.get(name);
+      } else {
+        frame = frame.parent;
+      }
+    }
+    return frame.typeConstructors.get(name);
   }
   blockScope<T>(fn: () => T): T {
     this.frame = {
       tag: "block",
-      values: new StrictMap(),
-      types: new StrictMap(),
       parent: this.frame,
+      ...this.newFrameValue(),
     };
     const res = fn();
     this.frame = this.frame.parent;
@@ -145,9 +165,8 @@ export class Scope implements IScope {
     this.frame = {
       tag: "loop",
       id,
-      values: new StrictMap(),
-      types: new StrictMap(),
       parent: this.frame,
+      ...this.newFrameValue(),
     };
     const res = fn();
     this.frame = this.frame.parent;
@@ -161,9 +180,8 @@ export class Scope implements IScope {
       tag: "func",
       checkReturns,
       upvalues: new Set(),
-      values: new StrictMap(),
-      types: new StrictMap(),
       parent: this.frame,
+      ...this.newFrameValue(),
     };
     const result = fn();
     const { upvalues } = this.frame;
@@ -177,5 +195,12 @@ export class Scope implements IScope {
       frame = frame.parent;
     }
     return null;
+  }
+  private newFrameValue(): ScopeFrameValue {
+    return {
+      values: new StrictMap(),
+      types: new StrictMap(),
+      typeConstructors: new StrictMap(),
+    };
   }
 }

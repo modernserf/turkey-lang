@@ -31,11 +31,7 @@ export class Func implements IFunc {
     // but when checking the function _body_, we bind them to unique concrete types,
     // so that they're not unified with anything else.
     const typeParamsWithTracers = typeParams.map(({ type, traits }) => {
-      const tracer = createType(
-        Symbol(`Trace(${type.name.description})`),
-        [],
-        []
-      );
+      const tracer = createType(Symbol(`Trace(${type.name.description})`), []);
       return { type, traits, tracer };
     });
 

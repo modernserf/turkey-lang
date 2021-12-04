@@ -96,6 +96,13 @@ class Heap {
     }
     return addr;
   }
+  array(size: number, fillValue: StackValue): StackValue {
+    const addr = this._push({ tag: "object", size });
+    for (let i = 0; i < size; i++) {
+      this._push(fillValue);
+    }
+    return addr;
+  }
   // istanbul ignore next
   toString(): string {
     return `[${this._heap
@@ -290,8 +297,9 @@ class Interpreter {
         return;
       }
       case Opcode.NewArray: {
-        const size = this.stack.pop();
-        const addr = this.heap.object(size);
+        const fillValue = this.stack.pop();
+        const size = this.program.nextOp();
+        const addr = this.heap.array(size, fillValue);
         this.stack.push(addr);
         return;
       }
@@ -389,6 +397,10 @@ class Interpreter {
       case Opcode.PrintNum: {
         const value = this.stack.pop();
         this.write(value);
+        return;
+      }
+      case Opcode.Debug_DumpStack: {
+        console.log(this.stack);
         return;
       }
       // istanbul ignore next

@@ -820,37 +820,27 @@ it("cannot reference underscore identifiers", () => {
 //   expect(run(code)).toEqual(["2", "4", "6"]);
 // });
 
-// it.skip("has mutable refs", () => {
-//   const code = `
-//     let counter = Ref(0)
-//     print(counter:0)
-//     counter.set(1)
-//     print(counter:0)
-//   `;
-//   expect(run(code)).toEqual(["0", "1"]);
-// });
+it("has mutable fixed-size arrays", () => {
+  const code = `
+    let cell = Array[0; 2]
+    print(cell:0)
+    print(cell:1)
+    cell:0 = 1
+    print(cell:0)
+    print(cell:1)
+  `;
+  expect(run(code)).toEqual([0, 0, 1, 0]);
+});
 
-// it.skip("runs a while loop", () => {
-//   const code = `
-//     let counter = Ref(0)
-//     while(counter:0 < 10) {
-//       let value = counter:0
-//       print(value)
-//       counter.set(value + 1)
-//     }
-//   `;
-//   expect(run(code)).toMatchInlineSnapshot(`
-// Array [
-//   "0",
-//   "1",
-//   "2",
-//   "3",
-//   "4",
-//   "5",
-//   "6",
-//   "7",
-//   "8",
-//   "9",
-// ]
-// `);
-// });
+it("runs a while loop", () => {
+  const code = `
+    let counter = Array[0]
+    while (counter:0 < 10) {
+      let val = counter:0
+      print(val)
+      counter:0 = val + 1
+    }
+    print(counter:0)
+  `;
+  expect(run(code)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+});

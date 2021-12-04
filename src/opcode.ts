@@ -14,7 +14,7 @@ export enum Opcode {
   Drop,
   New, // size
   NewClosure, // size, target
-  NewArray,
+  NewArray, // size
   //
   Jump, // target
   JumpIfZero, // target
@@ -45,4 +45,6 @@ export enum Opcode {
   //
   PrintNum,
   PrintStr,
+  //
+  Debug_DumpStack,
 }

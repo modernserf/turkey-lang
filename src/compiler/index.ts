@@ -32,7 +32,6 @@ const builtins: Record<Builtin, { code: Opcode[]; hasValue: boolean }> = {
   not: { code: [Opcode.Not], hasValue: true },
   print_num: { code: [Opcode.PrintNum], hasValue: false },
   print_string: { code: [Opcode.PrintStr], hasValue: false },
-  init_array: { code: [Opcode.NewArray], hasValue: true },
   get_array: { code: [Opcode.LoadIndex], hasValue: true },
   set_array: { code: [Opcode.StoreIndex], hasValue: false },
 };
@@ -108,8 +107,7 @@ export class Compiler {
         this.labels.create(loopIn);
         this.expr(stmt.expr);
         this.labels.jumpIfZero(loopOut);
-        const res = this.block(stmt.block);
-        if (res.hasValue) this.asm.drop();
+        this.loopBlock(stmt.block);
         this.labels.jump(loopIn);
         this.labels.create(loopOut);
         return { hasValue: false };
@@ -137,13 +135,17 @@ export class Compiler {
         this.asm.getHeap(2);
         this.setVar(iter);
         // run the loop
-        const res = this.block(stmt.block);
-        if (res.hasValue) this.asm.drop();
+        this.loopBlock(stmt.block);
         this.labels.jump(loopIn);
         // exit
         this.labels.create(loopOut);
         return { hasValue: false };
       }
+      case "assign":
+        this.expr(stmt.target);
+        this.expr(stmt.expr);
+        this.asm.setHeap(stmt.index);
+        return { hasValue: false };
       // istanbul ignore next
       default:
         noMatch(stmt);
@@ -164,6 +166,10 @@ export class Compiler {
           this.expr(value);
           this.asm.setHeap(i);
         });
+        return { hasValue: true };
+      case "array":
+        this.expr(expr.init);
+        this.asm.newArray(expr.size);
         return { hasValue: true };
       case "rootVar":
         this.getRoot(expr.value);
@@ -253,7 +259,19 @@ export class Compiler {
       if (hasValue) this.asm.drop();
       hasValue = this.stmt(stmt).hasValue;
     });
+
     return { hasValue };
+  }
+  private loopBlock(block: IRStmt[]): void {
+    const prevVarIndex = this.varIndex;
+    const { hasValue } = this.block(block);
+    // Need to drop vars allocated in loops so that stack does not accumulate values
+    // & get out of sync with varIndex
+    if (hasValue) this.asm.drop();
+    while (this.varIndex > prevVarIndex) {
+      this.asm.drop();
+      this.varIndex--;
+    }
   }
   private internString(string: string): number {
     if (this.strings.has(string)) return this.strings.get(string) as number;

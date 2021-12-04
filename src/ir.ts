@@ -17,7 +17,6 @@ export type Builtin =
   | "not"
   | "print_num"
   | "print_string"
-  | "init_array"
   | "get_array"
   | "set_array";
 
@@ -25,6 +24,7 @@ export type IRExpr =
   | { tag: "primitive"; value: number }
   | { tag: "string"; value: string }
   | { tag: "object"; value: IRExpr[] }
+  | { tag: "array"; init: IRExpr; size: number }
   | { tag: "rootVar"; value: symbol }
   | { tag: "local"; value: symbol }
   | {
@@ -61,7 +61,8 @@ export type IRStmt =
       upvalues: Array<{ binding: symbol; expr: IRExpr }>;
       parameters: symbol[];
       block: IRStmt[];
-    };
+    }
+  | { tag: "assign"; target: IRExpr; index: number; expr: IRExpr };
 
 type IRExprLiteral = string | symbol | number | IRExprLiteral[] | IRExpr;
 type IRStmtLiteral = IRExprLiteral | IRStmt;
@@ -92,6 +93,7 @@ function stmt_(value: IRStmtLiteral): IRStmt {
     case "for":
     case "while":
     case "return":
+    case "assign":
       return value;
     default:
       return { tag: "expr", expr: value };
@@ -225,6 +227,10 @@ export class PrettyPrinter {
           .join(", ")}) ${this.upvalues(stmt.upvalues)} ${this.block(
           stmt.block
         )}`;
+      case "assign":
+        return `${this.expr(stmt.target).value}:${stmt.index} = ${
+          this.expr(stmt.expr).value
+        }`;
     }
   }
   expr(expr: IRExpr): { value: string; multiline?: boolean } {
@@ -235,6 +241,13 @@ export class PrettyPrinter {
         return { value: `"${expr.value}"` };
       case "object":
         return this.exprList(expr.value, "[", "]");
+      case "array": {
+        const init = this.expr(expr.init);
+        return {
+          value: `[${init.value}; ${expr.size}]`,
+          multiline: init.multiline,
+        };
+      }
       case "rootVar":
       case "local":
         return { value: this.binding(expr.value) };

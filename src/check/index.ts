@@ -15,9 +15,12 @@ import {
   numTrait,
   eqTrait,
   boolType,
+  arrayType,
+  vecType,
 } from "./types";
 import { Traits } from "./trait";
 import { IRExpr, IRStmt, func_, field_, call_, expr_, builtIn_ } from "../ir";
+import { Obj } from "./obj";
 
 const printFunc: CheckedExpr = (() => {
   const implShow = Symbol("impl_Show_T");
@@ -59,6 +62,7 @@ const implEqPrimitive: IRExpr = (() => {
   ]);
 })();
 
+const anyT = createVar(Symbol("T"), []);
 const numT = createVar(Symbol("T"), [numTrait]);
 const eqT = createVar(Symbol("T"), [eqTrait]);
 
@@ -68,6 +72,9 @@ const stdlib: Stdlib = {
     ["Int", { type: intType }],
     ["Float", { type: floatType }],
     ["String", { type: stringType }],
+    ["Bool", { type: boolType, constructors: ["True", "False"] }],
+    ["Array", { type: arrayType(anyT, 0), constructors: [] }],
+    ["Vec", { type: vecType(anyT), constructors: [] }],
   ]),
   values: new Map([["print", printFunc]]),
   traits: new Map([
@@ -131,12 +138,16 @@ export function check(program: Stmt[]): IRStmt[] {
   const scope = new Scope(stdlib);
   const func = new Func();
   const traits = new Traits(stdlib);
+  const obj = new Obj();
   treeWalker.scope = scope;
   treeWalker.func = func;
   treeWalker.traits = traits;
+  treeWalker.obj = obj;
   func.scope = scope;
   func.treeWalker = treeWalker;
   func.traits = traits;
+  obj.treeWalker = treeWalker;
+  obj.traits = traits;
 
   return treeWalker.program(stdlib, program);
 }

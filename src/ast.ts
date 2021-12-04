@@ -27,6 +27,7 @@ export type Stmt =
       target: TypeExpr;
       block: Stmt[];
     }
+  | { tag: "assign"; target: Expr; index: number; value: Expr }
   | { tag: "expr"; expr: Expr };
 
 export type EnumCase = {

@@ -510,8 +510,8 @@ Array [
         "tag": "identifier",
         "value": "foo",
       },
-      "fieldName": "0",
-      "tag": "field",
+      "index": 0,
+      "tag": "index",
     },
     "tag": "expr",
   },
@@ -2050,10 +2050,10 @@ Array [
 
 it("supports array types", () => {
   expect(
-parse(`
+    parse(`
     type Vec4<T> = Array [T; 4] 
-  `)).
-toMatchInlineSnapshot(`
+  `)
+  ).toMatchInlineSnapshot(`
 Array [
   Object {
     "binding": Object {
@@ -2081,4 +2081,32 @@ Array [
   },
 ]
 `);
+});
+
+it("supports array assignment", () => {
+  expect(parse(`arr:0 = 1`)).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "index": 0,
+    "tag": "assign",
+    "target": Object {
+      "tag": "identifier",
+      "value": "arr",
+    },
+    "value": Object {
+      "tag": "integer",
+      "value": 1,
+    },
+  },
+]
+`);
+});
+
+it("rejects invalid assignment LHS", () => {
+  expect(() => {
+    parse(`arr = 1`);
+  }).toThrow();
+  expect(() => {
+    parse(`arr:x = 1`);
+  }).toThrow();
 });
