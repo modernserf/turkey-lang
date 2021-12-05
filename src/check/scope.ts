@@ -1,4 +1,4 @@
-import { Binding } from "../ast";
+import { Binding, TypeExpr } from "../ast";
 import { noMatch } from "../utils";
 import {
   CheckedExpr,
@@ -8,16 +8,23 @@ import {
   CheckedStmt,
   voidType,
   TypeConstructor,
+  tupleType,
+  funcType,
 } from "./types";
 import { StrictMap } from "../strict-map";
+import { CheckerProvider } from "./checker";
 
 type CheckType = (value: Type) => void;
 
 type ValueRecord = { name: symbol; type: Type };
+type TypeRecord =
+  | { tag: "simple"; value: Type }
+  | { tag: "alias"; params: Type[]; type: Type }
+  | { tag: "array"; value: Type };
 
 type ScopeFrameValue = {
   values: StrictMap<string, ValueRecord>;
-  types: StrictMap<string, Type>;
+  types: StrictMap<string, TypeRecord>;
   typeConstructors: StrictMap<string, TypeConstructor>;
 };
 
@@ -65,9 +72,14 @@ export class Scope implements IScope {
     tag: "root",
     ...this.newFrameValue(),
   };
-  constructor(stdlib: Stdlib) {
+  constructor(stdlib: Stdlib, private checker: CheckerProvider) {
     for (const [name, { type, constructors }] of stdlib.types) {
-      this.initType(name, type);
+      // FIXME maybe
+      if (name === "Array") {
+        this.initArrayType(name, type);
+      } else {
+        this.initType(name, type);
+      }
       if (constructors) {
         if (constructors.length) {
           this.initEnumConstructors(constructors, type);
@@ -119,18 +131,95 @@ export class Scope implements IScope {
     return getValue(this.frame, str);
   }
   initType(name: string, value: Type): void {
-    this.frame.types.init(name, value);
+    this.frame.types.init(name, { tag: "simple", value });
   }
-  getType(name: string): { type: Type } {
+  initTypeAlias(name: string, params: Type[], type: Type): void {
+    this.frame.types.init(name, { tag: "alias", params, type });
+  }
+  initArrayType(name: string, value: Type) {
+    this.frame.types.init(name, { tag: "array", value });
+  }
+  getType(typeExpr: TypeExpr, typeParams?: Map<string, Type>): Type {
+    switch (typeExpr.tag) {
+      case "identifier":
+        return this.getNamedType(typeExpr.value, typeExpr.typeArgs, typeParams);
+      case "tuple":
+        return tupleType(
+          typeExpr.typeArgs.map((arg) => this.getType(arg, typeParams))
+        );
+      case "func":
+        return funcType(
+          this.getType(typeExpr.returnType, typeParams),
+          typeExpr.parameters.map((p) => this.getType(p, typeParams)),
+          [] // TODO: something with type params here?
+        );
+      case "array": {
+        const record = this.getTypeRecord(typeExpr.value);
+        if (record.tag === "array") {
+          if (record.value.tag === "abstract") throw new Error("todo");
+          const param = this.getType(typeExpr.type, typeParams);
+          return {
+            ...record.value,
+            parameters: [param],
+            arraySize: typeExpr.size,
+          };
+        } else {
+          throw new Error("expected array type");
+        }
+      }
+      // istanbul ignore next
+      default:
+        noMatch(typeExpr);
+    }
+  }
+  private getTypeRecord(name: string): TypeRecord {
     let frame = this.frame;
     while (frame.tag !== "root") {
       if (frame.types.has(name)) {
-        return { type: frame.types.get(name) };
+        return frame.types.get(name);
       } else {
         frame = frame.parent;
       }
     }
-    return { type: frame.types.get(name) };
+    return frame.types.get(name);
+  }
+  private getNamedType(
+    name: string,
+    typeArgs: TypeExpr[],
+    typeParams?: Map<string, Type>
+  ): Type {
+    const args = typeArgs.map((arg) => this.getType(arg, typeParams));
+
+    if (typeParams) {
+      const found = typeParams.get(name);
+      if (args.length) throw new Error("can't param a param");
+      if (found) return found;
+    }
+
+    const record = this.getTypeRecord(name);
+    switch (record.tag) {
+      case "simple": {
+        const baseType = record.value;
+        if (baseType.tag === "abstract") throw new Error("todo");
+        if (args.length !== baseType.parameters.length) {
+          throw new Error("param mismatch");
+        }
+        return { ...baseType, parameters: args };
+      }
+      case "alias": {
+        if (args.length !== record.params.length) {
+          throw new Error("arity mismatch");
+        }
+        const checker = this.checker.create();
+        record.params.forEach((p, i) => checker.unify(p, args[i]));
+        return checker.resolve(record.type);
+      }
+      case "array":
+        throw new Error("Array type missing length");
+      // istanbul ignore next
+      default:
+        noMatch(record);
+    }
   }
   initStructConstructor(name: string, type: Type) {
     this.frame.typeConstructors.init(name, { tag: "struct", type });

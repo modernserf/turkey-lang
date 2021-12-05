@@ -99,7 +99,6 @@ export type UnifyResult = {
 export interface TreeWalker {
   expr(expr: Expr, context: Type | null): CheckedExpr;
   block(block: Stmt[]): { block: CheckedStmt[]; type: Type };
-  typeExpr(typeExpr: TypeExpr, typeParams?: Map<string, Type>): Type;
 }
 
 export type TypeConstructor =
@@ -116,7 +115,7 @@ export interface Scope {
   ): { root: symbol; rest: Array<{ name: symbol; expr: CheckedExpr }> };
   getValue(str: string): CheckedExpr;
   initType(name: string, value: Type): void;
-  getType(name: string): { type: Type };
+  getType(typeExpr: TypeExpr, typeParams?: Map<string, Type>): Type;
   initStructConstructor(name: string, type: Type): void;
   initEnumConstructors(names: string[], type: Type): void;
   getConstructor(name: string): TypeConstructor;

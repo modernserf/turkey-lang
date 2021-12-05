@@ -1,5 +1,5 @@
 import { IRStmt } from "../ir";
-import { Expr, Stmt, TypeExpr } from "../ast";
+import { Expr, Stmt } from "../ast";
 import { noMatch } from "../utils";
 import { CheckerProvider } from "./checker";
 import {
@@ -17,7 +17,6 @@ import {
   Stdlib,
   tupleType,
   vecType,
-  arrayType,
 } from "./types";
 import { Scope } from "./scope";
 import { Func } from "./func";
@@ -27,9 +26,9 @@ import { Obj } from "./obj";
 export class TreeWalker implements ITreeWalker {
   private unaryOps = this.stdlib.unaryOps;
   private binaryOps = this.stdlib.binaryOps;
-  private scope = new Scope(this.stdlib);
   private traits = new Traits(this.stdlib);
   private checker = new CheckerProvider(this.traits);
+  private scope = new Scope(this.stdlib, this.checker);
   private func = new Func(this, this.scope, this.traits, this.checker);
   private obj = new Obj(this, this.checker);
   constructor(private stdlib: Stdlib) {}
@@ -194,37 +193,6 @@ export class TreeWalker implements ITreeWalker {
       }
     });
   }
-  typeExpr(typeExpr: TypeExpr, typeParams?: Map<string, Type>): Type {
-    switch (typeExpr.tag) {
-      case "identifier": {
-        if (typeExpr.typeArgs.length) throw new Error("todo");
-        if (typeParams) {
-          const found = typeParams.get(typeExpr.value);
-          if (found) return found;
-        }
-        return this.scope.getType(typeExpr.value).type;
-      }
-      case "tuple":
-        return tupleType(
-          typeExpr.typeArgs.map((arg) => this.typeExpr(arg, typeParams))
-        );
-      case "func":
-        return funcType(
-          this.typeExpr(typeExpr.returnType, typeParams),
-          typeExpr.parameters.map((p) => this.typeExpr(p, typeParams)),
-          [] // TODO: something with type params here?
-        );
-      case "array": {
-        if (typeExpr.value !== "Array") throw new Error("todo");
-        const type = this.typeExpr(typeExpr.type, typeParams);
-        return arrayType(type, typeExpr.size);
-      }
-
-      // istanbul ignore next
-      default:
-        noMatch(typeExpr);
-    }
-  }
   private stmt(stmt: Stmt): CheckedStmt[] {
     switch (stmt.tag) {
       case "expr": {
@@ -238,7 +206,7 @@ export class TreeWalker implements ITreeWalker {
       case "impl":
         throw new Error("todo");
       case "let": {
-        const type = stmt.type ? this.typeExpr(stmt.type) : null;
+        const type = stmt.type ? this.scope.getType(stmt.type) : null;
         const expr = this.expr(stmt.expr, type);
         if (type) {
           this.checker.check(type, expr.type);
@@ -268,11 +236,11 @@ export class TreeWalker implements ITreeWalker {
 
         const parameters = stmt.parameters.map((p) => {
           const binding = p.binding;
-          const type = this.typeExpr(p.type, varMap);
+          const type = this.scope.getType(p.type, varMap);
           return { binding, type };
         });
 
-        const returns = this.typeExpr(stmt.returnType, varMap);
+        const returns = this.scope.getType(stmt.returnType, varMap);
         const type = funcType(
           returns,
           parameters.map((p) => p.type),
