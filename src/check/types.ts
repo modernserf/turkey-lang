@@ -55,7 +55,6 @@ export function funcType(
 }
 
 export const arrayTypeName = Symbol("Array");
-// TODO: iter trait
 export function arrayType(type: Type, arraySize: number): Type {
   return {
     tag: "concrete",
