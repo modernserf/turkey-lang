@@ -1,7 +1,7 @@
 import { IRStmt } from "../ir";
 import { Expr, Stmt, TypeExpr } from "../ast";
 import { noMatch } from "../utils";
-import { CheckerCtx } from "./checker";
+import { CheckerProvider } from "./checker";
 import {
   TreeWalker as ITreeWalker,
   CheckedExpr,
@@ -29,8 +29,9 @@ export class TreeWalker implements ITreeWalker {
   private binaryOps = this.stdlib.binaryOps;
   private scope = new Scope(this.stdlib);
   private traits = new Traits(this.stdlib);
-  private func = new Func(this, this.scope, this.traits);
-  private obj = new Obj(this, this.traits);
+  private checker = new CheckerProvider(this.traits);
+  private func = new Func(this, this.scope, this.traits, this.checker);
+  private obj = new Obj(this, this.checker);
   constructor(private stdlib: Stdlib) {}
   program(program: Stmt[]): IRStmt[] {
     const prelude: IRStmt[] = Array.from(this.stdlib.values).map(
@@ -135,13 +136,12 @@ export class TreeWalker implements ITreeWalker {
         return { tag: "do", block, type };
       }
       case "if": {
-        const predChecker = new CheckerCtx(this.traits);
-        const resultChecker = new CheckerCtx(this.traits);
+        const resultChecker = this.checker.create();
         const resultType = createVar(Symbol("Result"), []);
 
         const ifCases = expr.cases.map((ifCase) => {
           const predicate = this.expr(ifCase.predicate, null);
-          predChecker.unify(boolType, predicate.type);
+          this.checker.check(boolType, predicate.type);
 
           const caseResult = this.block(ifCase.block);
           resultChecker.unify(resultType, caseResult.type);
@@ -156,7 +156,7 @@ export class TreeWalker implements ITreeWalker {
       }
       case "match": {
         const target = this.expr(expr.expr, null);
-        const resultChecker = new CheckerCtx(this.traits);
+        const resultChecker = this.checker.create();
         const resultType = createVar(Symbol("Result"), []);
         const matcher = this.obj.createMatcher(target);
 
@@ -241,7 +241,7 @@ export class TreeWalker implements ITreeWalker {
         const type = stmt.type ? this.typeExpr(stmt.type) : null;
         const expr = this.expr(stmt.expr, type);
         if (type) {
-          new CheckerCtx(this.traits).unify(type, expr.type);
+          this.checker.check(type, expr.type);
         }
         const bindings = this.scope.initValue(stmt.binding, expr.type);
         if (bindings.rest.length) throw new Error("todo");
@@ -293,7 +293,7 @@ export class TreeWalker implements ITreeWalker {
         ];
       case "while": {
         const expr = this.expr(stmt.expr, null);
-        new CheckerCtx(this.traits).unify(boolType, expr.type);
+        this.checker.check(boolType, expr.type);
         const { block } = this.block(stmt.block);
         return [{ tag: "while", expr, block }];
       }

@@ -1,5 +1,5 @@
 import { Expr, MatchBinding, StructFieldValue } from "../ast";
-import { CheckerCtx } from "./checker";
+import { CheckerProvider } from "./checker";
 import {
   Obj as IObj,
   Matcher as IMatcher,
@@ -9,7 +9,6 @@ import {
   TreeWalker,
   Type,
   arrayTypeName,
-  Traits,
   createVar,
   tupleTypeName,
   tupleType,
@@ -24,7 +23,10 @@ export class Matcher implements IMatcher {
 }
 
 export class Obj implements IObj {
-  constructor(private treeWalker: TreeWalker, private traits: Traits) {}
+  constructor(
+    private treeWalker: TreeWalker,
+    private checker: CheckerProvider
+  ) {}
   list(
     ctor: TypeConstructor,
     inItems: Expr[],
@@ -32,7 +34,7 @@ export class Obj implements IObj {
   ): CheckedExpr {
     if (ctor.tag === "enum") throw new Error("todo");
     if (ctor.type.name !== arrayTypeName) throw new Error("todo");
-    const checker = new CheckerCtx(this.traits);
+    const checker = this.checker.create();
     const itemType = createVar(Symbol("Result"), []);
 
     const value = inItems.map((item) => {
@@ -94,7 +96,7 @@ export class Obj implements IObj {
     const target = this.treeWalker.expr(inTarget, null);
     const indexType = this.getIndexType(target.type, index);
     const expr = this.treeWalker.expr(inExpr, indexType);
-    new CheckerCtx(this.traits).unify(expr.type, indexType);
+    this.checker.check(expr.type, indexType);
     return { tag: "assign", target, index, expr };
   }
   private getIndexType(type: Type, index: number): Type {

@@ -6,11 +6,19 @@ export class TypeCheckError extends Error {
   }
 }
 
-export class CheckerCtx {
-  constructor(
-    private traits: Traits,
-    private context = new Map<symbol, Type>()
-  ) {}
+export class CheckerProvider {
+  constructor(private traits: Traits) {}
+  check(left: Type, right: Type): void {
+    const checker = this.create();
+    checker.unify(left, right);
+  }
+  create(context = new Map<symbol, Type>()) {
+    return new Checker(this.traits, context);
+  }
+}
+
+export class Checker {
+  constructor(private traits: Traits, private context: Map<symbol, Type>) {}
   unify(left: Type, right: Type): Type {
     return this.unifyInner(left, right, this.context, new Map()).type;
   }

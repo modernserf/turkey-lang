@@ -1,6 +1,6 @@
 import { Builtin, IRExpr } from "../ir";
 import { Binding, Expr, Stmt } from "../ast";
-import { CheckerCtx } from "./checker";
+import { Checker, CheckerProvider } from "./checker";
 import {
   CheckedExpr,
   Func as IFunc,
@@ -20,7 +20,8 @@ export class Func implements IFunc {
   constructor(
     private treeWalker: TreeWalker,
     private scope: Scope,
-    private traits: Traits
+    private traits: Traits,
+    private checker: CheckerProvider
   ) {}
   create(
     binding: symbol,
@@ -41,7 +42,7 @@ export class Func implements IFunc {
       typeParamsWithTracers.map(({ type, tracer }) => [type.name, tracer])
     );
 
-    const checker = new CheckerCtx(this.traits, tracerTypes);
+    const checker = new Checker(this.traits, tracerTypes);
     const check = (type: Type) => checker.unify(type, returnType);
 
     const { upvalues: us, result } = this.scope.funcScope(check, () => {
@@ -94,7 +95,7 @@ export class Func implements IFunc {
       typeHint,
       inParams.length
     );
-    const checker = new CheckerCtx(this.traits);
+    const checker = this.checker.create();
     const check = (type: Type) => checker.unify(type, returnType);
 
     const { upvalues: us, result } = this.scope.funcScope(check, () => {
@@ -138,7 +139,7 @@ export class Func implements IFunc {
       inArgs.length
     );
 
-    const checker = new CheckerCtx(this.traits);
+    const checker = this.checker.create();
 
     // unify in args with callee params, resulting in fully bound callee
     const concreteArgs = inArgs.map((arg, i) => {
@@ -158,7 +159,7 @@ export class Func implements IFunc {
   }
   op(op: Builtin, type: Type, inArgs: Expr[]): CheckedExpr {
     const { returnType, params } = this.checkCallee(type, inArgs.length);
-    const checker = new CheckerCtx(this.traits);
+    const checker = this.checker.create();
     const args = inArgs.map((arg, i) => {
       const checkedArg = this.treeWalker.expr(arg, checker.resolve(params[i]));
       checkedArg.type = checker.unify(params[i], checkedArg.type);
