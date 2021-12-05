@@ -37,7 +37,7 @@ export class Traits implements ITraits {
     if (!trait) {
       throw new Error("unknown trait");
     }
-    traitExpr.typeArgs.forEach((arg) => {
+    traitExpr.typeArgs.forEach((_arg) => {
       throw new Error("todo");
     });
     return trait;

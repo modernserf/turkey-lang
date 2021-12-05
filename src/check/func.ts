@@ -17,9 +17,11 @@ import {
 } from "./types";
 
 export class Func implements IFunc {
-  public scope!: Scope;
-  public treeWalker!: TreeWalker;
-  public traits!: Traits;
+  constructor(
+    private treeWalker: TreeWalker,
+    private scope: Scope,
+    private traits: Traits
+  ) {}
   create(
     binding: symbol,
     typeParams: Array<{ type: Type; traits: Trait[] }>,

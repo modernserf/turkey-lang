@@ -1,21 +1,17 @@
-import { Builtin, IRStmt } from "../ir";
+import { IRStmt } from "../ir";
 import { Expr, Stmt, TypeExpr } from "../ast";
 import { noMatch } from "../utils";
 import { CheckerCtx } from "./checker";
 import {
   TreeWalker as ITreeWalker,
-  Obj,
   CheckedExpr,
-  Scope,
   CheckedStmt,
   voidType,
   intType,
   floatType,
   stringType,
   boolType,
-  Func,
   createVar,
-  Traits,
   funcType,
   Type,
   Stdlib,
@@ -23,26 +19,30 @@ import {
   vecType,
   arrayType,
 } from "./types";
+import { Scope } from "./scope";
+import { Func } from "./func";
+import { Traits } from "./trait";
+import { Obj } from "./obj";
 
 export class TreeWalker implements ITreeWalker {
-  public scope!: Scope;
-  public func!: Func;
-  public traits!: Traits;
-  public obj!: Obj;
-  private unaryOps!: Map<string, { op: Builtin; type: Type }>;
-  private binaryOps!: Map<string, { op: Builtin; type: Type }>;
-  program(stdlib: Stdlib, program: Stmt[]): IRStmt[] {
-    const prelude: IRStmt[] = Array.from(stdlib.values).map(([name, expr]) => {
-      const binding = this.scope.initValue(
-        { tag: "identifier", value: name },
-        expr.type
-      );
+  private unaryOps = this.stdlib.unaryOps;
+  private binaryOps = this.stdlib.binaryOps;
+  private scope = new Scope(this.stdlib);
+  private traits = new Traits(this.stdlib);
+  private func = new Func(this, this.scope, this.traits);
+  private obj = new Obj(this, this.traits);
+  constructor(private stdlib: Stdlib) {}
+  program(program: Stmt[]): IRStmt[] {
+    const prelude: IRStmt[] = Array.from(this.stdlib.values).map(
+      ([name, expr]) => {
+        const binding = this.scope.initValue(
+          { tag: "identifier", value: name },
+          expr.type
+        );
 
-      return { tag: "let", binding: binding.root, expr };
-    });
-
-    this.unaryOps = stdlib.unaryOps;
-    this.binaryOps = stdlib.binaryOps;
+        return { tag: "let", binding: binding.root, expr };
+      }
+    );
 
     return [...prelude, ...this.block(program).block];
   }

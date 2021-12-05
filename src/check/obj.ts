@@ -24,8 +24,7 @@ export class Matcher implements IMatcher {
 }
 
 export class Obj implements IObj {
-  public treeWalker!: TreeWalker;
-  public traits!: Traits;
+  constructor(private treeWalker: TreeWalker, private traits: Traits) {}
   list(
     ctor: TypeConstructor,
     inItems: Expr[],

@@ -1,7 +1,5 @@
 import { Stmt } from "../ast";
-import { Scope } from "./scope";
 import { TreeWalker } from "./tree-walker";
-import { Func } from "./func";
 import {
   intType,
   Stdlib,
@@ -18,9 +16,7 @@ import {
   arrayType,
   vecType,
 } from "./types";
-import { Traits } from "./trait";
 import { IRExpr, IRStmt, func_, field_, call_, expr_, builtIn_ } from "../ir";
-import { Obj } from "./obj";
 
 const printFunc: CheckedExpr = (() => {
   const implShow = Symbol("impl_Show_T");
@@ -134,20 +130,6 @@ const stdlib: Stdlib = {
 };
 
 export function check(program: Stmt[]): IRStmt[] {
-  const treeWalker = new TreeWalker();
-  const scope = new Scope(stdlib);
-  const func = new Func();
-  const traits = new Traits(stdlib);
-  const obj = new Obj();
-  treeWalker.scope = scope;
-  treeWalker.func = func;
-  treeWalker.traits = traits;
-  treeWalker.obj = obj;
-  func.scope = scope;
-  func.treeWalker = treeWalker;
-  func.traits = traits;
-  obj.treeWalker = treeWalker;
-  obj.traits = traits;
-
-  return treeWalker.program(stdlib, program);
+  const treeWalker = new TreeWalker(stdlib);
+  return treeWalker.program(program);
 }
