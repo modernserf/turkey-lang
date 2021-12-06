@@ -216,3 +216,30 @@ it("rejects type aliases arity mismatch", () => {
   `;
   expect(() => check(code2)).toThrow();
 });
+
+it("uses structs", () => {
+  const code = `
+    struct Point { x: Int, y: Int }
+    let p = Point { x: 1, y: 2 }
+    let x = p:x
+  `;
+  expect(check(code)).toBeTruthy();
+});
+
+it("provides context in structs", () => {
+  const code = `
+    struct Foo <Fn> {
+      foo: func (Int): Int,
+      bar: Fn,
+    }
+
+    let f: Foo<func (Float): Float> = Foo {
+      foo: |x| x,
+      bar: |x| x,
+    }
+
+    f:foo(1)
+    f:bar(1.5)
+  `;
+  expect(check(code)).toBeTruthy();
+});

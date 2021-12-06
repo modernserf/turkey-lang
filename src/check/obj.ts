@@ -1,3 +1,4 @@
+import { StrictMap } from "../strict-map";
 import { Expr, MatchBinding, StructFieldValue } from "../ast";
 import { CheckerProvider } from "./checker";
 import {
@@ -22,11 +23,23 @@ export class Matcher implements IMatcher {
   }
 }
 
+type StructMapRecord = {
+  baseType: Type;
+  fields: StrictMap<string, { type: Type; index: number }>;
+};
+
 export class Obj implements IObj {
+  private structMap = new StrictMap<Type["name"], StructMapRecord>();
   constructor(
     private treeWalker: TreeWalker,
     private checker: CheckerProvider
   ) {}
+  initStruct(type: Type, fields: Array<{ name: string; type: Type }>): void {
+    const fieldsMap = new StrictMap(
+      fields.map((f, index) => [f.name, { type: f.type, index }])
+    );
+    this.structMap.init(type.name, { baseType: type, fields: fieldsMap });
+  }
   list(
     ctor: TypeConstructor,
     inItems: Expr[],
@@ -73,14 +86,47 @@ export class Obj implements IObj {
     return { tag: "object", value, type };
   }
   record(
-    _ctor: TypeConstructor,
-    _fields: StructFieldValue[],
-    _context: Type | null
+    ctor: TypeConstructor,
+    inFields: StructFieldValue[],
+    context: Type | null
   ): CheckedExpr {
-    throw new Error("todo");
+    if (ctor.tag === "enum") throw new Error("todo");
+    const { baseType, fields } = this.structMap.get(ctor.type.name);
+    const checker = this.checker.create();
+    if (context) {
+      checker.unify(baseType, context);
+    }
+
+    const checkedFields = new StrictMap(
+      inFields.map((field) => {
+        let { type: fieldType } = fields.get(field.fieldName);
+        fieldType = checker.resolve(fieldType);
+        const expr = this.treeWalker.expr(field.expr, fieldType);
+        checker.unify(fieldType, expr.type);
+        return [field.fieldName, expr];
+      })
+    );
+
+    const indexedFields: CheckedExpr[] = [];
+    for (const [fieldName, { index }] of fields) {
+      const expr = checkedFields.get(fieldName);
+      indexedFields[index] = expr;
+    }
+
+    return {
+      tag: "object",
+      value: indexedFields,
+      type: checker.resolve(ctor.type),
+    };
   }
-  getField(_expr: CheckedExpr, _value: string): CheckedExpr {
-    throw new Error("todo");
+  getField(expr: CheckedExpr, value: string): CheckedExpr {
+    const { baseType, fields } = this.structMap.get(expr.type.name);
+    const checker = this.checker.create();
+    checker.unify(baseType, expr.type);
+    const { type: fieldType, index } = fields.get(value);
+    const type = checker.resolve(fieldType);
+
+    return { tag: "field", target: expr, index, type };
   }
   getIndex(expr: CheckedExpr, index: number): CheckedExpr {
     const type = this.getIndexType(expr.type, index);

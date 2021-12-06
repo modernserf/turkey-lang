@@ -358,15 +358,15 @@ it("has tuple types", () => {
   expect(run(code)).toEqual([1, "hello"]);
 });
 
-// it.skip("has type aliases", () => {
-//   const code = `
-//     type Mapper = func (Int): Int
-//     let fn: Mapper = |x| { x + x }
-//     print(fn(1))
-//   `;
+it("has type aliases", () => {
+  const code = `
+    type Mapper = func (Int): Int
+    let fn: Mapper = |x| { x + x }
+    print(fn(1))
+  `;
 
-//   expect(run(code)).toEqual(["2"]);
-// });
+  expect(run(code)).toEqual([2]);
+});
 
 // it("has pattern matching", () => {
 //   const code = `
@@ -384,25 +384,38 @@ it("has tuple types", () => {
 //   expect(run(code)).toEqual(["1"]);
 // });
 
-// it("has structs", () => {
-//   const code = `
-//     struct Point {
-//       x: Int,
-//       y: Int,
-//     }
+it("has structs", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,
+    }
 
-//     func abs (x: Int): Int {
-//       if (x > 0) { x } else { -x }
-//     }
+    func abs (x: Int): Int {
+      if (x > 0) { x } else { -x }
+    }
 
-//     func manhattan_distance (from: Point, to: Point): Int {
-//       abs(to:x - from:x) + abs(to:y - from:y)
-//     }
+    func manhattan_distance (from: Point, to: Point): Int {
+      abs(to:x - from:x) + abs(to:y - from:y)
+    }
 
-//     print(manhattan_distance(Point { x: 1, y: 1 }, Point { x: 2, y: 0 }))
-//   `;
-//   expect(run(code)).toEqual(["2"]);
-// });
+    print(manhattan_distance(Point { x: 1, y: 1 }, Point { x: 2, y: 0 }))
+  `;
+  expect(run(code)).toEqual([2]);
+});
+
+it("has parameterized structs", () => {
+  const code = `
+    struct Point<T> {
+      x: T,
+      y: T,
+    }
+
+    let p = Point { x: 1.5, y: 2.5 }
+    print(p:y)
+  `;
+  expect(run(code)).toEqual([2.5]);
+});
 
 // it("puns struct fields in construction", () => {
 //   const code = `

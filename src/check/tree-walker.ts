@@ -1,5 +1,5 @@
 import { IRStmt } from "../ir";
-import { Expr, Stmt } from "../ast";
+import { Expr, Stmt, TypeParam } from "../ast";
 import { noMatch } from "../utils";
 import { CheckerProvider } from "./checker";
 import {
@@ -17,6 +17,8 @@ import {
   Stdlib,
   tupleType,
   vecType,
+  createType,
+  Trait,
 } from "./types";
 import { Scope } from "./scope";
 import { Func } from "./func";
@@ -52,23 +54,11 @@ export class TreeWalker implements ITreeWalker {
       case "identifier":
         return this.scope.getValue(expr.value);
       case "integer":
-        return {
-          tag: "primitive",
-          value: expr.value,
-          type: intType,
-        };
+        return { tag: "primitive", value: expr.value, type: intType };
       case "float":
-        return {
-          tag: "primitive",
-          value: expr.value,
-          type: floatType,
-        };
+        return { tag: "primitive", value: expr.value, type: floatType };
       case "string":
-        return {
-          tag: "string",
-          value: expr.value,
-          type: stringType,
-        };
+        return { tag: "string", value: expr.value, type: stringType };
       case "tuple": {
         return this.obj.tuple(
           {
@@ -201,21 +191,42 @@ export class TreeWalker implements ITreeWalker {
         return [{ tag: "expr", expr, type: expr.type }];
       }
       case "type": {
-        const pairs: [string, Type][] = stmt.binding.typeParameters.map((p) => [
-          p.value,
-          createVar(
-            Symbol(p.value),
-            p.traits.map((t) => this.traits.getTrait(t))
-          ),
-        ]);
-        const params = pairs.map((p) => p[1]);
-        const type = this.scope.getType(stmt.type, new StrictMap(pairs));
+        const paramList = this.typeParams(stmt.binding.typeParameters);
+        const type = this.scope.getType(
+          stmt.type,
+          this.paramListToMap(paramList)
+        );
 
-        this.scope.initTypeAlias(stmt.binding.value, params, type);
+        this.scope.initTypeAlias(
+          stmt.binding.value,
+          paramList.map((p) => p.type),
+          type
+        );
         return [];
       }
+      case "struct": {
+        if (stmt.isTuple) throw new Error("todo");
+        const paramList = this.typeParams(stmt.binding.typeParameters);
 
-      case "struct":
+        const type = createType(
+          Symbol(stmt.binding.value),
+          paramList.map((p) => p.type)
+        );
+        this.scope.initType(stmt.binding.value, type);
+        this.scope.initStructConstructor(stmt.binding.value, type);
+
+        const typeParams = this.paramListToMap(paramList);
+        const fields = stmt.fields.map((field) => {
+          return {
+            name: field.fieldName,
+            type: this.scope.getType(field.type, typeParams),
+          };
+        });
+
+        this.obj.initStruct(type, fields);
+
+        return [];
+      }
       case "enum":
       case "trait":
       case "impl":
@@ -234,18 +245,12 @@ export class TreeWalker implements ITreeWalker {
         // for each type param:
         // - create a new abstract type
         // - look up associated traits
-        const typeParams = stmt.typeParameters.map((p) => {
-          const traits = p.traits.map((t) => this.traits.getTrait(t));
-          const type = createVar(Symbol(p.value), traits);
-          return { name: p.value, type, traits };
-        });
+        const paramList = this.typeParams(stmt.typeParameters);
         // map of type param name -> type used when checking param & return types
-        const varMap = new StrictMap(
-          typeParams.map(({ name, type }) => [name, type])
-        );
+        const varMap = this.paramListToMap(paramList);
         // hidden trait impl params, flattened out from type params
         // func foo <T: Foo + Bar, U, V: Baz> => [Foo, Bar, Baz]
-        const traitParams = typeParams.flatMap(({ type, traits }) => {
+        const traitParams = paramList.flatMap(({ type, traits }) => {
           return traits.map((trait) => ({ type, trait }));
         });
 
@@ -267,7 +272,7 @@ export class TreeWalker implements ITreeWalker {
         );
 
         return [
-          this.func.create(root, typeParams, parameters, returns, stmt.block),
+          this.func.create(root, paramList, parameters, returns, stmt.block),
         ];
       }
       case "return":
@@ -298,5 +303,19 @@ export class TreeWalker implements ITreeWalker {
       default:
         noMatch(stmt);
     }
+  }
+  private typeParams(
+    params: TypeParam[]
+  ): Array<{ name: string; type: Type; traits: Trait[] }> {
+    return params.map((p) => {
+      const traits = p.traits.map((t) => this.traits.getTrait(t));
+      const type = createVar(Symbol(p.value), traits);
+      return { name: p.value, type, traits };
+    });
+  }
+  private paramListToMap(
+    paramList: Array<{ name: string; type: Type }>
+  ): StrictMap<string, Type> {
+    return new StrictMap(paramList.map((p) => [p.name, p.type]));
   }
 }

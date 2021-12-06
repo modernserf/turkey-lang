@@ -36,4 +36,7 @@ export class StrictMap<K, V> {
   get size(): number {
     return this.map.size;
   }
+  *[Symbol.iterator]() {
+    yield* this.map;
+  }
 }
