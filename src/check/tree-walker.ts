@@ -31,9 +31,9 @@ export class TreeWalker implements ITreeWalker {
   private binaryOps = this.stdlib.binaryOps;
   private traits = new Traits(this.stdlib);
   private checker = new CheckerProvider(this.traits);
-  private scope = new Scope(this.stdlib, this.checker);
-  private func = new Func(this, this.scope, this.traits, this.checker);
   private obj = new Obj(this, this.checker);
+  private scope = new Scope(this.stdlib, this.checker, this.obj);
+  private func = new Func(this, this.scope, this.traits, this.checker);
   constructor(private stdlib: Stdlib) {}
   program(program: Stmt[]): IRStmt[] {
     const prelude: IRStmt[] = Array.from(this.stdlib.values).map(
@@ -238,8 +238,7 @@ export class TreeWalker implements ITreeWalker {
           this.checker.check(type, expr.type);
         }
         const bindings = this.scope.initValue(stmt.binding, expr.type);
-        if (bindings.rest.length) throw new Error("todo");
-        return [{ tag: "let", binding: bindings.root, expr }];
+        return [{ tag: "let", binding: bindings.root, expr }, ...bindings.rest];
       }
       case "func": {
         // for each type param:
@@ -290,8 +289,8 @@ export class TreeWalker implements ITreeWalker {
         const iter = this.obj.iter(expr);
         return this.scope.blockScope(() => {
           const { root, rest } = this.scope.initValue(stmt.binding, iter.type);
-          if (rest.length) throw new Error("todo");
-          const { block } = this.block(stmt.block);
+          const { block: blockBody } = this.block(stmt.block);
+          const block = [...rest, ...blockBody];
 
           return [{ tag: "for", binding: root, expr, block }];
         });

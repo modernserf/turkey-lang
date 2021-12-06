@@ -113,7 +113,7 @@ export interface Scope {
   initValue(
     binding: Binding,
     type: Type
-  ): { root: symbol; rest: Array<{ name: symbol; expr: CheckedExpr }> };
+  ): { root: symbol; rest: CheckedStmt[] };
   getValue(str: string): CheckedExpr;
   initType(name: string, value: Type): void;
   getType(typeExpr: TypeExpr, typeParams?: StrictMap<string, Type>): Type;

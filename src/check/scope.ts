@@ -10,6 +10,7 @@ import {
   TypeConstructor,
   tupleType,
   funcType,
+  Obj,
 } from "./types";
 import { StrictMap } from "../strict-map";
 import { CheckerProvider } from "./checker";
@@ -72,7 +73,11 @@ export class Scope implements IScope {
     tag: "root",
     ...this.newFrameValue(),
   };
-  constructor(stdlib: Stdlib, private checker: CheckerProvider) {
+  constructor(
+    stdlib: Stdlib,
+    private checker: CheckerProvider,
+    private obj: Obj
+  ) {
     for (const [name, { type, constructors }] of stdlib.types) {
       // FIXME maybe
       if (name === "Array") {
@@ -108,7 +113,7 @@ export class Scope implements IScope {
   initValue(
     binding: Binding,
     type: Type
-  ): { root: symbol; rest: Array<{ name: symbol; expr: CheckedExpr }> } {
+  ): { root: symbol; rest: CheckedStmt[] } {
     switch (binding.tag) {
       case "identifier": {
         const name = Symbol(binding.value);
@@ -117,7 +122,19 @@ export class Scope implements IScope {
         }
         return { root: name, rest: [] };
       }
-      case "record":
+      case "record": {
+        const root = Symbol("root");
+        const rootExpr: CheckedExpr = { tag: "local", value: root, type };
+        const rest = binding.fields.flatMap((f) => {
+          const field = this.obj.getField(rootExpr, f.fieldName);
+          const res = this.initValue(f.binding, field.type);
+          return [
+            { tag: "let" as const, binding: res.root, expr: field },
+            ...res.rest,
+          ];
+        });
+        return { root, rest };
+      }
       case "tuple":
         throw new Error("todo");
       // istanbul ignore next

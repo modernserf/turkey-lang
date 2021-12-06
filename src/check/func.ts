@@ -66,14 +66,16 @@ export class Func implements IFunc {
       // and get the symbols that the corresponding arguments will be bound to
       const mainParamSymbols = inParameters.map((p) => {
         const resolvedType = checker.resolve(p.type);
-        const res = this.scope.initValue(p.binding, resolvedType);
-        // TODO: add destructured bindings to beginning of block
-        if (res.rest.length) throw new Error("todo");
-        return res.root;
+        return this.scope.initValue(p.binding, resolvedType);
       });
-      const parameters = [...traitParamSymbols, ...mainParamSymbols];
+      const parameters = [
+        ...traitParamSymbols,
+        ...mainParamSymbols.map((b) => b.root),
+      ];
 
-      const { block } = this.treeWalker.block(inBlock);
+      const blockHeader = mainParamSymbols.flatMap((b) => b.rest);
+      const { block: blockBody } = this.treeWalker.block(inBlock);
+      const block = [...blockHeader, ...blockBody];
       const blockReturnType = this.blockReturnType(block);
       if (blockReturnType) check(blockReturnType);
       return { parameters, block };
@@ -110,14 +112,17 @@ export class Func implements IFunc {
       });
 
       const mainParamSymbols = inParams.map((binding, i) => {
-        const res = this.scope.initValue(binding, params[i]);
-        // TODO: add destructured bindings to beginning of block
-        if (res.rest.length) throw new Error("todo");
-        return res.root;
+        return this.scope.initValue(binding, params[i]);
       });
-      const parameters = [...traitParamSymbols, ...mainParamSymbols];
 
-      const { block } = this.treeWalker.block(inBlock);
+      const parameters = [
+        ...traitParamSymbols,
+        ...mainParamSymbols.map((b) => b.root),
+      ];
+
+      const blockHeader = mainParamSymbols.flatMap((b) => b.rest);
+      const { block: blockBody } = this.treeWalker.block(inBlock);
+      const block = [...blockHeader, ...blockBody];
       const blockReturnType = this.blockReturnType(block);
       if (blockReturnType) check(blockReturnType);
       return { parameters, block };

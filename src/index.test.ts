@@ -417,64 +417,64 @@ it("has parameterized structs", () => {
   expect(run(code)).toEqual([2.5]);
 });
 
-// it("puns struct fields in construction", () => {
-//   const code = `
-//     struct Point {
-//       x: Int,
-//       y: Int,
-//     }
+it("puns struct fields in construction", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,
+    }
 
-//     let x = 1
-//     let y = 2
-//     let point = Point { x, y }
-//     print(point:x)
-//   `;
-//   expect(run(code)).toEqual(["1"]);
-// });
+    let x = 1
+    let y = 2
+    let point = Point { x, y }
+    print(point:x)
+  `;
+  expect(run(code)).toEqual([1]);
+});
 
-// it("has destructuring", () => {
-//   const code = `
-//   struct Point {
-//     x: Int,
-//     y: Int,
-//   }
+it("has destructuring", () => {
+  const code = `
+  struct Point {
+    x: Int,
+    y: Int,
+  }
 
-//   let point = Point { x: 1, y: 2 }
-//   let { x: x } = point
-//   print(x)
-//   `;
-//   expect(run(code)).toEqual(["1"]);
-// });
+  let point = Point { x: 1, y: 2 }
+  let { x: x } = point
+  print(x)
+  `;
+  expect(run(code)).toEqual([1]);
+});
 
-// it("puns struct fields in destructuring", () => {
-//   const code = `
-//     struct Point {
-//       x: Int,
-//       y: Int,
-//     }
+it("puns struct fields in destructuring", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,
+    }
 
-//     let point = Point { x: 1, y: 2 }
-//     let { x } = point
-//     print(x)
-//   `;
-//   expect(run(code)).toEqual(["1"]);
-// });
+    let point = Point { x: 1, y: 2 }
+    let { x } = point
+    print(x)
+  `;
+  expect(run(code)).toEqual([1]);
+});
 
-// it("destructures function parameters", () => {
-//   const code = `
-//     struct Point {
-//       x: Int,
-//       y: Int,
-//     }
+it("destructures function parameters", () => {
+  const code = `
+    struct Point {
+      x: Int,
+      y: Int,
+    }
 
-//     func get_x ({ x }: Point): Int {
-//       x
-//     }
+    func get_x ({ x }: Point): Int {
+      x
+    }
 
-//     print(get_x(Point { x: 1, y: 2 }))
-//   `;
-//   expect(run(code)).toEqual(["1"]);
-// });
+    print(get_x(Point { x: 1, y: 2 }))
+  `;
+  expect(run(code)).toEqual([1]);
+});
 
 // it("has tuple structs", () => {
 //   const code = `
