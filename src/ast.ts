@@ -1,11 +1,15 @@
 export type Stmt =
   | { tag: "type"; binding: TypeBinding; type: TypeExpr }
-  | { tag: "enum"; binding: TypeBinding; cases: EnumCase[] }
+  | { tag: "enum"; binding: TypeBinding; cases: EnumType[] }
   | {
       tag: "struct";
       binding: TypeBinding;
       fields: StructFieldType[];
-      isTuple: boolean;
+    }
+  | {
+      tag: "structTuple";
+      binding: TypeBinding;
+      fields: TypeExpr[];
     }
   | { tag: "let"; binding: Binding; type: TypeExpr | null; expr: Expr }
   | { tag: "while"; expr: Expr; block: Stmt[] }
@@ -30,11 +34,28 @@ export type Stmt =
   | { tag: "assign"; target: Expr; index: number; value: Expr }
   | { tag: "expr"; expr: Expr };
 
-export type EnumCase = {
-  tagName: string;
-  fields: StructFieldType[];
-  isTuple: boolean;
-};
+export type EnumType =
+  | {
+      tag: "record";
+      tagName: string;
+      fields: StructFieldType[];
+    }
+  | {
+      tag: "tuple";
+      tagName: string;
+      fields: TypeExpr[];
+    };
+export type EnumBinding =
+  | {
+      tag: "record";
+      tagName: string;
+      fields: StructFieldBinding[];
+    }
+  | {
+      tag: "tuple";
+      tagName: string;
+      fields: Binding[];
+    };
 
 export type StructFieldType = { fieldName: string; type: TypeExpr };
 export type StructFieldValue = { fieldName: string; expr: Expr };
@@ -76,16 +97,12 @@ export type Expr =
 
 export type IfCase = { tag: "cond"; predicate: Expr; block: Stmt[] };
 
-export type MatchCase = { binding: MatchBinding; block: Stmt[] };
-export type MatchBinding = {
-  tag: "typeIdentifier";
-  value: string;
-  fields: StructFieldBinding[];
-};
+export type MatchCase = { binding: EnumBinding; block: Stmt[] };
 
 export type Binding =
   | { tag: "identifier"; value: string }
-  | { tag: "struct"; fields: StructFieldBinding[] };
+  | { tag: "record"; fields: StructFieldBinding[] }
+  | { tag: "tuple"; fields: Binding[] };
 
 export type TypeExpr =
   | { tag: "identifier"; value: string; typeArgs: TypeExpr[] }

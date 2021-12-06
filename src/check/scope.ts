@@ -117,7 +117,8 @@ export class Scope implements IScope {
         }
         return { root: name, rest: [] };
       }
-      case "struct":
+      case "record":
+      case "tuple":
         throw new Error("todo");
       // istanbul ignore next
       default:

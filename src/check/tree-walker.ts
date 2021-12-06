@@ -205,7 +205,6 @@ export class TreeWalker implements ITreeWalker {
         return [];
       }
       case "struct": {
-        if (stmt.isTuple) throw new Error("todo");
         const paramList = this.typeParams(stmt.binding.typeParameters);
 
         const type = createType(
@@ -227,6 +226,7 @@ export class TreeWalker implements ITreeWalker {
 
         return [];
       }
+      case "structTuple":
       case "enum":
       case "trait":
       case "impl":

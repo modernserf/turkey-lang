@@ -685,7 +685,7 @@ Array [
 });
 
 it("parses struct type declarations", () => {
-  expect(parse(`struct Foo`)).toMatchInlineSnapshot(`
+  expect(parse(`struct Foo()`)).toMatchInlineSnapshot(`
 Array [
   Object {
     "binding": Object {
@@ -694,8 +694,7 @@ Array [
       "value": "Foo",
     },
     "fields": Array [],
-    "isTuple": false,
-    "tag": "struct",
+    "tag": "structTuple",
   },
 ]
 `);
@@ -709,34 +708,27 @@ Array [
     },
     "fields": Array [
       Object {
-        "fieldName": "0",
-        "type": Object {
-          "tag": "identifier",
-          "typeArgs": Array [],
-          "value": "Int",
-        },
+        "tag": "identifier",
+        "typeArgs": Array [],
+        "value": "Int",
       },
       Object {
-        "fieldName": "1",
-        "type": Object {
-          "tag": "identifier",
-          "typeArgs": Array [],
-          "value": "Int",
-        },
+        "tag": "identifier",
+        "typeArgs": Array [],
+        "value": "Int",
       },
     ],
-    "isTuple": true,
-    "tag": "struct",
+    "tag": "structTuple",
   },
 ]
 `);
   expect(
-    parse(`
+parse(`
     struct Foo { 
       x: Int, 
       y: Int, 
-    }`)
-  ).toMatchInlineSnapshot(`
+    }`)).
+toMatchInlineSnapshot(`
 Array [
   Object {
     "binding": Object {
@@ -762,7 +754,6 @@ Array [
         },
       },
     ],
-    "isTuple": false,
     "tag": "struct",
   },
 ]
@@ -781,12 +772,12 @@ Array [
     "cases": Array [
       Object {
         "fields": Array [],
-        "isTuple": false,
+        "tag": "tuple",
         "tagName": "V1",
       },
       Object {
         "fields": Array [],
-        "isTuple": false,
+        "tag": "tuple",
         "tagName": "V2",
       },
     ],
@@ -818,21 +809,18 @@ Array [
     "cases": Array [
       Object {
         "fields": Array [],
-        "isTuple": false,
+        "tag": "tuple",
         "tagName": "None",
       },
       Object {
         "fields": Array [
           Object {
-            "fieldName": "0",
-            "type": Object {
-              "tag": "identifier",
-              "typeArgs": Array [],
-              "value": "T",
-            },
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "T",
           },
         ],
-        "isTuple": true,
+        "tag": "tuple",
         "tagName": "Some",
       },
     ],
@@ -859,15 +847,12 @@ Array [
       Object {
         "fields": Array [
           Object {
-            "fieldName": "0",
-            "type": Object {
-              "tag": "identifier",
-              "typeArgs": Array [],
-              "value": "Int",
-            },
+            "tag": "identifier",
+            "typeArgs": Array [],
+            "value": "Int",
           },
         ],
-        "isTuple": true,
+        "tag": "tuple",
         "tagName": "Number",
       },
       Object {
@@ -889,7 +874,7 @@ Array [
             },
           },
         ],
-        "isTuple": false,
+        "tag": "record",
         "tagName": "Add",
       },
     ],
@@ -959,7 +944,7 @@ Array [
           "fieldName": "y",
         },
       ],
-      "tag": "struct",
+      "tag": "record",
     },
     "expr": Object {
       "tag": "identifier",
@@ -990,7 +975,7 @@ Array [
           "fieldName": "y",
         },
       ],
-      "tag": "struct",
+      "tag": "record",
     },
     "expr": Object {
       "tag": "identifier",
@@ -1007,21 +992,15 @@ Array [
     "binding": Object {
       "fields": Array [
         Object {
-          "binding": Object {
-            "tag": "identifier",
-            "value": "a",
-          },
-          "fieldName": "0",
+          "tag": "identifier",
+          "value": "a",
         },
         Object {
-          "binding": Object {
-            "tag": "identifier",
-            "value": "b",
-          },
-          "fieldName": "1",
+          "tag": "identifier",
+          "value": "b",
         },
       ],
-      "tag": "struct",
+      "tag": "tuple",
     },
     "expr": Object {
       "tag": "identifier",
@@ -1812,15 +1791,15 @@ Array [
 
 it("parses match expressions", () => {
   expect(
-    parse(`
+parse(`
     match (list) {
       Nil => 0,
       Cons(head, tail) => {
         1 + length(tail)
       }
     }
-  `)
-  ).toMatchInlineSnapshot(`
+  `)).
+toMatchInlineSnapshot(`
 Array [
   Object {
     "expr": Object {
@@ -1828,8 +1807,8 @@ Array [
         Object {
           "binding": Object {
             "fields": Array [],
-            "tag": "typeIdentifier",
-            "value": "Nil",
+            "tag": "tuple",
+            "tagName": "Nil",
           },
           "block": Array [
             Object {
@@ -1845,22 +1824,16 @@ Array [
           "binding": Object {
             "fields": Array [
               Object {
-                "binding": Object {
-                  "tag": "identifier",
-                  "value": "head",
-                },
-                "fieldName": "0",
+                "tag": "identifier",
+                "value": "head",
               },
               Object {
-                "binding": Object {
-                  "tag": "identifier",
-                  "value": "tail",
-                },
-                "fieldName": "1",
+                "tag": "identifier",
+                "value": "tail",
               },
             ],
-            "tag": "typeIdentifier",
-            "value": "Cons",
+            "tag": "tuple",
+            "tagName": "Cons",
           },
           "block": Array [
             Object {
@@ -1901,13 +1874,13 @@ Array [
 ]
 `);
   expect(
-    parse(`
+parse(`
     match (ast) {
       Number(x) => x,
       Add { left, right } => left + right,
     }
-  `)
-  ).toMatchInlineSnapshot(`
+  `)).
+toMatchInlineSnapshot(`
 Array [
   Object {
     "expr": Object {
@@ -1916,15 +1889,12 @@ Array [
           "binding": Object {
             "fields": Array [
               Object {
-                "binding": Object {
-                  "tag": "identifier",
-                  "value": "x",
-                },
-                "fieldName": "0",
+                "tag": "identifier",
+                "value": "x",
               },
             ],
-            "tag": "typeIdentifier",
-            "value": "Number",
+            "tag": "tuple",
+            "tagName": "Number",
           },
           "block": Array [
             Object {
@@ -1954,8 +1924,8 @@ Array [
                 "fieldName": "right",
               },
             ],
-            "tag": "typeIdentifier",
-            "value": "Add",
+            "tag": "record",
+            "tagName": "Add",
           },
           "block": Array [
             Object {

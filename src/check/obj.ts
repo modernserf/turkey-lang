@@ -1,5 +1,5 @@
 import { StrictMap } from "../strict-map";
-import { Expr, MatchBinding, StructFieldValue } from "../ast";
+import { Expr, EnumBinding, StructFieldValue } from "../ast";
 import { CheckerProvider } from "./checker";
 import {
   Obj as IObj,
@@ -18,7 +18,7 @@ import {
 
 export class Matcher implements IMatcher {
   public binding = Symbol("MatchBinding");
-  case(_binding: MatchBinding): { index: number; block: CheckedStmt[] } {
+  case(_binding: EnumBinding): { index: number; block: CheckedStmt[] } {
     throw new Error("todo");
   }
 }

@@ -2,7 +2,7 @@ import { StrictMap } from "../strict-map";
 import {
   Binding,
   Expr,
-  MatchBinding,
+  EnumBinding,
   Stmt,
   StructFieldValue,
   TraitExpr,
@@ -153,7 +153,7 @@ export interface Traits {
 
 export interface Matcher {
   binding: symbol;
-  case(binding: MatchBinding): { index: number; block: CheckedStmt[] };
+  case(binding: EnumBinding): { index: number; block: CheckedStmt[] };
 }
 
 export interface Obj {

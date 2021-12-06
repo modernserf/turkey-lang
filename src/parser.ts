@@ -5,7 +5,7 @@ import {
   IfCase,
   TypeExpr,
   TypeBinding,
-  EnumCase,
+  EnumType,
   StructFieldType,
   StructFieldValue,
   MatchCase,
@@ -13,6 +13,7 @@ import {
   TypeParam,
   TraitField,
   TraitExpr,
+  EnumBinding,
 } from "./ast";
 import { Token } from "./token";
 
@@ -70,8 +71,16 @@ const matchStatement: Parser<Stmt | null> = (state) => {
     case "struct": {
       state.advance();
       const binding = matchTypeBinding(state);
-      const { fields, isTuple } = matchStructFieldTypeList(state);
-      return { tag: "struct", binding, fields, isTuple };
+      if (check(state, "{")) {
+        const fields = commaList(state, checkStructFieldType);
+        match(state, "}");
+        return { tag: "struct", binding, fields };
+      } else {
+        match(state, "(");
+        const fields = commaList(state, checkType);
+        match(state, ")");
+        return { tag: "structTuple", binding, fields };
+      }
     }
     case "let": {
       state.advance();
@@ -327,13 +336,24 @@ const checkBaseExpr: Parser<Expr | null> = (state) => {
 const checkMatchCase: Parser<MatchCase | null> = (state) => {
   const enumTag = check(state, "typeIdentifier");
   if (!enumTag) return null;
-  const fields = matchStructFieldBindingList(state);
+  let binding: EnumBinding = {
+    tag: "tuple",
+    tagName: enumTag.value,
+    fields: [],
+  };
+  if (check(state, "{")) {
+    const fields = commaList(state, checkStructFieldBinding);
+    match(state, "}");
+    binding = { tag: "record", tagName: enumTag.value, fields };
+  } else if (check(state, "(")) {
+    const fields = commaList(state, checkBinding);
+    match(state, ")");
+    binding = { tag: "tuple", tagName: enumTag.value, fields };
+  }
+
   match(state, "=>");
   const block = matchBlockOrExpr(state);
-  return {
-    binding: { tag: "typeIdentifier", value: enumTag.value, fields },
-    block,
-  };
+  return { binding, block };
 };
 
 const matchBlockOrExpr: Parser<Stmt[]> = (state) => {
@@ -343,20 +363,6 @@ const matchBlockOrExpr: Parser<Stmt[]> = (state) => {
   } else {
     const expr = matchExpr(state);
     return [{ tag: "expr", expr }];
-  }
-};
-
-const matchStructFieldBindingList: Parser<StructFieldBinding[]> = (state) => {
-  if (check(state, "{")) {
-    const fields = commaList(state, checkStructFieldBinding);
-    match(state, "}");
-    return fields;
-  } else if (check(state, "(")) {
-    const fields = commaList(state, checkBinding);
-    match(state, ")");
-    return fields.map((binding, i) => ({ fieldName: String(i), binding }));
-  } else {
-    return [];
   }
 };
 
@@ -382,10 +388,17 @@ const checkBinding: Parser<Binding | null> = (state) => {
     case "identifier":
       state.advance();
       return { tag: "identifier", value: token.value };
-    case "{":
+    case "{": {
+      state.advance();
+      const fields = commaList(state, checkStructFieldBinding);
+      match(state, "}");
+      return { tag: "record", fields };
+    }
     case "(": {
-      const fields = matchStructFieldBindingList(state);
-      return { tag: "struct", fields };
+      state.advance();
+      const fields = commaList(state, checkBinding);
+      match(state, ")");
+      return { tag: "tuple", fields };
     }
     default:
       return null;
@@ -489,30 +502,19 @@ const checkTypeParam: Parser<TypeParam | null> = (state) => {
   return { tag: "identifier", value: param.value, traits };
 };
 
-const checkEnumCase: Parser<EnumCase | null> = (state) => {
+const checkEnumCase: Parser<EnumType | null> = (state) => {
   const tagName = check(state, "typeIdentifier");
   if (!tagName) return null;
-  const { fields, isTuple } = matchStructFieldTypeList(state);
-  return { tagName: tagName.value, fields, isTuple };
-};
-
-const matchStructFieldTypeList: Parser<{
-  fields: StructFieldType[];
-  isTuple: boolean;
-}> = (state) => {
   if (check(state, "{")) {
     const fields = commaList(state, checkStructFieldType);
     match(state, "}");
-    return { fields, isTuple: false };
+    return { tag: "record", tagName: tagName.value, fields };
   } else if (check(state, "(")) {
     const fields = commaList(state, checkType);
     match(state, ")");
-    return {
-      fields: fields.map((type, i) => ({ fieldName: String(i), type })),
-      isTuple: true,
-    };
+    return { tag: "tuple", tagName: tagName.value, fields };
   } else {
-    return { fields: [], isTuple: false };
+    return { tag: "tuple", tagName: tagName.value, fields: [] };
   }
 };
 
