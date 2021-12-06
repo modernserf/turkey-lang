@@ -176,6 +176,7 @@ export interface Obj {
   ): CheckedExpr;
   getField(expr: CheckedExpr, value: string): CheckedExpr;
   getIndex(expr: CheckedExpr, value: number): CheckedExpr;
+  getTupleItems(expr: CheckedExpr): CheckedExpr[];
   createMatcher(expr: CheckedExpr): Matcher;
   iter(expr: CheckedExpr): CheckedExpr;
   assign(target: Expr, index: number, expr: Expr): CheckedStmt;

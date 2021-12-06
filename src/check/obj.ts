@@ -23,10 +23,17 @@ export class Matcher implements IMatcher {
   }
 }
 
-type StructMapRecord = {
-  baseType: Type;
-  fields: StrictMap<string, { type: Type; index: number }>;
-};
+type StructMapRecord =
+  | {
+      tag: "record";
+      baseType: Type;
+      fields: StrictMap<string, { type: Type; index: number }>;
+    }
+  | {
+      tag: "tuple";
+      baseType: Type;
+      fields: Type[];
+    };
 
 export class Obj implements IObj {
   private structMap = new StrictMap<Type["name"], StructMapRecord>();
@@ -38,7 +45,14 @@ export class Obj implements IObj {
     const fieldsMap = new StrictMap(
       fields.map((f, index) => [f.name, { type: f.type, index }])
     );
-    this.structMap.init(type.name, { baseType: type, fields: fieldsMap });
+    this.structMap.init(type.name, {
+      tag: "record",
+      baseType: type,
+      fields: fieldsMap,
+    });
+  }
+  initTupleStruct(type: Type, fields: Type[]): void {
+    this.structMap.init(type.name, { tag: "tuple", baseType: type, fields });
   }
   list(
     ctor: TypeConstructor,
@@ -75,15 +89,39 @@ export class Obj implements IObj {
   tuple(
     ctor: TypeConstructor,
     inItems: Expr[],
-    _context: Type | null
+    context: Type | null
   ): CheckedExpr {
     if (ctor.tag === "enum") throw new Error("todo");
-    if (ctor.type.name !== tupleTypeName) throw new Error("todo");
-    const value = inItems.map((item) => {
-      return this.treeWalker.expr(item, null);
-    });
-    const type = tupleType(value.map((expr) => expr.type));
-    return { tag: "object", value, type };
+    if (ctor.type.name === tupleTypeName) {
+      const value = inItems.map((item) => {
+        return this.treeWalker.expr(item, null);
+      });
+      const type = tupleType(value.map((expr) => expr.type));
+      return { tag: "object", value, type };
+    } else {
+      const data = this.structMap.get(ctor.type.name);
+      if (data.tag === "record") throw new Error("expected tuple, got record");
+      const checker = this.checker.create();
+      if (context) {
+        checker.unify(data.baseType, context);
+      }
+      if (inItems.length !== data.fields.length) {
+        throw new Error("tuple arity mismatch");
+      }
+      const checkedFields = inItems.map((item, i) => {
+        let fieldType = data.fields[i];
+        fieldType = checker.resolve(fieldType);
+        const expr = this.treeWalker.expr(item, fieldType);
+        checker.unify(fieldType, expr.type);
+        return expr;
+      });
+
+      return {
+        tag: "object",
+        value: checkedFields,
+        type: checker.resolve(ctor.type),
+      };
+    }
   }
   record(
     ctor: TypeConstructor,
@@ -91,15 +129,16 @@ export class Obj implements IObj {
     context: Type | null
   ): CheckedExpr {
     if (ctor.tag === "enum") throw new Error("todo");
-    const { baseType, fields } = this.structMap.get(ctor.type.name);
+    const data = this.structMap.get(ctor.type.name);
+    if (data.tag === "tuple") throw new Error("expected record, got tuple");
     const checker = this.checker.create();
     if (context) {
-      checker.unify(baseType, context);
+      checker.unify(data.baseType, context);
     }
 
     const checkedFields = new StrictMap(
       inFields.map((field) => {
-        let { type: fieldType } = fields.get(field.fieldName);
+        let { type: fieldType } = data.fields.get(field.fieldName);
         fieldType = checker.resolve(fieldType);
         const expr = this.treeWalker.expr(field.expr, fieldType);
         checker.unify(fieldType, expr.type);
@@ -108,7 +147,7 @@ export class Obj implements IObj {
     );
 
     const indexedFields: CheckedExpr[] = [];
-    for (const [fieldName, { index }] of fields) {
+    for (const [fieldName, { index }] of data.fields) {
       const expr = checkedFields.get(fieldName);
       indexedFields[index] = expr;
     }
@@ -120,10 +159,11 @@ export class Obj implements IObj {
     };
   }
   getField(expr: CheckedExpr, value: string): CheckedExpr {
-    const { baseType, fields } = this.structMap.get(expr.type.name);
+    const data = this.structMap.get(expr.type.name);
+    if (data.tag === "tuple") throw new Error("expected record, got tuple");
     const checker = this.checker.create();
-    checker.unify(baseType, expr.type);
-    const { type: fieldType, index } = fields.get(value);
+    checker.unify(data.baseType, expr.type);
+    const { type: fieldType, index } = data.fields.get(value);
     const type = checker.resolve(fieldType);
 
     return { tag: "field", target: expr, index, type };
@@ -131,6 +171,23 @@ export class Obj implements IObj {
   getIndex(expr: CheckedExpr, index: number): CheckedExpr {
     const type = this.getIndexType(expr.type, index);
     return { tag: "field", target: expr, index, type };
+  }
+  getTupleItems(expr: CheckedExpr): CheckedExpr[] {
+    if (expr.type.tag !== "concrete") throw new Error("cannot get index");
+    if (expr.type.name === tupleTypeName) {
+      return expr.type.parameters.map((type, index) => {
+        return { tag: "field", target: expr, index, type };
+      });
+    }
+    const data = this.structMap.get(expr.type.name);
+    if (data.tag === "record") {
+      throw new Error("expected tuple, got record");
+    }
+    const checker = this.checker.create();
+    checker.unify(data.baseType, expr.type);
+    return data.fields.map((type, index) => {
+      return { tag: "field", target: expr, index, type };
+    });
   }
   createMatcher(_expr: CheckedExpr): Matcher {
     throw new Error("todo");
@@ -160,8 +217,15 @@ export class Obj implements IObj {
           throw new Error("index out of bounds");
         }
         return type.parameters[index];
-      default:
-        throw new Error("todo");
+      default: {
+        const data = this.structMap.get(type.name);
+        if (data.tag === "record") {
+          throw new Error("expected tuple, got record");
+        }
+        const checker = this.checker.create();
+        checker.unify(data.baseType, type);
+        return checker.resolve(data.fields[index]);
+      }
     }
   }
 }

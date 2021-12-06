@@ -206,7 +206,6 @@ export class TreeWalker implements ITreeWalker {
       }
       case "struct": {
         const paramList = this.typeParams(stmt.binding.typeParameters);
-
         const type = createType(
           Symbol(stmt.binding.value),
           paramList.map((p) => p.type)
@@ -223,10 +222,26 @@ export class TreeWalker implements ITreeWalker {
         });
 
         this.obj.initStruct(type, fields);
-
         return [];
       }
-      case "structTuple":
+      case "structTuple": {
+        const paramList = this.typeParams(stmt.binding.typeParameters);
+        const type = createType(
+          Symbol(stmt.binding.value),
+          paramList.map((p) => p.type)
+        );
+        this.scope.initType(stmt.binding.value, type);
+        this.scope.initStructConstructor(stmt.binding.value, type);
+        const typeParams = this.paramListToMap(paramList);
+
+        const fields = stmt.fields.map((field) => {
+          return this.scope.getType(field, typeParams);
+        });
+
+        this.obj.initTupleStruct(type, fields);
+        return [];
+      }
+
       case "enum":
       case "trait":
       case "impl":

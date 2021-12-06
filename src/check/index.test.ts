@@ -243,3 +243,14 @@ it("provides context in structs", () => {
   `;
   expect(check(code)).toBeTruthy();
 });
+
+it("rejects incomplete tuple destructuring", () => {
+  const code = `
+    struct Point (Int, Int)
+
+    let (x) = Point(10,20)
+
+    print(x)
+  `;
+  expect(() => check(code)).toThrow();
+});

@@ -135,8 +135,23 @@ export class Scope implements IScope {
         });
         return { root, rest };
       }
-      case "tuple":
-        throw new Error("todo");
+      case "tuple": {
+        const root = Symbol("root");
+        const rootExpr: CheckedExpr = { tag: "local", value: root, type };
+        const matchFields = this.obj.getTupleItems(rootExpr);
+        if (matchFields.length !== binding.fields.length) {
+          throw new Error("tuple length mismatch");
+        }
+        const rest = binding.fields.flatMap((binding, i) => {
+          const field = matchFields[i];
+          const res = this.initValue(binding, field.type);
+          return [
+            { tag: "let" as const, binding: res.root, expr: field },
+            ...res.rest,
+          ];
+        });
+        return { root, rest };
+      }
       // istanbul ignore next
       default:
         noMatch(binding);
