@@ -1,3 +1,4 @@
+import { StrictMap } from "../strict-map";
 import {
   Binding,
   Expr,
@@ -115,7 +116,7 @@ export interface Scope {
   ): { root: symbol; rest: Array<{ name: symbol; expr: CheckedExpr }> };
   getValue(str: string): CheckedExpr;
   initType(name: string, value: Type): void;
-  getType(typeExpr: TypeExpr, typeParams?: Map<string, Type>): Type;
+  getType(typeExpr: TypeExpr, typeParams?: StrictMap<string, Type>): Type;
   initStructConstructor(name: string, type: Type): void;
   initEnumConstructors(names: string[], type: Type): void;
   getConstructor(name: string): TypeConstructor;

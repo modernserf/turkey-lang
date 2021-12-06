@@ -22,6 +22,7 @@ import { Scope } from "./scope";
 import { Func } from "./func";
 import { Traits } from "./trait";
 import { Obj } from "./obj";
+import { StrictMap } from "../strict-map";
 
 export class TreeWalker implements ITreeWalker {
   private unaryOps = this.stdlib.unaryOps;
@@ -199,7 +200,21 @@ export class TreeWalker implements ITreeWalker {
         const expr = this.expr(stmt.expr, null);
         return [{ tag: "expr", expr, type: expr.type }];
       }
-      case "type":
+      case "type": {
+        const pairs: [string, Type][] = stmt.binding.typeParameters.map((p) => [
+          p.value,
+          createVar(
+            Symbol(p.value),
+            p.traits.map((t) => this.traits.getTrait(t))
+          ),
+        ]);
+        const params = pairs.map((p) => p[1]);
+        const type = this.scope.getType(stmt.type, new StrictMap(pairs));
+
+        this.scope.initTypeAlias(stmt.binding.value, params, type);
+        return [];
+      }
+
       case "struct":
       case "enum":
       case "trait":
@@ -225,7 +240,7 @@ export class TreeWalker implements ITreeWalker {
           return { name: p.value, type, traits };
         });
         // map of type param name -> type used when checking param & return types
-        const varMap = new Map(
+        const varMap = new StrictMap(
           typeParams.map(({ name, type }) => [name, type])
         );
         // hidden trait impl params, flattened out from type params

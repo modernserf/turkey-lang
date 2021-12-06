@@ -139,7 +139,7 @@ export class Scope implements IScope {
   initArrayType(name: string, value: Type) {
     this.frame.types.init(name, { tag: "array", value });
   }
-  getType(typeExpr: TypeExpr, typeParams?: Map<string, Type>): Type {
+  getType(typeExpr: TypeExpr, typeParams?: StrictMap<string, Type>): Type {
     switch (typeExpr.tag) {
       case "identifier":
         return this.getNamedType(typeExpr.value, typeExpr.typeArgs, typeParams);
@@ -186,14 +186,13 @@ export class Scope implements IScope {
   private getNamedType(
     name: string,
     typeArgs: TypeExpr[],
-    typeParams?: Map<string, Type>
+    typeParams?: StrictMap<string, Type>
   ): Type {
     const args = typeArgs.map((arg) => this.getType(arg, typeParams));
 
     if (typeParams) {
-      const found = typeParams.get(name);
       if (args.length) throw new Error("can't param a param");
-      if (found) return found;
+      if (typeParams.has(name)) return typeParams.get(name);
     }
 
     const record = this.getTypeRecord(name);

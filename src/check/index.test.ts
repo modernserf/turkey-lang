@@ -191,3 +191,28 @@ it("rejects size mismatches in array types", () => {
   `;
   expect(() => check(code)).toThrow();
 });
+
+it("has type aliases", () => {
+  const code = `
+    type Int4 = Array[Int; 4]
+    let xs: Int4 = Array[255,255,255,0]
+
+    type IdFunc<T> = func (T): T
+    let id_int: IdFunc<Int> = |x| x
+    id_int(1)
+  `;
+  expect(check(code)).toBeTruthy();
+});
+
+it("rejects type aliases arity mismatch", () => {
+  const code = `
+    type IdFunc<T> = func (T): T
+    let id_int: IdFunc = |x| x
+  `;
+  expect(() => check(code)).toThrow();
+  const code2 = `
+    type IdFunc<T> = func (T): T
+    let id_int: IdFunc<Int, Int> = |x| x
+  `;
+  expect(() => check(code2)).toThrow();
+});
