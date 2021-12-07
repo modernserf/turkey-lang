@@ -64,13 +64,23 @@ const eqT = createVar(Symbol("T"), [eqTrait]);
 
 const stdlib: Stdlib = {
   types: new Map([
-    ["Void", { type: voidType }],
-    ["Int", { type: intType }],
-    ["Float", { type: floatType }],
-    ["String", { type: stringType }],
-    ["Bool", { type: boolType, constructors: ["True", "False"] }],
-    ["Array", { type: arrayType(anyT, 0), constructors: [] }],
-    ["Vec", { type: vecType(anyT), constructors: [] }],
+    ["Void", { tag: "primitive", type: voidType }],
+    ["Int", { tag: "primitive", type: intType }],
+    ["Float", { tag: "primitive", type: floatType }],
+    ["String", { tag: "primitive", type: stringType }],
+    [
+      "Bool",
+      {
+        tag: "enum",
+        type: boolType,
+        constructors: new Map([
+          ["False", { tag: "tuple", index: 0, fields: [] }],
+          ["True", { tag: "tuple", index: 1, fields: [] }],
+        ]),
+      },
+    ],
+    ["Array", { tag: "array", type: arrayType(anyT, 0) }],
+    ["Vec", { tag: "array", type: vecType(anyT) }],
   ]),
   values: new Map([["print", printFunc]]),
   traits: new Map([

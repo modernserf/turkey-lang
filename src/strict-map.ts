@@ -39,4 +39,7 @@ export class StrictMap<K, V> {
   *[Symbol.iterator]() {
     yield* this.map;
   }
+  *keys() {
+    yield* this.map.keys();
+  }
 }

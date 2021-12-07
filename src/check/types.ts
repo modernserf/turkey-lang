@@ -104,7 +104,7 @@ export interface TreeWalker {
 
 export type TypeConstructor =
   | { tag: "struct"; type: Type }
-  | { tag: "enum"; type: Type; tagValue: number };
+  | { tag: "enum"; type: Type; tagName: string; tagValue: number };
 
 export interface Scope {
   break(): CheckedStmt;
@@ -153,7 +153,11 @@ export interface Traits {
 
 export interface Matcher {
   binding: symbol;
-  case(binding: EnumBinding): { index: number; block: CheckedStmt[] };
+  case(
+    scope: Scope,
+    binding: EnumBinding
+  ): { index: number; block: CheckedStmt[] };
+  done(): void;
 }
 
 export interface Obj {
@@ -182,8 +186,25 @@ export interface Obj {
   assign(target: Expr, index: number, expr: Expr): CheckedStmt;
 }
 
+type StdEnum =
+  | {
+      tag: "record";
+      index: number;
+      fields: Array<{ name: string; type: Type }>;
+    }
+  | { tag: "tuple"; index: number; fields: Type[] };
+type StdStruct =
+  | { tag: "record"; fields: Array<{ name: string; type: Type }> }
+  | { tag: "tuple"; fields: Type[] };
+
+type StdType =
+  | { tag: "primitive"; type: Type }
+  | { tag: "array"; type: Type }
+  | { tag: "enum"; type: Type; constructors: Map<string, StdEnum> }
+  | { tag: "struct"; type: Type; constructor: StdStruct };
+
 export type Stdlib = {
-  types: Map<string, { type: Type; constructors?: string[] }>;
+  types: Map<string, StdType>;
   values: Map<string, CheckedExpr>;
   traits: Map<string, Trait>;
   impls: Map<Type["name"], Map<Trait["name"], IRExpr>>;

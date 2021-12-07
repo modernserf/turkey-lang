@@ -23,7 +23,7 @@ import {
 import { Scope } from "./scope";
 import { Func } from "./func";
 import { Traits } from "./trait";
-import { Obj } from "./obj";
+import { EnumCaseRecord, Obj } from "./obj";
 import { StrictMap } from "../strict-map";
 
 export class TreeWalker implements ITreeWalker {
@@ -31,7 +31,7 @@ export class TreeWalker implements ITreeWalker {
   private binaryOps = this.stdlib.binaryOps;
   private traits = new Traits(this.stdlib);
   private checker = new CheckerProvider(this.traits);
-  private obj = new Obj(this, this.checker);
+  private obj = new Obj(this.stdlib, this, this.checker);
   private scope = new Scope(this.stdlib, this.checker, this.obj);
   private func = new Func(this, this.scope, this.traits, this.checker);
   constructor(private stdlib: Stdlib) {}
@@ -152,12 +152,17 @@ export class TreeWalker implements ITreeWalker {
 
         const matchCases = expr.cases.map((matchCase) => {
           return this.scope.blockScope(() => {
-            const { index, block: header } = matcher.case(matchCase.binding);
+            const { index, block: header } = matcher.case(
+              this.scope,
+              matchCase.binding
+            );
             const { block, type } = this.block(matchCase.block);
             resultChecker.unify(resultType, type);
             return { index, block: [...header, ...block] };
           });
         });
+
+        matcher.done();
 
         const type = resultChecker.resolve(resultType);
         return {
@@ -241,8 +246,40 @@ export class TreeWalker implements ITreeWalker {
         this.obj.initTupleStruct(type, fields);
         return [];
       }
+      case "enum": {
+        const paramList = this.typeParams(stmt.binding.typeParameters);
+        const type = createType(
+          Symbol(stmt.binding.value),
+          paramList.map((p) => p.type)
+        );
+        this.scope.initType(stmt.binding.value, type);
+        this.scope.initEnumConstructors(
+          stmt.cases.map((e) => e.tagName),
+          type
+        );
 
-      case "enum":
+        const typeParams = this.paramListToMap(paramList);
+        const enumCases = new StrictMap<string, EnumCaseRecord>(
+          stmt.cases.map((e, index) => {
+            if (e.tag === "record") {
+              const fields = new StrictMap(
+                e.fields.map((field, index) => {
+                  const type = this.scope.getType(field.type, typeParams);
+                  return [field.fieldName, { type, index }];
+                })
+              );
+              return [e.tagName, { tag: "record", index, fields }];
+            } else {
+              const fields = e.fields.map((field) => {
+                return this.scope.getType(field, typeParams);
+              });
+              return [e.tagName, { tag: "tuple", index, fields }];
+            }
+          })
+        );
+        this.obj.initEnum(type, enumCases);
+        return [];
+      }
       case "trait":
       case "impl":
         throw new Error("todo");

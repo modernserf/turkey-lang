@@ -368,21 +368,21 @@ it("has type aliases", () => {
   expect(run(code)).toEqual([2]);
 });
 
-// it("has pattern matching", () => {
-//   const code = `
-//     enum V { V1, V2 }
+it("has pattern matching", () => {
+  const code = `
+    enum V { V1, V2 }
 
-//     match (V1) {
-//       V1 => {
-//         print(1)
-//       },
-//       V2 => {
-//         print(2)
-//       }
-//     }
-//   `;
-//   expect(run(code)).toEqual(["1"]);
-// });
+    match (V1) {
+      V1 => {
+        print(1)
+      },
+      V2 => {
+        print(2)
+      }
+    }
+  `;
+  expect(run(code)).toEqual([1]);
+});
 
 it("has structs", () => {
   const code = `
@@ -504,78 +504,78 @@ it("destructures tuple structs", () => {
   expect(run(code)).toEqual([30]);
 });
 
-// it("has tagged variants", () => {
-//   const code = `
-//     enum IntOption {
-//       None,
-//       Some(Int),
-//     }
+it("has tagged variants", () => {
+  const code = `
+    enum IntOption {
+      None,
+      Some(Int),
+    }
 
-//     func print_int_option(val: IntOption): Void {
-//       match (val) {
-//         None => {
-//           print("None")
-//         },
-//         Some(_) => {
-//           print("Some")
-//         },
-//       }
-//     }
+    func print_int_option(val: IntOption): Void {
+      match (val) {
+        None => {
+          print("None")
+        },
+        Some(_) => {
+          print("Some")
+        },
+      }
+    }
 
-//     print_int_option(None)
-//     print_int_option(Some(5))
-//   `;
-//   expect(run(code)).toEqual(["None", "Some"]);
-// });
+    print_int_option(None)
+    print_int_option(Some(5))
+  `;
+  expect(run(code)).toEqual(["None", "Some"]);
+});
 
-// it("destructures tagged variant values", () => {
-//   const code = `
-//     enum IntOption {
-//       None,
-//       Some(Int),
-//     }
+it("destructures tagged variant values", () => {
+  const code = `
+    enum IntOption {
+      None,
+      Some(Int),
+    }
 
-//     func print_int_option(val: IntOption): Void {
-//       match (val) {
-//         None => {
-//           print("None")
-//         },
-//         Some(x) => {
-//           print(x)
-//         },
-//       }
-//     }
+    func print_int_option(val: IntOption): Void {
+      match (val) {
+        None => {
+          print("None")
+        },
+        Some(x) => {
+          print(x)
+        },
+      }
+    }
 
-//     print_int_option(None)
-//     print_int_option(Some(5))
-//   `;
-//   expect(run(code)).toEqual(["None", "5"]);
-// });
+    print_int_option(None)
+    print_int_option(Some(5))
+  `;
+  expect(run(code)).toEqual(["None", 5]);
+});
 
-// it("has recursive types", () => {
-//   const code = `
-//     enum IntList {
-//       Nil,
-//       Cons(Int, IntList),
-//     }
+it("has recursive types", () => {
+  const code = `
+    enum IntList {
+      Nil,
+      Cons(Int, IntList),
+    }
 
-//     func foldl (
-//       list: IntList,
-//       acc: Int,
-//       fn: func (Int, Int): Int
-//     ): Int {
-//       match (list) {
-//         Cons(h, t) => foldl(t, fn(acc, h), fn),
-//         Nil => acc,
-//       }
-//     }
+    func foldl (
+      list: IntList,
+      acc: Int,
+      fn: func (Int, Int): Int
+    ): Int {
+      match (list) {
+        Cons(h, t) => foldl(t, fn(acc, h), fn),
+        Nil => acc,
+      }
+    }
 
-//     let list = Cons(1, Cons(2, Cons(3, Nil)))
-//     let sum  = foldl(list, 0, |acc, value| { acc + value })
-//     print(sum)
-//   `;
-//   expect(run(code)).toEqual(["6"]);
-// });
+    let list = Cons(1, Cons(2, Cons(3, Nil)))
+    let sum  = foldl(list, 0, |acc, value| { acc + value })
+    print(sum)
+  `;
+  expect(run(code)).toEqual([6]);
+});
 
 // it("has generic function params", () => {
 //   const code = `
@@ -698,29 +698,29 @@ it("destructures tuple structs", () => {
 //     print(length(list1))
 //     print(length(list2))
 //   `;
-//   expect(run(code)).toEqual(["3", "2"]);
+//   expect(run(code)).toEqual([3, 2]);
 // });
 
-// it("unifies types across if branches", () => {
-//   const code = `
-//     enum Either<L, R> {
-//       Left(L),
-//       Right(R),
-//     }
+it("unifies types across if branches", () => {
+  const code = `
+    enum Either<L, R> {
+      Left(L),
+      Right(R),
+    }
 
-//     let res = if (True) {
-//       Left(1)
-//     } else {
-//       Right("foo")
-//     }
+    let res = if (True) {
+      Left(1)
+    } else {
+      Right("foo")
+    }
 
-//     match (res) {
-//       Left(x) => print("left"),
-//       Right(x) => print("right"),
-//     }
-//   `;
-//   expect(run(code)).toEqual(["left"]);
-// });
+    match (res) {
+      Left(x) => print("left"),
+      Right(x) => print("right"),
+    }
+  `;
+  expect(run(code)).toEqual(["left"]);
+});
 
 // it("has method syntax", () => {
 //   const code = `

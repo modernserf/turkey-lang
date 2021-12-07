@@ -78,19 +78,26 @@ export class Scope implements IScope {
     private checker: CheckerProvider,
     private obj: Obj
   ) {
-    for (const [name, { type, constructors }] of stdlib.types) {
-      // FIXME maybe
-      if (name === "Array") {
-        this.initArrayType(name, type);
-      } else {
-        this.initType(name, type);
-      }
-      if (constructors) {
-        if (constructors.length) {
-          this.initEnumConstructors(constructors, type);
-        } else {
-          this.initStructConstructor(name, type);
-        }
+    for (const [name, stdType] of stdlib.types) {
+      switch (stdType.tag) {
+        case "primitive":
+          this.initType(name, stdType.type);
+          break;
+        case "array":
+          this.initArrayType(name, stdType.type);
+          this.initStructConstructor(name, stdType.type);
+          break;
+        case "enum":
+          this.initType(name, stdType.type);
+          this.initEnumConstructors(
+            Array.from(stdType.constructors.keys()),
+            stdType.type
+          );
+          break;
+        case "struct":
+          this.initType(name, stdType.type);
+          this.initStructConstructor(name, stdType.type);
+          break;
       }
     }
   }
@@ -258,7 +265,12 @@ export class Scope implements IScope {
   }
   initEnumConstructors(names: string[], type: Type) {
     names.forEach((name, tagValue) => {
-      this.frame.typeConstructors.init(name, { tag: "enum", type, tagValue });
+      this.frame.typeConstructors.init(name, {
+        tag: "enum",
+        type,
+        tagName: name,
+        tagValue,
+      });
     });
   }
   getConstructor(name: string): TypeConstructor {
