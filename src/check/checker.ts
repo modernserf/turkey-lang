@@ -41,11 +41,11 @@ export class Checker {
     if (left.tag === "abstract") {
       if (right.tag === "abstract") {
         const type = createVar(
-          Symbol(`${left.name.description} + ${right.name.description}`),
+          left.name,
           this.unionTraits(left.traits, right.traits)
         );
         return {
-          type,
+          type: left,
           leftResults: leftResults.set(left.name, type),
           rightResults: rightResults.set(right.name, type),
         };

@@ -577,129 +577,135 @@ it("has recursive types", () => {
   expect(run(code)).toEqual([6]);
 });
 
-// it("has generic function params", () => {
-//   const code = `
-//     func id<T> (value: T): T {
-//       value
-//     }
+it("has generic function params", () => {
+  const code = `
+    func id<T> (value: T): T {
+      value
+    }
 
-//     print(id(1))
-//     print(id("hello"))
-//   `;
-//   expect(run(code)).toEqual(["1", "hello"]);
-// });
+    print(id(1))
+    print(id("hello"))
+  `;
+  expect(run(code)).toEqual([1, "hello"]);
+});
 
-// it("has generic struct params", () => {
-//   const code = `
-//     struct Cell <T> {
-//       current: T
-//     }
+it("has generic struct params", () => {
+  const code = `
+    struct Cell <T> {
+      current: T
+    }
 
-//     let x = Cell { current: 1 }
-//     let y: Cell<String> = Cell { current: "hello" }
+    let x = Cell { current: 1 }
+    let y: Cell<String> = Cell { current: "hello" }
 
-//     print(x:current)
-//     print(y:current)
-//   `;
-//   expect(run(code)).toEqual(["1", "hello"]);
-// });
+    print(x:current)
+    print(y:current)
+  `;
+  expect(run(code)).toEqual([1, "hello"]);
+});
 
-// it.skip("has parameterized type aliases", () => {
-//   const code = `
-//     struct Cell <T> {
-//       current: T
-//     }
+it("has parameterized type aliases", () => {
+  const code = `
+    struct Cell <T> {
+      current: T
+    }
 
-//     type CellAlias<T> = Cell<T>
+    type CellAlias<T> = Cell<T>
 
-//     let x: CellAlias<Int> = Cell { current: 1 }
+    let x: CellAlias<Int> = Cell { current: 1 }
 
-//     print(x:current)
-//   `;
-//   expect(run(code)).toEqual(["1"]);
-// });
+    print(x:current)
+  `;
+  expect(run(code)).toEqual([1]);
+});
 
-// it("destructures generic struct params", () => {
-//   const code = `
-//     struct Cell <T> {
-//       current: T
-//     }
+it("destructures generic struct params", () => {
+  const code = `
+    struct Cell <T> {
+      current: T
+    }
 
-//     let { current } = Cell { current: "hello" }
-//     print(current)
-//   `;
-//   expect(run(code)).toEqual(["hello"]);
-// });
+    let { current } = Cell { current: "hello" }
+    print(current)
+  `;
+  expect(run(code)).toEqual(["hello"]);
+});
 
-// it("accepts concrete parameterized types in function bindings", () => {
-//   const code = `
-//     struct Cell<Value> {
-//       current: Value
-//     }
+it("accepts concrete parameterized types in function bindings", () => {
+  const code = `
+    struct Cell<Value> {
+      current: Value
+    }
 
-//     func current (cell: Cell<Int>): Int {
-//       cell:current
-//     }
+    func current (cell: Cell<Int>): Int {
+      cell:current
+    }
 
-//     let x = current(Cell { current: 1 })
-//     print(x)
-//   `;
-//   expect(run(code)).toEqual(["1"]);
-// });
+    let x = current(Cell { current: 1 })
+    print(x)
+  `;
+  expect(run(code)).toEqual([1]);
+});
 
-// it("propagates generic args", () => {
-//   const code = `
-//     struct Cell<Value> {
-//       current: Value
-//     }
+it("propagates generic args", () => {
+  const code = `
+    struct Cell<Value> {
+      current: Value
+    }
 
-//     func current<U> (cell: Cell<U>): Cell<U> {
-//       cell
-//     }
+    func current<U> (cell: Cell<U>): Cell<U> {
+      cell
+    }
 
-//     let x = current(Cell { current: 1 })
-//     print(x:current)
-//   `;
-//   expect(run(code)).toEqual(["1"]);
-// });
+    let x = current(Cell { current: 1 })
+    print(x:current)
+  `;
+  try {
+    run(code);
+  } catch (e) {
+    console.log(e);
+  }
 
-// it("makes generic args concrete at call time", () => {
-//   const code = `
-//     struct Cell<Value> {
-//       current: Value
-//     }
+  expect(run(code)).toEqual([1]);
+});
 
-//     func current<U> (cell: Cell<U>): U {
-//       cell:current
-//     }
+it("makes generic args concrete at call time", () => {
+  const code = `
+    struct Cell<Value> {
+      current: Value
+    }
 
-//     let x = current(Cell { current: 1 })
-//     print(x)
-//   `;
-//   expect(run(code)).toEqual(["1"]);
-// });
+    func current<U> (cell: Cell<U>): U {
+      cell:current
+    }
 
-// it("has generic enum params", () => {
-//   const code = `
-//     enum List<T> {
-//       Nil,
-//       Cons(T, List<T>),
-//     }
+    let x = current(Cell { current: 1 })
+    print(x)
+  `;
+  expect(run(code)).toEqual([1]);
+});
 
-//     func length<T>(list: List<T>): Int {
-//       match (list) {
-//         Nil => 0,
-//         Cons(h, t) => 1 + length(t),
-//       }
-//     }
+it("has generic enum params", () => {
+  const code = `
+    enum List<T> {
+      Nil,
+      Cons(T, List<T>),
+    }
 
-//     let list1 = Cons(1, Cons(2, Cons(3, Nil)))
-//     let list2 = Cons("foo", Cons("bar", Nil))
-//     print(length(list1))
-//     print(length(list2))
-//   `;
-//   expect(run(code)).toEqual([3, 2]);
-// });
+    func length<T>(list: List<T>): Int {
+      match (list) {
+        Nil => 0,
+        Cons(h, t) => 1 + length(t),
+      }
+    }
+
+    let list1 = Cons(1, Cons(2, Cons(3, Nil)))
+    let list2 = Cons("foo", Cons("bar", Nil))
+    print(length(list1))
+    print(length(list2))
+  `;
+  expect(run(code)).toEqual([3, 2]);
+});
 
 it("unifies types across if branches", () => {
   const code = `
@@ -722,68 +728,60 @@ it("unifies types across if branches", () => {
   expect(run(code)).toEqual(["left"]);
 });
 
-// it("has method syntax", () => {
-//   const code = `
-//     enum List<T> {
-//       Nil,
-//       Cons(T, List<T>),
-//     }
+it("has method syntax", () => {
+  const code = `
+    enum List<T> {
+      Nil,
+      Cons(T, List<T>),
+    }
 
-//     func foldl<Item, Acc> (
-//       list: List<Item>,
-//       acc: Acc,
-//       fn: func (Acc, Item): Acc
-//     ): Acc {
-//       match (list) {
-//         Cons(h, t) => t.foldl(fn(acc, h), fn),
-//         Nil => acc,
-//       }
-//     }
+    func foldl<Item, Acc> (
+      list: List<Item>,
+      acc: Acc,
+      fn: func (Acc, Item): Acc
+    ): Acc {
+      match (list) {
+        Cons(h, t) => t.foldl(fn(acc, h), fn),
+        Nil => acc,
+      }
+    }
 
-//     func add (acc: Int, value: Int): Int {
-//       acc + value
-//     }
+    func add (acc: Int, value: Int): Int {
+      acc + value
+    }
 
-//     let list: List<Int> = Cons(1, Cons(2, Cons(3, Nil)))
-//     let sum = list.foldl(0, add)
-//     print(sum)
-//   `;
-//   expect(run(code)).toEqual(["6"]);
-// });
+    let list: List<Int> = Cons(1, Cons(2, Cons(3, Nil)))
+    let sum = list.foldl(0, add)
+    print(sum)
+  `;
+  expect(run(code)).toEqual([6]);
+});
 
-// it("has methods without arguments", () => {
-//   const code = `
-//     "foo".print
-//     "bar".print()
-//   `;
-//   expect(run(code)).toEqual(["foo", "bar"]);
-// });
+it("has methods without arguments", () => {
+  const code = `
+    "foo".print
+    "bar".print()
+  `;
+  expect(run(code)).toEqual(["foo", "bar"]);
+});
 
-// it("has tuple literals", () => {
-//   const code = `
-//     let (x, y) = (1, "foo")
-//     print(x)
-//     print(y)
-//   `;
-//   expect(run(code)).toEqual(["1", "foo"]);
-// });
+it("has tuple literals", () => {
+  const code = `
+    let (x, y) = (1, "foo")
+    print(x)
+    print(y)
+  `;
+  expect(run(code)).toEqual([1, "foo"]);
+});
 
-// it("has tuple type literals", () => {
-//   const code = `
-//     let pair: (Int, String) = (1, "foo")
-//     print(pair:0)
-//     print(pair:1)
-//   `;
-//   expect(run(code)).toEqual(["1", "foo"]);
-// });
-
-// it("rejects destructuring tuples with the wrong number of args", () => {
-//   const code = `
-//     let (x) = (1, "foo")
-//     print(x)
-//   `;
-//   expect(() => run(code)).toThrow();
-// });
+it("has tuple type literals", () => {
+  const code = `
+    let pair: (Int, String) = (1, "foo")
+    print(pair:0)
+    print(pair:1)
+  `;
+  expect(run(code)).toEqual([1, "foo"]);
+});
 
 it("does not bind identifiers starting with underscore", () => {
   const code = `

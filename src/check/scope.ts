@@ -228,12 +228,10 @@ export class Scope implements IScope {
     typeArgs: TypeExpr[],
     typeParams?: StrictMap<string, Type>
   ): Type {
-    const args = typeArgs.map((arg) => this.getType(arg, typeParams));
+    // TODO: typeArgs?
+    if (typeParams?.has(name)) return typeParams.get(name);
 
-    if (typeParams) {
-      if (args.length) throw new Error("can't param a param");
-      if (typeParams.has(name)) return typeParams.get(name);
-    }
+    const args = typeArgs.map((arg) => this.getType(arg, typeParams));
 
     const record = this.getTypeRecord(name);
     switch (record.tag) {
